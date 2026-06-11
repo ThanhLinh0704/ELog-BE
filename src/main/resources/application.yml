@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: elog-backend
+
+  # ── Active profile (override per environment) ──
+  profiles:
+    active: dev
+
+  # ── JPA ──
+  jpa:
+    hibernate:
+      ddl-auto: validate          # Flyway manages schema — NEVER change to create/update
+    show-sql: false               # Enable in dev profile only
+    properties:
+      hibernate:
+        format_sql: false
+
+  # ── Flyway ──
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+# ── Server ──
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# ── Swagger / SpringDoc ──
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui/index.html
+    enabled: true
+
+# ── App-level config ──
+elog:
+  jwt:
+    secret: ${JWT_SECRET:elog-dev-secret-key-change-in-production-min-32-chars}
+    expiration-ms: 86400000       # 24 hours
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
