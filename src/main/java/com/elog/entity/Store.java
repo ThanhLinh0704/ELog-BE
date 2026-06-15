@@ -35,10 +35,10 @@ public class Store {
     @Column(name = "contact_phone", length = 15)
     private String contactPhone;
 
-    @Column(precision = 10, scale = 7)
+    @Column(columnDefinition = "DECIMAL(10,7)")
     private Double latitude;
 
-    @Column(precision = 10, scale = 7)
+    @Column(columnDefinition = "DECIMAL(10,7)")
     private Double longitude;
 
     @Column(name = "is_active", nullable = false)
