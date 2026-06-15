@@ -39,7 +39,6 @@ For resource APIs, success responses are wrapped in a standard envelope:
   "message": "Optional info message"
 }
 ```
-*Note: Authentication APIs (`/api/auth/*`) do not use the wrapper envelope. They return flat structures directly (e.g., TokenResponse, TokenRefreshResponse, or logout message).*
 
 ### Paginated Success
 ```json
