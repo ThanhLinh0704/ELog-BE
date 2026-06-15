@@ -48,7 +48,7 @@
   - JWT secret from env var
 - [ ] Add `GlobalExceptionHandler` (skeleton — catches Exception, returns error envelope)
 - [ ] Add `SwaggerConfig` → Swagger UI accessible at `/swagger-ui/index.html`
-- [ ] `GET /api/v1/health` → `{ "status": "UP" }` (no auth required)
+- [ ] `GET /api/health` → `{ "status": "UP" }` (no auth required)
 - [ ] Verify: `mvn spring-boot:run` starts without errors
 
 ---
@@ -120,7 +120,7 @@
 
 - [ ] `mvn spring-boot:run` → backend starts, Flyway migration clean
 - [ ] *[Moved to ELog-FE]* `npm run dev` → frontend starts, routing works, no console errors
-- [ ] `GET /api/v1/health` returns `{ "status": "UP" }` with HTTP 200
+- [ ] `GET /api/health` returns `{ "status": "UP" }` with HTTP 200
 - [ ] Flyway baseline migration script committed (`V1__init_schema.sql`)
 - [ ] GitHub Actions CI pipeline passes on `develop` (Backend build & tests)
 - [ ] PR template in place (`.github/PULL_REQUEST_TEMPLATE.md`)

@@ -103,7 +103,7 @@ src/
 ### Axios Base Config
 ```ts
 // src/api/axiosInstance.ts
-const api = axios.create({ baseURL: '/api/v1' });
+const api = axios.create({ baseURL: '/api' });
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -127,7 +127,7 @@ api.interceptors.request.use(config => {
 ## Authentication — JWT
 
 ```
-POST /api/v1/auth/login  → { token, expiresIn, user: { id, role } }
+POST /api/auth/login  → { accessToken, refreshToken, tokenType, expiresIn, userId, username, roles }
 
 Header on subsequent requests:
 Authorization: Bearer <token>

@@ -19,19 +19,24 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserDetailsServiceImpl implements UserDetailsService {
 
-    private final UserRepository userRepository;
+        private final UserRepository userRepository;
 
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsernameAndIsActiveTrue(username)
-                .orElseThrow(() -> new UsernameNotFoundException(
-                        "User not found or inactive: " + username));
+        @Override
+        public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+                User user = userRepository.findByUsernameAndIsActiveTrue(username)
+                                .orElseThrow(() -> new UsernameNotFoundException(
+                                                "User not found or inactive: " + username));
 
-        return org.springframework.security.core.userdetails.User
-                .withUsername(user.getUsername())
-                .password(user.getPasswordHash())
-                .authorities(List.of(new SimpleGrantedAuthority(
-                        "ROLE_" + user.getRole().getName())))
-                .build();
-    }
+                // Duyệt qua tập hợp roles và map thành danh sách GrantedAuthority
+                List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
+                                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
+                                .toList();
+
+                return org.springframework.security.core.userdetails.User
+                                .withUsername(user.getUsername())
+                                .password(user.getPasswordHash())
+                                .authorities(authorities)
+                                .build();
+        }
+
 }

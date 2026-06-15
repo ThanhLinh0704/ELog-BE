@@ -1,5 +1,6 @@
 package com.elog.security;
 
+import com.elog.entity.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -9,10 +10,12 @@ import org.springframework.stereotype.Component;
 
 import java.security.Key;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * JWT utility — generates, validates and parses JWT tokens.
- * Secret loaded from application.yml → elog.jwt.secret (env var in prod).
  */
 @Slf4j
 @Component
@@ -21,14 +24,22 @@ public class JwtUtils {
     @Value("${elog.jwt.secret}")
     private String jwtSecret;
 
-    @Value("${elog.jwt.expiration-ms}")
+    // Lấy config thời gian hết hạn (ví dụ: 900000 ms = 15 phút)
+    @Value("${elog.jwt.expiration-ms:900000}")
     private long jwtExpirationMs;
 
-    // ── Token generation ──────────────────────────────────────────────────────
+    // ── Generate Access Token với Custom Claims ─────────────────────────────────
+    public String generateAccessToken(User user) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", user.getId());
+        claims.put("username", user.getUsername());
+        claims.put("roles", user.getRoles().stream()
+                .map(role -> role.getName())
+                .collect(Collectors.toList()));
 
-    public String generateToken(String username) {
         return Jwts.builder()
-                .setSubject(username)
+                .setClaims(claims)
+                .setSubject(user.getUsername())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(getSignKey(), SignatureAlgorithm.HS256)
@@ -36,7 +47,6 @@ public class JwtUtils {
     }
 
     // ── Token validation ──────────────────────────────────────────────────────
-
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder().setSigningKey(getSignKey()).build().parseClaimsJws(token);
@@ -45,6 +55,7 @@ public class JwtUtils {
             log.warn("Invalid JWT token: {}", e.getMessage());
         } catch (ExpiredJwtException e) {
             log.warn("JWT token expired: {}", e.getMessage());
+            throw e; // Ném ra để filter/controller xử lý trả về mã lỗi riêng biệt
         } catch (UnsupportedJwtException e) {
             log.warn("JWT token unsupported: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
@@ -53,8 +64,7 @@ public class JwtUtils {
         return false;
     }
 
-    // ── Claims extraction ─────────────────────────────────────────────────────
-
+    // ── Trích xuất Username từ Token ──────────────────────────────────────────
     public String getUsernameFromToken(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSignKey())
@@ -65,7 +75,6 @@ public class JwtUtils {
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────
-
     private Key getSignKey() {
         byte[] keyBytes = Decoders.BASE64.decode(
                 java.util.Base64.getEncoder()

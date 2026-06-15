@@ -22,10 +22,6 @@ INSERT INTO roles (id, name) VALUES
 -- 2. Default Admin User
 -- username: admin | password: Admin@2025 (BCrypt, cost 12)
 -- ────────────────────────────────────────────────────────────
-INSERT INTO users (id, username, password_hash, full_name, role_id, is_active) VALUES
-(1, 'admin',
- '$2a$12$4tQRRKOvZ1f5.2R5C8zTtuIXIHBSb4yjJj7r2VtQKEZEG6GCCLFqm',
- 'System Administrator', 1, TRUE);
 
 -- ────────────────────────────────────────────────────────────
 -- 3. Dev Users (Sprint 1 testing — 1 per role)
@@ -33,19 +29,19 @@ INSERT INTO users (id, username, password_hash, full_name, role_id, is_active) V
 -- ────────────────────────────────────────────────────────────
 INSERT INTO users (id, username, password_hash, full_name, role_id, is_active) VALUES
 (2, 'dispatcher01',
- '$2a$12$UGkFh4FVYnmX9FvjLkF9FO8yC.Tr8x2bS2D0V8q7kDQv6aFcvp./K',
+ '$2a$12$dfT1VXhfjzIm5GRAjwgYg.5O8XQ.mCMmneaFuXSOLrpXGRRNApJxG',
  'Nguyen Van Dispatcher', 2, TRUE),
 
 (3, 'warehouse01',
- '$2a$12$UGkFh4FVYnmX9FvjLkF9FO8yC.Tr8x2bS2D0V8q7kDQv6aFcvp./K',
+ '$2a$12$dfT1VXhfjzIm5GRAjwgYg.5O8XQ.mCMmneaFuXSOLrpXGRRNApJxG',
  'Tran Thi Warehouse', 3, TRUE),
 
 (4, 'driver01',
- '$2a$12$UGkFh4FVYnmX9FvjLkF9FO8yC.Tr8x2bS2D0V8q7kDQv6aFcvp./K',
+ '$2a$12$dfT1VXhfjzIm5GRAjwgYg.5O8XQ.mCMmneaFuXSOLrpXGRRNApJxG',
  'Le Van Driver', 4, TRUE),
 
 (5, 'manager01',
- '$2a$12$UGkFh4FVYnmX9FvjLkF9FO8yC.Tr8x2bS2D0V8q7kDQv6aFcvp./K',
+ '$2a$12$dfT1VXhfjzIm5GRAjwgYg.5O8XQ.mCMmneaFuXSOLrpXGRRNApJxG',
  'Pham Thi Manager', 5, TRUE);
 
 -- ────────────────────────────────────────────────────────────

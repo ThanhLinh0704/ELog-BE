@@ -7,10 +7,10 @@
 ## Base URL
 
 ```
-/api/v1/{resource}
+/api/{resource}
 ```
 
-All paths are relative to the server root. Frontend Axios is pre-configured with `baseURL: '/api/v1'`.
+All paths are relative to the server root. Frontend Axios is pre-configured with `baseURL: '/api'`.
 
 ---
 
@@ -20,9 +20,9 @@ All paths are relative to the server root. Frontend Axios is pre-configured with
 Authorization: Bearer <jwt-token>
 ```
 
-- Token obtained from `POST /api/v1/auth/login`
+- Token obtained from `POST /api/auth/login`
 - Token expiry: 24 hours (`elog.jwt.expiration-ms`)
-- Refresh: not implemented in INC-1 (re-login required)
+- Refresh: implemented with `/api/auth/refresh`
 - Missing/invalid token → `401 Unauthorized`
 - Insufficient role → `403 Forbidden`
 
@@ -31,6 +31,7 @@ Authorization: Bearer <jwt-token>
 ## Standard Response Envelope
 
 ### Success (2xx)
+For resource APIs, success responses are wrapped in a standard envelope:
 ```json
 {
   "success": true,
@@ -38,6 +39,7 @@ Authorization: Bearer <jwt-token>
   "message": "Optional info message"
 }
 ```
+*Note: Authentication APIs (`/api/auth/*`) do not use the wrapper envelope. They return flat structures directly (e.g., TokenResponse, TokenRefreshResponse, or logout message).*
 
 ### Paginated Success
 ```json
@@ -125,7 +127,7 @@ Query params on all list endpoints:
 ## File Upload Convention (Excel Import)
 
 ```http
-POST /api/v1/orders/import
+POST /api/orders/import
 Content-Type: multipart/form-data
 
 Form field: file (Excel .xlsx only)
