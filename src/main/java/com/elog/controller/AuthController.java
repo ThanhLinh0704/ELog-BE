@@ -27,7 +27,6 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(summary = "Authenticate user and return tokens")
     @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully authenticated")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Invalid credentials")
     public ResponseEntity<ApiResponse<TokenResponse>> login(@Valid @RequestBody LoginRequest request) {
         TokenResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success(response));
