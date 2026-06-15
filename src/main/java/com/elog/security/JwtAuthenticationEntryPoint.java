@@ -22,12 +22,14 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 
-        final Map<String, Object> body = new HashMap<>();
-        body.put("status", HttpServletResponse.SC_UNAUTHORIZED);
-        body.put("error", "Unauthorized");
-        body.put("message", authException.getMessage() != null ? authException.getMessage()
+        final Map<String, Object> errorDetails = new HashMap<>();
+        errorDetails.put("code", "AUTHENTICATION_FAILED");
+        errorDetails.put("message", authException.getMessage() != null ? authException.getMessage()
                 : "Full authentication is required to access this resource");
-        body.put("path", request.getServletPath());
+
+        final Map<String, Object> body = new HashMap<>();
+        body.put("success", false);
+        body.put("error", errorDetails);
 
         final ObjectMapper mapper = new ObjectMapper();
         mapper.writeValue(response.getOutputStream(), body);
