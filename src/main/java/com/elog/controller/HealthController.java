@@ -13,10 +13,10 @@ import java.util.Map;
  * Health check endpoint — no authentication required.
  * Used by CI pipeline and load balancer health checks.
  *
- * GET /api/v1/health → 200 { "status": "UP", "version": "v1" }
+ * GET /api/health → 200 { "status": "UP", "version": "v1" }
  */
 @RestController
-@RequestMapping("/api/v1/health")
+@RequestMapping("/api/health")
 @Tag(name = "Health", description = "Health check — no auth required")
 public class HealthController {
 

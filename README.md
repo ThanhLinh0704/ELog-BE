@@ -32,7 +32,7 @@ mvn spring-boot:run
 *Note: Frontend is hosted in a separate repository (ELog-FE).*
 
 Swagger UI: http://localhost:8080/swagger-ui/index.html  
-Health check: `GET http://localhost:8080/api/v1/health`
+Health check: `GET http://localhost:8080/api/health`
 
 ---
 

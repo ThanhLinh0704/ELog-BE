@@ -17,17 +17,16 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/users") // Theo chính xác file Task
+@RequestMapping("/api/users")
 @RequiredArgsConstructor
 @Tag(name = "Users", description = "User management APIs (Admin only)")
-// @PreAuthorize("hasRole('SYSTEM_ADMIN')") // Cập nhật đúng tên vai trò là
-// SYSTEM_ADMIN
 public class UserController {
 
     private final UserService userService;
 
     @PostMapping
     @Operation(summary = "Create a new user")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> createUser(@Valid @RequestBody UserCreateRequest request) {
         UserResponse response = userService.createUser(request);
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -36,6 +35,7 @@ public class UserController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get user details by ID")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> getUserById(@PathVariable Long id) {
         UserResponse response = userService.getUserById(id);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -43,6 +43,7 @@ public class UserController {
 
     @GetMapping
     @Operation(summary = "Get paginated and filtered list of users")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserResponse>>> getAllUsers(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String role,
@@ -54,6 +55,7 @@ public class UserController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update user base information")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> updateUser(
             @PathVariable Long id,
             @Valid @RequestBody UserUpdateRequest request) {
@@ -63,6 +65,7 @@ public class UserController {
 
     @PatchMapping("/{id}/roles")
     @Operation(summary = "Assign/unassign roles to user")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> updateUserRoles(
             @PathVariable Long id,
             @Valid @RequestBody UserRolesUpdateRequest request) {
@@ -73,6 +76,7 @@ public class UserController {
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Lock/unlock a user account")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> updateUserStatus(
             @PathVariable Long id,
             @Valid @RequestBody UserStatusUpdateRequest request) {

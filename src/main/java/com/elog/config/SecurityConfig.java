@@ -1,6 +1,9 @@
 package com.elog.config;
 
+import com.elog.security.CustomAccessDeniedHandler;
 import com.elog.security.JwtAuthFilter;
+import com.elog.security.JwtAuthenticationEntryPoint;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,7 +22,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
  * Spring Security configuration — stateless JWT, RBAC via @PreAuthorize.
- * Public endpoints: /api/v1/auth/**, /api/v1/health, Swagger UI.
+ * Public endpoints: /api/auth/**, /api/health, Swagger UI.
  * All other endpoints require a valid Bearer token.
  */
 @Configuration
@@ -30,12 +33,14 @@ public class SecurityConfig {
 
         private final JwtAuthFilter jwtAuthFilter;
         private final CorsConfigurationSource corsConfigurationSource;
+        private final JwtAuthenticationEntryPoint unauthorizedHandler;
+        private final CustomAccessDeniedHandler accessDeniedHandler;
 
         /** Endpoints that do NOT require authentication. */
         private static final String[] PUBLIC_URLS = {
-                        "/api/v1/auth/**",
-                        "/api/v1/users/**",
-                        "/api/v1/health",
+                        "/api/auth/**",
+                        // "/api/users/**",
+                        "/api/health",
                         "/swagger-ui/**",
                         "/swagger-ui/index.html",
                         "/api-docs/**",
@@ -47,6 +52,9 @@ public class SecurityConfig {
                 http
                                 .csrf(AbstractHttpConfigurer::disable)
                                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
+                                .exceptionHandling(exception -> exception
+                                                .authenticationEntryPoint(unauthorizedHandler)
+                                                .accessDeniedHandler(accessDeniedHandler))
                                 .sessionManagement(session -> session
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .authorizeHttpRequests(auth -> auth

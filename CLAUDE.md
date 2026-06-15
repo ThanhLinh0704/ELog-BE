@@ -112,14 +112,14 @@ ELog-BE/ (Backend Repository)
 ## 8. API Base URL Convention
 
 ```
-/api/v1/{resource}
+/api/{resource}
 ```
 
 | Pattern | Example |
 |---------|---------|
-| Collection | `GET /api/v1/routes` |
-| Single item | `GET /api/v1/routes/{id}` |
-| Action | `POST /api/v1/trips/{id}/dispatch` |
+| Collection | `GET /api/routes` |
+| Single item | `GET /api/routes/{id}` |
+| Action | `POST /api/trips/{id}/dispatch` |
 
 > Full conventions (auth header, envelope, errors, pagination) → `@docs/api-conventions.md`
 
