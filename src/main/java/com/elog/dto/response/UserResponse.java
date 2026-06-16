@@ -1,4 +1,4 @@
-package com.elog.dto;
+package com.elog.dto.response;
 
 import lombok.*;
 import java.time.LocalDateTime;

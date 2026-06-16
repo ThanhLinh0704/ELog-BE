@@ -3,8 +3,10 @@ package com.elog.exception;
 import lombok.Getter;
 
 /**
- * Application-level error codes — map 1:1 to the codes in docs/api-conventions.md.
- * Used in ApiErrorResponse.code field so frontend can handle errors programmatically.
+ * Application-level error codes — map 1:1 to the codes in
+ * docs/api-conventions.md.
+ * Used in ApiErrorResponse.code field so frontend can handle errors
+ * programmatically.
  */
 @Getter
 public enum ErrorCode {
@@ -15,6 +17,7 @@ public enum ErrorCode {
     INVALID_CREDENTIALS("INVALID_CREDENTIALS"),
     TOKEN_EXPIRED("TOKEN_EXPIRED"),
     TOKEN_INVALID("TOKEN_INVALID"),
+    ACCOUNT_DISABLED("ACCOUNT_DISABLED"),
 
     // Business rule violations
     STORE_NOT_FOUND("STORE_NOT_FOUND"),
@@ -25,10 +28,18 @@ public enum ErrorCode {
     CAPACITY_EXCEEDED("CAPACITY_EXCEEDED"),             // BR-03
     FLEET_CAPACITY_INSUFFICIENT("FLEET_CAPACITY_INSUFFICIENT"), // BR-08
     INVALID_STATE_TRANSITION("INVALID_STATE_TRANSITION"), // DC-01
-    EPOD_REQUIRED("EPOD_REQUIRED"),                     // BR-11
+    EPOD_REQUIRED("EPOD_REQUIRED"), // BR-11
 
     // Import
     EXCEL_PARSE_ERROR("EXCEL_PARSE_ERROR"),
+
+    // Validation
+    FIELD_REQUIRED("Field cannot be blank"),
+    INVALID_FORMAT("Invalid format"),
+    INVALID_SIZE("Invalid size"),
+    USERNAME_INVALID("Username must be 3-50 characters and contain only letters, numbers, and underscores"),
+    PASSWORD_INVALID(
+            "Password must be at least 8 characters, containing at least 1 uppercase letter, 1 number, and 1 special character"),
 
     // Generic
     VALIDATION_FAILED("VALIDATION_FAILED"),

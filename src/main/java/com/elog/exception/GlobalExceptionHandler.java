@@ -38,7 +38,16 @@ public class GlobalExceptionHandler {
         List<String> details = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(FieldError::getDefaultMessage)
+                .map(fieldError -> {
+                    String fieldName = fieldError.getField();
+                    String defaultMessage = fieldError.getDefaultMessage();
+                    try {
+                        ErrorCode errorCode = ErrorCode.valueOf(defaultMessage);
+                        return fieldName + ": " + errorCode.getCode();
+                    } catch (IllegalArgumentException | NullPointerException e) {
+                        return fieldName + ": " + defaultMessage;
+                    }
+                })
                 .toList();
         return buildError(HttpStatus.BAD_REQUEST,
                 ErrorCode.VALIDATION_FAILED.getCode(),

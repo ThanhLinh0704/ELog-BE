@@ -1,4 +1,4 @@
-package com.elog.dto;
+package com.elog.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
@@ -8,6 +8,6 @@ import lombok.Setter;
 @Setter
 public class TokenRefreshRequest {
 
-    @NotBlank(message = "Refresh token cannot be blank")
+    @NotBlank(message = "FIELD_REQUIRED")
     private String refreshToken;
 }

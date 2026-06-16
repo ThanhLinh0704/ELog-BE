@@ -1,9 +1,9 @@
 package com.elog.service.impl;
 
-import com.elog.dto.LoginRequest;
-import com.elog.dto.TokenRefreshRequest;
-import com.elog.dto.TokenResponse;
-import com.elog.dto.TokenRefreshResponse;
+import com.elog.dto.request.LoginRequest;
+import com.elog.dto.request.TokenRefreshRequest;
+import com.elog.dto.response.TokenResponse;
+import com.elog.dto.response.TokenRefreshResponse;
 import com.elog.entity.RefreshToken;
 import com.elog.entity.User;
 import com.elog.exception.BusinessException;
@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtUtils jwtUtils;
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${elog.jwt.refresh-expiration-ms:604800000}") // Default 7 ngày
     private long refreshExpirationMs;
@@ -39,11 +41,21 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public TokenResponse login(LoginRequest request) {
-        // 1. Kiểm tra tài khoản tồn tại và active
-        User user = userRepository.findByUsernameAndIsActiveTrue(request.getUsername())
+        // 1. Kiểm tra tài khoản tồn tại
+        User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS, "Invalid username or password", HttpStatus.UNAUTHORIZED));
 
-        // 2. Thực hiện authenticate qua Spring Security AuthenticationManager
+        // 2. Kiểm tra mật khẩu trước (đảm bảo nếu nhập sai mật khẩu của tài khoản bị khóa vẫn báo sai tài khoản/mật khẩu)
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "Invalid username or password", HttpStatus.UNAUTHORIZED);
+        }
+
+        // 3. Kiểm tra tài khoản có hoạt động không
+        if (Boolean.FALSE.equals(user.getIsActive())) {
+            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, "Account has been disabled", HttpStatus.FORBIDDEN);
+        }
+
+        // 4. Thực hiện authenticate qua Spring Security AuthenticationManager
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));

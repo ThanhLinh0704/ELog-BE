@@ -1,4 +1,4 @@
-package com.elog.dto;
+package com.elog.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
@@ -8,9 +8,9 @@ import lombok.Setter;
 @Setter
 public class LoginRequest {
 
-    @NotBlank(message = "Username cannot be blank")
+    @NotBlank(message = "FIELD_REQUIRED")
     private String username;
 
-    @NotBlank(message = "Password cannot be blank")
+    @NotBlank(message = "FIELD_REQUIRED")
     private String password;
 }
