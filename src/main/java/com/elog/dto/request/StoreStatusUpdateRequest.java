@@ -1,4 +1,4 @@
-package com.elog.dto;
+package com.elog.dto.request;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -8,6 +8,6 @@ import lombok.Setter;
 @Setter
 public class StoreStatusUpdateRequest {
 
-    @NotNull(message = "isActive is required")
+    @NotNull(message = "FIELD_REQUIRED")
     private Boolean isActive;
 }

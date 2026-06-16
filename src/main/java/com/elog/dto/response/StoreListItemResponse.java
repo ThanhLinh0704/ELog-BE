@@ -1,9 +1,7 @@
-package com.elog.dto;
+package com.elog.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
-
-import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -11,16 +9,12 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class StoreResponse {
+public class StoreListItemResponse {
     private Long id;
     private String storeCode;
     private String storeName;
     private String address;
-    private String contactName;
-    private String contactPhone;
-    private Double latitude;
-    private Double longitude;
     private Boolean isActive;
+    private Boolean hasCoordinates;
     private AssignedRouteDto assignedRoute;
-    private LocalDateTime createdAt;
 }
