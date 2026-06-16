@@ -1,4 +1,4 @@
-package com.elog.dto;
+package com.elog.dto.request;
 
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Getter;
@@ -8,6 +8,6 @@ import java.util.Set;
 @Getter
 @Setter
 public class UserRolesUpdateRequest {
-    @NotEmpty(message = "At least one role must be specified")
+    @NotEmpty(message = "FIELD_REQUIRED")
     private Set<String> roles;
 }

@@ -1,6 +1,7 @@
 package com.elog.controller;
 
-import com.elog.dto.*;
+import com.elog.dto.request.*;
+import com.elog.dto.response.*;
 import com.elog.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -48,7 +49,7 @@ public class UserController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String role,
             @RequestParam(required = false) Boolean isActive,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @org.springdoc.core.annotations.ParameterObject @PageableDefault(size = 20) Pageable pageable) {
         ApiResponse<List<UserResponse>> response = userService.getAllUsers(keyword, role, isActive, pageable);
         return ResponseEntity.ok(response);
     }
