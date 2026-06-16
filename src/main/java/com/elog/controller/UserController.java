@@ -1,6 +1,7 @@
 package com.elog.controller;
 
-import com.elog.dto.*;
+import com.elog.dto.request.*;
+import com.elog.dto.response.*;
 import com.elog.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

@@ -1,9 +1,9 @@
 package com.elog.service.impl;
 
-import com.elog.dto.LoginRequest;
-import com.elog.dto.TokenRefreshRequest;
-import com.elog.dto.TokenResponse;
-import com.elog.dto.TokenRefreshResponse;
+import com.elog.dto.request.LoginRequest;
+import com.elog.dto.request.TokenRefreshRequest;
+import com.elog.dto.response.TokenResponse;
+import com.elog.dto.response.TokenRefreshResponse;
 import com.elog.entity.RefreshToken;
 import com.elog.entity.User;
 import com.elog.exception.BusinessException;

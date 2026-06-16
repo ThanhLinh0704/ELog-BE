@@ -1,10 +1,10 @@
 package com.elog.controller;
 
-import com.elog.dto.ApiResponse;
-import com.elog.dto.LoginRequest;
-import com.elog.dto.TokenRefreshRequest;
-import com.elog.dto.TokenResponse;
-import com.elog.dto.TokenRefreshResponse;
+import com.elog.dto.request.LoginRequest;
+import com.elog.dto.request.TokenRefreshRequest;
+import com.elog.dto.response.ApiResponse;
+import com.elog.dto.response.TokenRefreshResponse;
+import com.elog.dto.response.TokenResponse;
 import com.elog.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,7 +26,6 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "Authenticate user and return tokens")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully authenticated")
     public ResponseEntity<ApiResponse<TokenResponse>> login(@Valid @RequestBody LoginRequest request) {
         TokenResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -34,8 +33,6 @@ public class AuthController {
 
     @PostMapping("/refresh")
     @Operation(summary = "Refresh expired access token using refresh token")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Token refreshed successfully")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Invalid or expired refresh token")
     public ResponseEntity<ApiResponse<TokenRefreshResponse>> refresh(@Valid @RequestBody TokenRefreshRequest request) {
         TokenRefreshResponse response = authService.refresh(request);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -43,7 +40,6 @@ public class AuthController {
 
     @PostMapping("/logout")
     @Operation(summary = "Logout user and invalidate refresh token")
-    @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Logged out successfully")
     public ResponseEntity<ApiResponse<Map<String, String>>> logout(@Valid @RequestBody TokenRefreshRequest request) {
         authService.logout(request.getRefreshToken());
         Map<String, String> response = new HashMap<>();
