@@ -108,11 +108,11 @@ public class ProductServiceImpl implements ProductService {
 
         product.setProductName(request.getProductName());
         product.setWeightKg(request.getWeightKg());
-        product.setLengthCm(request.getLengthCm());
-        product.setWidthCm(request.getWidthCm());
-        product.setHeightCm(request.getHeightCm());
+        product.setLengthM(request.getLengthM());
+        product.setWidthM(request.getWidthM());
+        product.setHeightM(request.getHeightM());
         product.setVolumeM3(productMapper.calculateVolume(
-                request.getLengthCm(), request.getWidthCm(), request.getHeightCm()));
+                request.getLengthM(), request.getWidthM(), request.getHeightM()));
 
         Product saved = productRepository.save(product);
         return productMapper.toResponse(saved);
