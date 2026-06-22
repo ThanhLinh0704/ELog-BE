@@ -17,10 +17,10 @@ public class ProductMapper {
                 .sku(request.getSku())
                 .productName(request.getProductName())
                 .weightKg(request.getWeightKg())
-                .lengthCm(request.getLengthCm())
-                .widthCm(request.getWidthCm())
-                .heightCm(request.getHeightCm())
-                .volumeM3(calculateVolume(request.getLengthCm(), request.getWidthCm(), request.getHeightCm()))
+                .lengthM(request.getLengthM())
+                .widthM(request.getWidthM())
+                .heightM(request.getHeightM())
+                .volumeM3(calculateVolume(request.getLengthM(), request.getWidthM(), request.getHeightM()))
                 .isActive(true)
                 .build();
     }
@@ -31,9 +31,9 @@ public class ProductMapper {
                 .sku(product.getSku())
                 .productName(product.getProductName())
                 .weightKg(product.getWeightKg())
-                .lengthCm(product.getLengthCm())
-                .widthCm(product.getWidthCm())
-                .heightCm(product.getHeightCm())
+                .lengthM(product.getLengthM())
+                .widthM(product.getWidthM())
+                .heightM(product.getHeightM())
                 .volumeM3(product.getVolumeM3())
                 .isActive(product.getIsActive())
                 .createdAt(product.getCreatedAt())
@@ -52,10 +52,10 @@ public class ProductMapper {
                 .build();
     }
 
-    public BigDecimal calculateVolume(BigDecimal lengthCm, BigDecimal widthCm, BigDecimal heightCm) {
-        return lengthCm
-                .multiply(widthCm)
-                .multiply(heightCm)
-                .divide(new BigDecimal("1000000"), 6, RoundingMode.HALF_UP);
+    public BigDecimal calculateVolume(BigDecimal lengthM, BigDecimal widthM, BigDecimal heightM) {
+        return lengthM
+                .multiply(widthM)
+                .multiply(heightM)
+                .setScale(6, RoundingMode.HALF_UP);
     }
 }

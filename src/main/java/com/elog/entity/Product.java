@@ -30,14 +30,14 @@ public class Product {
     @Column(name = "weight_kg", nullable = false, precision = 8, scale = 3)
     private BigDecimal weightKg;
 
-    @Column(name = "length_cm", nullable = false, precision = 8, scale = 2)
-    private BigDecimal lengthCm;
+    @Column(name = "length_m", nullable = false, precision = 8, scale = 4)
+    private BigDecimal lengthM;
 
-    @Column(name = "width_cm", nullable = false, precision = 8, scale = 2)
-    private BigDecimal widthCm;
+    @Column(name = "width_m", nullable = false, precision = 8, scale = 4)
+    private BigDecimal widthM;
 
-    @Column(name = "height_cm", nullable = false, precision = 8, scale = 2)
-    private BigDecimal heightCm;
+    @Column(name = "height_m", nullable = false, precision = 8, scale = 4)
+    private BigDecimal heightM;
 
     @Column(name = "volume_m3", nullable = false, precision = 10, scale = 6)
     private BigDecimal volumeM3;

@@ -15,9 +15,9 @@ public class ProductResponse {
     private String sku;
     private String productName;
     private BigDecimal weightKg;
-    private BigDecimal lengthCm;
-    private BigDecimal widthCm;
-    private BigDecimal heightCm;
+    private BigDecimal lengthM;
+    private BigDecimal widthM;
+    private BigDecimal heightM;
     private BigDecimal volumeM3;
     private Boolean isActive;
     private LocalDateTime createdAt;

@@ -23,17 +23,17 @@ public class ProductUpdateRequest {
     private BigDecimal weightKg;
 
     @NotNull(message = "FIELD_REQUIRED")
-    @DecimalMin(value = "0.01", inclusive = true, message = "INVALID_FORMAT")
-    @Digits(integer = 6, fraction = 2, message = "INVALID_FORMAT")
-    private BigDecimal lengthCm;
+    @DecimalMin(value = "0.0001", inclusive = true, message = "INVALID_FORMAT")
+    @Digits(integer = 4, fraction = 4, message = "INVALID_FORMAT")
+    private BigDecimal lengthM;
 
     @NotNull(message = "FIELD_REQUIRED")
-    @DecimalMin(value = "0.01", inclusive = true, message = "INVALID_FORMAT")
-    @Digits(integer = 6, fraction = 2, message = "INVALID_FORMAT")
-    private BigDecimal widthCm;
+    @DecimalMin(value = "0.0001", inclusive = true, message = "INVALID_FORMAT")
+    @Digits(integer = 4, fraction = 4, message = "INVALID_FORMAT")
+    private BigDecimal widthM;
 
     @NotNull(message = "FIELD_REQUIRED")
-    @DecimalMin(value = "0.01", inclusive = true, message = "INVALID_FORMAT")
-    @Digits(integer = 6, fraction = 2, message = "INVALID_FORMAT")
-    private BigDecimal heightCm;
+    @DecimalMin(value = "0.0001", inclusive = true, message = "INVALID_FORMAT")
+    @Digits(integer = 4, fraction = 4, message = "INVALID_FORMAT")
+    private BigDecimal heightM;
 }
