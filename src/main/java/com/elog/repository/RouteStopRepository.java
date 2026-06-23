@@ -19,7 +19,7 @@ public interface RouteStopRepository extends JpaRepository<RouteStop, Long> {
     int findMaxSequenceOrderByRouteId(Long routeId);
 
     @Query("SELECT COUNT(rs) FROM RouteStop rs WHERE rs.route.id = :routeId " +
-           "AND rs.store.latitude IS NULL OR rs.store.longitude IS NULL")
+           "AND (rs.store.latitude IS NULL OR rs.store.longitude IS NULL)")
     int countStopsWithoutCoordinatesByRouteId(Long routeId);
 }
 
