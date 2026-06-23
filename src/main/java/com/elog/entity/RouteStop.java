@@ -2,6 +2,9 @@ package com.elog.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "route_stops")
@@ -24,6 +27,10 @@ public class RouteStop {
     @JoinColumn(name = "store_id", nullable = false)
     private Store store;
 
-    @Column(name = "sequence_no", nullable = false)
-    private Integer sequenceNo;
+    @Column(name = "sequence_order", nullable = false)
+    private Integer sequenceOrder;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 }

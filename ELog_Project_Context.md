@@ -24,7 +24,7 @@
 | Type | Role |
 |------|------|
 | Internal | Dispatcher · Warehouse Staff · Driver · Logistics Manager · System Admin |
-| External | GPS Platform (realtime location feed) · Map Service (Haversine distance, setup-time only) |
+| External | GPS Platform (realtime location feed, fed by Driver app) · Map Service (Haversine distance, setup-time only — accessed by System Admin during Store Master Data configuration) |
 
 ---
 
@@ -43,19 +43,19 @@
 
 ## 5. Business Rules
 
-| ID | Rule |
-|----|------|
-| BR-01 | Orders via Excel only (no manual order UI) |
-| BR-02 | 1 order → 1 stop → 1 fixed route; unmapped store = unassignable |
-| BR-03 | Capacity validated on BOTH m³ AND kg (no 3D packing) |
-| BR-04 | LIFO: last stop loaded first, first stop unloaded first |
-| BR-05 | Fixed routes/stops = read-only ref data; not editable in operational UI |
-| BR-06 | Stops with no orders for the date are excluded from trip |
-| BR-07 | Oversized load split into minimum number of trips that each fit a vehicle |
-| BR-08 | If total fleet capacity < day's load → block dispatch, notify Dispatcher |
-| BR-09 | Stop behind ETA > threshold → flag time exception on dashboard |
-| BR-10 | Driver records rejection → flag delivery exception |
-| BR-11 | Stop cannot be completed without e-POD (signature + ≥1 cargo image) |
+| ID | Rule | Covered by UC |
+|----|------|----------------|
+| BR-01 | Orders via Excel only (no manual order UI) | UC-05 |
+| BR-02 | 1 order → 1 stop → 1 fixed route; unmapped store = unassignable | UC-05 |
+| BR-03 | Capacity validated on BOTH m³ AND kg (no 3D packing) | UC-07 |
+| BR-04 | LIFO: last stop loaded first, first stop unloaded first | UC-07, UC-09, UC-10, UC-15 |
+| BR-05 | Fixed routes/stops = read-only ref data; not editable in operational UI | UC-03 |
+| BR-06 | Stops with no orders for the date are excluded from trip | UC-06, UC-11 |
+| BR-07 | Oversized load split into minimum number of trips that each fit a vehicle | UC-18 |
+| BR-08 | If total fleet capacity < day's load → block dispatch, notify Dispatcher | UC-17 |
+| BR-09 | Stop behind ETA > threshold → flag time exception on dashboard | UC-19 |
+| BR-10 | Driver records rejection → flag delivery exception | UC-14 |
+| BR-11 | Stop cannot be completed without e-POD (signature + ≥1 cargo image) | UC-16 |
 
 ---
 
@@ -83,18 +83,7 @@
 
 ---
 
-## 8. Artifact Reference
-
-| File | Purpose |
-|------|---------|
-| `ELog_Report1_VisionScope_v1.0.9_EN.docx` | Scope baseline, GAP-01→03, FE-01→06 |
-| `ELog_Report3_SRS_v1.0.1_EN.docx` | FT-01→06, AC/NAC/BV, data model, NFRs |
-| `high_level_Usecase.docx` | UC-01→UC-16 table |
-| `Report_3_1_RTW_Template.xlsx` | UC list, traceability, data dict, BR register, NFR tracker |
-
----
-
-## 9. Working Rules (BA Conventions)
+## 8. Working Rules (BA Conventions)
 
 1. **Scope** — Align strictly with V&S. Flag anything unsupported as `[ASSUMPTION]`.
 2. **Req type** — Distinguish business requirement vs functional requirement.
@@ -107,37 +96,48 @@
 
 ---
 
-## 10. Key Data Concepts
+## 9. Key Data Concepts
 
 - **Route:** Predefined ordered sequence of stops (read-only ref data).
 - **Stop:** One store on one route; has fixed sequence position.
 - **Trip:** One vehicle dispatched on one route for one date; contains ordered stop list.
 - **Loading Manifest:** Flat LIFO-ordered list generated from trip stops.
 - **e-POD:** Electronic proof of delivery = digital signature + ≥1 cargo photo.
-- **Exception Types:** Time exception (ETA breach) · Delivery exception (rejection).
+- **Exception Types:** Time exception (ETA breach, system-detected, UC-19) · Delivery exception (rejection, driver-recorded, UC-14).
 
 ---
 
-## 11. Use Case Index (UC-01 → UC-16)
+## 10. Use Case Index (UC-01 → UC-20) — v2.0 Official Baseline
 
-| UC | Title | Primary Actor |
-|----|-------|--------------|
-| UC-01 | Import & Validate Order Excel | Dispatcher |
-| UC-02 | Assign Orders to Routes | System (auto) |
-| UC-03 | Review Consolidated Order List | Dispatcher |
-| UC-04 | Validate Trip Capacity | System (auto) |
-| UC-05 | Generate LIFO Loading Manifest | System (auto) |
-| UC-06 | Plan Trip (exclude empty stops) | Dispatcher |
-| UC-07 | Calculate Linear ETA | System (auto) |
-| UC-08 | Confirm Trip Plan | Dispatcher |
-| UC-09 | Allocate Vehicle & Lock Trip | Dispatcher |
-| UC-10 | Generate Handover Slip | System (auto) |
-| UC-11 | Dispatch Trip to Driver App | Dispatcher |
-| UC-12 | Monitor Live Dashboard | Logistics Manager |
-| UC-13 | Flag Time / Delivery Exception | System (auto) |
-| UC-14 | Execute Delivery at Stop | Driver |
-| UC-15 | Record e-POD | Driver |
-| UC-16 | Record Rejection | Driver |
+> Supersedes the previous UC-01→16 index. Renumbered/regrouped by primary actor; added UC-17→UC-20 to cover BR-07, BR-08, BR-09 and the Driver→GPS Platform data flow. Full spec with Pre/Post-conditions: `ELog_UseCase_Specification_v2_0.md`.
+
+| UC | Title | Primary Actor | Relationship |
+|----|-------|--------------|---------------|
+| UC-01 | Manage User Accounts & Roles | System Admin | — |
+| UC-02 | Manage Vehicle Data | System Admin | — |
+| UC-03 | Manage Fixed Routes | System Admin | — |
+| UC-04 | Manage Store Branches | System Admin | assoc. Map Service (setup-time) |
+| UC-05 | Import Orders | Dispatcher | — |
+| UC-06 | Confirm Route Plan | Dispatcher | — |
+| UC-07 | Loading Capacity Confirmation | Dispatcher | — |
+| UC-08 | View KPI Dashboard | Logistics Manager | — |
+| UC-09 | View LIFO Instructions | Warehouse Staff | included by UC-10 |
+| UC-10 | Load Vehicle & Confirm Completion | Warehouse Staff | `<<include>>` UC-09 |
+| UC-11 | Delivery Point Planning & ETA | Dispatcher | — |
+| UC-12 | Vehicle Assignment & Trip Coordination | Dispatcher | extended by UC-17, UC-18 |
+| UC-13 | Trip Progress Monitoring | Logistics Manager | assoc. GPS Platform; extended by UC-19 |
+| UC-14 | Record Delivery Rejection | Driver | extends UC-16 |
+| UC-15 | View Trip Details & LIFO Unloading | Driver | includes UC-20 |
+| UC-16 | Update Milestones & Submit e-POD | Driver | extended by UC-14 |
+| UC-17 | Block Dispatch on Capacity Shortfall | Dispatcher | `<<extend>>` UC-12 |
+| UC-18 | Split Oversized Load into Multiple Trips | Dispatcher | `<<extend>>` UC-12 |
+| UC-19 | Flag Time Exception | *(System — auto)* | `<<extend>>` UC-13 |
+| UC-20 | Broadcast Vehicle Location | Driver | assoc. GPS Platform; included by UC-15 |
+
+**Key changes from v1 (UC-01→16):**
+- UC-14 narrowed & renamed (was "Execute Delivery at Stop" combined with exception flagging) → now isolates driver-triggered rejection only (BR-10); system-triggered time exception moved to UC-19.
+- UC-15 Map Service association removed (was incorrectly attached to Driver's runtime unloading view; Map Service is setup-time only, now correctly under UC-04).
+- UC-17, UC-18, UC-19, UC-20 added — previously BR-07, BR-08, BR-09 had no UC coverage, and the Driver→GPS Platform broadcast direction was missing from the diagram.
 
 ---
 
@@ -159,6 +159,4 @@
 | GAP-02 | No ERP integration; order data enters via Excel only | Manual upload required each cycle |
 | GAP-03 | Route/stop master data managed outside system (static config) | Ops team must maintain separately |
 
----
 
-*Last updated: 2025 — align with `ELog_Report3_SRS_v1.0.1_EN.docx` as source of truth.*

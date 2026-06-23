@@ -72,9 +72,9 @@ is_active BOOLEAN DEFAULT TRUE
 ### `route_stops`
 ```sql
 id, route_id FK, store_id FK,
-sequence_no INT NOT NULL,    -- 1 = first delivery, N = last
--- LIFO: last sequence_no is loaded first into vehicle
-UNIQUE(route_id, sequence_no)
+sequence_order INT NOT NULL,    -- 1 = first delivery, N = last
+-- LIFO: last sequence_order is loaded first into vehicle
+UNIQUE(route_id, sequence_order)
 ```
 
 ### `stores`

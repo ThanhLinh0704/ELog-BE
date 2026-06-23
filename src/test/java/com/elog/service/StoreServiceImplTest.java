@@ -27,10 +27,14 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class StoreServiceImplTest {
 
-    @Mock StoreRepository storeRepository;
-    @Mock RouteStopRepository routeStopRepository;
-    @Mock StoreMapper storeMapper;
-    @InjectMocks StoreServiceImpl storeService;
+    @Mock
+    StoreRepository storeRepository;
+    @Mock
+    RouteStopRepository routeStopRepository;
+    @Mock
+    StoreMapper storeMapper;
+    @InjectMocks
+    StoreServiceImpl storeService;
 
     private StoreCreateRequest validCreateRequest;
     private Store savedStore;
@@ -74,7 +78,7 @@ class StoreServiceImplTest {
         when(storeRepository.existsByCode("ST-Q1-001")).thenReturn(true);
 
         BusinessException ex = catchThrowableOfType(
-            () -> storeService.createStore(validCreateRequest), BusinessException.class);
+                () -> storeService.createStore(validCreateRequest), BusinessException.class);
 
         assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.CONFLICT);
         verify(storeRepository, never()).save(any());
@@ -87,7 +91,7 @@ class StoreServiceImplTest {
         when(storeRepository.existsByCode(any())).thenReturn(false);
 
         BusinessException ex = catchThrowableOfType(
-            () -> storeService.createStore(validCreateRequest), BusinessException.class);
+                () -> storeService.createStore(validCreateRequest), BusinessException.class);
 
         assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
         verify(storeRepository, never()).save(any());
@@ -100,7 +104,7 @@ class StoreServiceImplTest {
         when(storeRepository.existsByCode(any())).thenReturn(false);
 
         BusinessException ex = catchThrowableOfType(
-            () -> storeService.createStore(validCreateRequest), BusinessException.class);
+                () -> storeService.createStore(validCreateRequest), BusinessException.class);
 
         assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
         verify(storeRepository, never()).save(any());
@@ -125,7 +129,7 @@ class StoreServiceImplTest {
         when(storeRepository.findById(99L)).thenReturn(Optional.empty());
 
         BusinessException ex = catchThrowableOfType(
-            () -> storeService.getStoreById(99L), BusinessException.class);
+                () -> storeService.getStoreById(99L), BusinessException.class);
 
         assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.NOT_FOUND);
     }
@@ -137,14 +141,14 @@ class StoreServiceImplTest {
         when(storeRepository.findById(1L)).thenReturn(Optional.of(savedStore));
         when(routeStopRepository.existsByStoreIdAndRouteIsActiveTrue(1L)).thenReturn(true);
         Route activeRoute = Route.builder().id(1L).code("RT-Q1").name("Tuyen Q1").isActive(true).build();
-        RouteStop rs = RouteStop.builder().route(activeRoute).store(savedStore).sequenceNo(1).build();
+        RouteStop rs = RouteStop.builder().route(activeRoute).store(savedStore).sequenceOrder(1).build();
         when(routeStopRepository.findFirstByStoreId(1L)).thenReturn(Optional.of(rs));
 
         StoreStatusUpdateRequest req = new StoreStatusUpdateRequest();
         req.setIsActive(false);
 
         BusinessException ex = catchThrowableOfType(
-            () -> storeService.updateStoreStatus(1L, req), BusinessException.class);
+                () -> storeService.updateStoreStatus(1L, req), BusinessException.class);
 
         assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.CONFLICT);
         verify(storeRepository, never()).save(any());
