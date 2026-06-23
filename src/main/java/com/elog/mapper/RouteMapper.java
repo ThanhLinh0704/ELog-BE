@@ -55,7 +55,7 @@ public class RouteMapper {
         return RouteStopResponse.builder()
                 .id(rs.getId())
                 .routeId(rs.getRoute().getId())
-                .sequenceOrder(rs.getSequenceNo())
+                .sequenceOrder(rs.getSequenceOrder())
                 .store(RouteStopStoreDto.builder()
                         .id(store.getId())
                         .storeCode(store.getCode())

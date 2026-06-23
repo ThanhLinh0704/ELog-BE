@@ -36,7 +36,7 @@ public class Route {
     private Boolean isActive = false;
 
     @OneToMany(mappedBy = "route", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("sequenceNo ASC")
+    @OrderBy("sequenceOrder ASC")
     @Builder.Default
     private List<RouteStop> stops = new ArrayList<>();
 

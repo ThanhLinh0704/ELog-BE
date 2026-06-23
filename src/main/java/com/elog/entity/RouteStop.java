@@ -27,8 +27,8 @@ public class RouteStop {
     @JoinColumn(name = "store_id", nullable = false)
     private Store store;
 
-    @Column(name = "sequence_no", nullable = false)
-    private Integer sequenceNo;
+    @Column(name = "sequence_order", nullable = false)
+    private Integer sequenceOrder;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

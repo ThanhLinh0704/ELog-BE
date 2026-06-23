@@ -58,7 +58,7 @@ public class RouteServiceImpl implements RouteService {
     @Transactional(readOnly = true)
     public RouteDetailResponse getRouteById(Long id) {
         Route route = findRouteOrThrow(id);
-        List<RouteStop> stops = routeStopRepository.findByRouteIdOrderBySequenceNoAsc(id);
+        List<RouteStop> stops = routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(id);
         return routeMapper.toDetailResponse(route, stops);
     }
 
@@ -145,12 +145,12 @@ public class RouteServiceImpl implements RouteService {
         }
 
         // Auto-append to end
-        int nextSeq = routeStopRepository.findMaxSequenceNoByRouteId(routeId) + 1;
+        int nextSeq = routeStopRepository.findMaxSequenceOrderByRouteId(routeId) + 1;
 
         RouteStop routeStop = RouteStop.builder()
                 .route(route)
                 .store(store)
-                .sequenceNo(nextSeq)
+                .sequenceOrder(nextSeq)
                 .build();
         RouteStop saved = routeStopRepository.save(routeStop);
 
@@ -163,7 +163,7 @@ public class RouteServiceImpl implements RouteService {
     public List<RouteStopResponse> reorderStops(Long routeId, RouteStopReorderRequest request) {
         findRouteOrThrow(routeId);
 
-        List<RouteStop> existingStops = routeStopRepository.findByRouteIdOrderBySequenceNoAsc(routeId);
+        List<RouteStop> existingStops = routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(routeId);
         Set<Long> existingIds = existingStops.stream()
                 .map(RouteStop::getId)
                 .collect(Collectors.toSet());
@@ -182,7 +182,7 @@ public class RouteServiceImpl implements RouteService {
 
         // Step 1: Move existing stops to a temporary sequence range to avoid unique constraint violations
         for (RouteStop rs : existingStops) {
-            rs.setSequenceNo(rs.getSequenceNo() + 10000);
+            rs.setSequenceOrder(rs.getSequenceOrder() + 10000);
             routeStopRepository.save(rs);
         }
         routeStopRepository.flush(); // Force update in DB before reassigning
@@ -192,7 +192,7 @@ public class RouteServiceImpl implements RouteService {
         List<RouteStopResponse> result = new ArrayList<>();
         for (Long stopId : request.getOrderedStopIds()) {
             RouteStop rs = stopMap.get(stopId);
-            rs.setSequenceNo(seq++);
+            rs.setSequenceOrder(seq++);
             routeStopRepository.save(rs);
 
             boolean hasCoords = rs.getStore().getLatitude() != null
@@ -221,10 +221,10 @@ public class RouteServiceImpl implements RouteService {
         routeStopRepository.delete(stop);
 
         // Renumber remaining stops
-        List<RouteStop> remaining = routeStopRepository.findByRouteIdOrderBySequenceNoAsc(routeId);
+        List<RouteStop> remaining = routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(routeId);
         int seq = 1;
         for (RouteStop rs : remaining) {
-            rs.setSequenceNo(seq++);
+            rs.setSequenceOrder(seq++);
             routeStopRepository.save(rs);
         }
     }

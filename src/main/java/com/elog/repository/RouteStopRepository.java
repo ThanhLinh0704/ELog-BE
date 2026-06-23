@@ -11,12 +11,12 @@ public interface RouteStopRepository extends JpaRepository<RouteStop, Long> {
     Optional<RouteStop> findFirstByStoreId(Long storeId);
     boolean existsByStoreIdAndRouteIsActiveTrue(Long storeId);
 
-    List<RouteStop> findByRouteIdOrderBySequenceNoAsc(Long routeId);
+    List<RouteStop> findByRouteIdOrderBySequenceOrderAsc(Long routeId);
     int countByRouteId(Long routeId);
     boolean existsByRouteIdAndStoreId(Long routeId, Long storeId);
 
-    @Query("SELECT COALESCE(MAX(rs.sequenceNo), 0) FROM RouteStop rs WHERE rs.route.id = :routeId")
-    int findMaxSequenceNoByRouteId(Long routeId);
+    @Query("SELECT COALESCE(MAX(rs.sequenceOrder), 0) FROM RouteStop rs WHERE rs.route.id = :routeId")
+    int findMaxSequenceOrderByRouteId(Long routeId);
 
     @Query("SELECT COUNT(rs) FROM RouteStop rs WHERE rs.route.id = :routeId " +
            "AND rs.store.latitude IS NULL OR rs.store.longitude IS NULL")
