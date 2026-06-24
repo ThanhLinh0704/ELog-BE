@@ -12,10 +12,6 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class VehicleUpdateRequest {
 
-    // Optional input accepted for client convenience, but ignored by service:
-    // plateNumber is immutable after vehicle creation.
-    private String plateNumber;
-
     @NotBlank(message = "FIELD_REQUIRED")
     @Size(min = 2, max = 50, message = "INVALID_SIZE")
     private String vehicleType;
