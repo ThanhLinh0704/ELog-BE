@@ -14,7 +14,7 @@ public class VehicleCreateRequest {
 
     @NotBlank(message = "FIELD_REQUIRED")
     @Size(min = 6, max = 12, message = "INVALID_SIZE")
-    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z0-9]+(-[A-Za-z0-9]+)?$",
+    @Pattern(regexp = "^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$",
             message = "INVALID_FORMAT")
     private String plateNumber;
 
