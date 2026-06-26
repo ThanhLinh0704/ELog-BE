@@ -1,0 +1,14 @@
+package com.elog.dto.response;
+
+import lombok.*;
+
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ImportErrorResponse {
+    private Integer rowNumber;
+    private String rawData;
+    private String errorReason;
+}
