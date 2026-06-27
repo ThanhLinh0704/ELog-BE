@@ -84,10 +84,25 @@ public class ImportController {
     }
 
     @GetMapping("/{batchId}/errors")
-    @Operation(summary = "Get error list for a specific import batch")
+    @Operation(summary = "Get error list for a specific import batch (paginated & filterable)")
     @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')")
-    public ResponseEntity<ApiResponse<List<ImportErrorResponse>>> getBatchErrors(@PathVariable Long batchId) {
-        List<ImportErrorResponse> errors = importService.getBatchErrors(batchId);
-        return ResponseEntity.ok(ApiResponse.success(errors));
+    public ResponseEntity<ApiResponse<List<ImportErrorResponse>>> getBatchErrors(
+            @PathVariable Long batchId,
+            @RequestParam(value = "errorCode", required = false) String errorCode,
+            @PageableDefault(size = 20) Pageable pageable) {
+        ApiResponse<List<ImportErrorResponse>> response = importService.getBatchErrors(batchId, errorCode, pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{batchId}/errors/export")
+    @Operation(summary = "Export error list to Excel file")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')")
+    public ResponseEntity<byte[]> exportBatchErrors(@PathVariable Long batchId) {
+        byte[] content = importService.exportBatchErrors(batchId);
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment", "import-errors-batch" + batchId + ".xlsx");
+        headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
+        return new ResponseEntity<>(content, headers, org.springframework.http.HttpStatus.OK);
     }
 }

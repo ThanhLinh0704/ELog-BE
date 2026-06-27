@@ -18,5 +18,7 @@ public interface ImportService {
 
     ImportBatchResponse getBatchById(Long batchId);
 
-    List<ImportErrorResponse> getBatchErrors(Long batchId);
+    ApiResponse<List<ImportErrorResponse>> getBatchErrors(Long batchId, String errorCode, Pageable pageable);
+
+    byte[] exportBatchErrors(Long batchId);
 }
