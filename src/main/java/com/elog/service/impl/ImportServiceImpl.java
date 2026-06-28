@@ -60,6 +60,7 @@ public class ImportServiceImpl implements ImportService {
             ImportBatch oldBatch = existingBatch.get();
             oldBatch.setIsActive(false);
             batchRepository.save(oldBatch);
+            batchRepository.flush(); // Force update to DB before inserting new active batch to prevent UNIQUE constraint violation
         }
 
         // Step 4: Create new batch
