@@ -2,9 +2,12 @@ package com.elog.repository;
 
 import com.elog.entity.Order;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
@@ -17,4 +20,19 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT COUNT(o) FROM Order o WHERE o.importBatch.id = :batchId")
     long countByBatchId(@Param("batchId") Long batchId);
+
+    @Query("SELECT o FROM Order o " +
+           "JOIN FETCH o.store s " +
+           "JOIN FETCH o.items " +
+           "WHERE o.deliveryDate = :deliveryDate AND o.status = :status " +
+           "AND o.importBatch.isActive = true")
+    List<Order> findByDeliveryDateAndStatus(
+            @Param("deliveryDate") LocalDate deliveryDate,
+            @Param("status") String status);
+
+    @Modifying
+    @Query("UPDATE Order o SET o.tripDraft.id = :tripDraftId WHERE o.id IN :orderIds")
+    void updateTripDraftId(@Param("orderIds") List<Long> orderIds,
+                           @Param("tripDraftId") Long tripDraftId);
 }
+

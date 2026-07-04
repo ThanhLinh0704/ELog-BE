@@ -54,6 +54,10 @@ public enum ErrorCode {
     INVALID_FILE_FORMAT("INVALID_FILE_FORMAT"),
     FILE_TOO_LARGE("FILE_TOO_LARGE"),
 
+    // Trip Draft (US-10)
+    TRIP_DRAFT_NOT_FOUND("TRIP_DRAFT_NOT_FOUND"),
+    TRIP_DRAFT_LOCKED("TRIP_DRAFT_LOCKED"),
+
     // Validation
     FIELD_REQUIRED("Field cannot be blank"),
     INVALID_FORMAT("Invalid format"),
