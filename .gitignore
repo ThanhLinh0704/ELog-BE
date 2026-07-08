@@ -61,3 +61,6 @@ ehthumbs.db
 # ─── Misc ───────────────────────────────────────────────────
 *.log
 logs/
+
+# ─── Integration Test Evidence ──────────────────────────────
+Evidence/

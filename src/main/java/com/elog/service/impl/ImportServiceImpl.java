@@ -56,7 +56,7 @@ public class ImportServiceImpl implements ImportService {
             // Deactivate old batch (soft replace)
             ImportBatch oldBatch = existingBatch.get();
             oldBatch.setIsActive(false);
-            batchRepository.save(oldBatch);
+            batchRepository.saveAndFlush(oldBatch);
         }
 
         // Step 3: Create new batch

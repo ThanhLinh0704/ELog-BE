@@ -29,12 +29,12 @@ INSERT INTO orders (id, import_batch_id, order_ref, store_id, delivery_date, sta
 -- ────────────────────────────────────────────────────────────
 INSERT INTO order_items (id, order_id, product_id, sku, quantity, unit_weight_kg, unit_volume_m3, line_weight_kg, line_volume_m3) VALUES
 -- Order DH160325-01 (ST-001): 2 items → gộp đơn
-(1, 1, 5, 'REF-SAM-300', 2, 65.000, 0.714000, 130.000, 1.428000),   -- Tủ lạnh Samsung 300L × 2
-(2, 1, 1, 'TV-SAM-55',   1, 28.500, 0.199260,  28.500, 0.199260),   -- Tivi Samsung 55" × 1
+(1, 1, (SELECT id FROM products WHERE sku = 'REF-SAM-300'), 'REF-SAM-300', 2, 65.000, 0.714000, 130.000, 1.428000),   -- Tủ lạnh Samsung 300L × 2
+(2, 1, (SELECT id FROM products WHERE sku = 'TV-SAM-55'),   'TV-SAM-55',   1, 28.500, 0.199260,  28.500, 0.199260),   -- Tivi Samsung 55" × 1
 -- Order DH160325-02 (ST-002): 1 item
-(3, 2, 6, 'GEN-DNY-5K',  3, 190.000, 0.280500, 570.000, 0.841500),  -- Máy phát điện × 3
+(3, 2, (SELECT id FROM products WHERE sku = 'GEN-DNY-5K'),  'GEN-DNY-5K',  3, 190.000, 0.280500, 570.000, 0.841500),  -- Máy phát điện × 3
 -- Order DH160325-03 (ST-003): 1 item
-(4, 3, 3, 'PHN-APL-14', 10,   0.450, 0.002112,   4.500, 0.021120);  -- iPhone 14 × 10
+(4, 3, (SELECT id FROM products WHERE sku = 'PHN-APL-14'), 'PHN-APL-14', 10,   0.450, 0.002112,   4.500, 0.021120);  -- iPhone 14 × 10
 
 -- ────────────────────────────────────────────────────────────
 -- 4. Import Errors — 2 dòng bị reject
@@ -57,14 +57,14 @@ INSERT INTO orders (id, import_batch_id, order_ref, store_id, delivery_date, sta
 (5, 3, 'DH170325-02', 2, '2026-03-17', 'IMPORTED');
 
 INSERT INTO order_items (id, order_id, product_id, sku, quantity, unit_weight_kg, unit_volume_m3, line_weight_kg, line_volume_m3) VALUES
-(5, 4, 5, 'REF-SAM-300', 1, 65.000, 0.714000,  65.000, 0.714000),  -- Tủ lạnh × 1
-(6, 4, 2, 'TV-SAM-43',   2, 18.500, 0.123692,  37.000, 0.247384),  -- Tivi 43" × 2
-(7, 5, 4, 'PHN-SAM-S23', 5,  0.400, 0.001920,   2.000, 0.009600),  -- Samsung S23 × 5
-(8, 5, 7, 'ACC-USB-C1', 20,  0.120, 0.001875,   2.400, 0.037500);  -- Cáp sạc × 20
+(5, 4, (SELECT id FROM products WHERE sku = 'REF-SAM-300'), 'REF-SAM-300', 1, 65.000, 0.714000,  65.000, 0.714000),  -- Tủ lạnh × 1
+(6, 4, (SELECT id FROM products WHERE sku = 'TV-SAM-43'),   'TV-SAM-43',   2, 18.500, 0.123692,  37.000, 0.247384),  -- Tivi 43" × 2
+(7, 5, (SELECT id FROM products WHERE sku = 'PHN-SAM-S23'), 'PHN-SAM-S23', 5,  0.400, 0.001920,   2.000, 0.009600),  -- Samsung S23 × 5
+(8, 5, (SELECT id FROM products WHERE sku = 'ACC-USB-C1'), 'ACC-USB-C1', 20,  0.120, 0.001875,   2.400, 0.037500);  -- Cáp sạc × 20
 
 -- Orders cho batch #2 (đã bị thay thế — giữ lại để audit)
 INSERT INTO orders (id, import_batch_id, order_ref, store_id, delivery_date, status) VALUES
 (6, 2, 'DH170325-01', 1, '2026-03-17', 'IMPORTED');
 
 INSERT INTO order_items (id, order_id, product_id, sku, quantity, unit_weight_kg, unit_volume_m3, line_weight_kg, line_volume_m3) VALUES
-(9, 6, 5, 'REF-SAM-300', 3, 65.000, 0.714000, 195.000, 2.142000);  -- File cũ ghi 3 cái, file mới sửa lại 1 cái
+(9, 6, (SELECT id FROM products WHERE sku = 'REF-SAM-300'), 'REF-SAM-300', 3, 65.000, 0.714000, 195.000, 2.142000);  -- File cũ ghi 3 cái, file mới sửa lại 1 cái
