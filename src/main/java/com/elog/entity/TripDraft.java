@@ -8,6 +8,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -53,6 +54,16 @@ public class TripDraft {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private String status = "DRAFT";
+
+    @Column(name = "planned_departure_time")
+    private LocalTime plannedDepartureTime;
+
+    @Column(name = "confirmed_at")
+    private LocalDateTime confirmedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "confirmed_by")
+    private User confirmedBy;
 
     @OneToMany(mappedBy = "tripDraft", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequenceNo ASC")

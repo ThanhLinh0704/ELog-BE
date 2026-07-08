@@ -9,14 +9,9 @@ import java.time.LocalDateTime;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class TripDraftStopResponse {
+public class StopEtaResponse {
     private Long tripDraftStopId;
     private Integer sequenceNo;
-    private Long storeId;
     private String storeCode;
-    private String storeName;
-    private Boolean isActive;
-    private Integer orderCount;
     private LocalDateTime plannedEta;
-    private String overrideNote;
 }

@@ -1,10 +1,13 @@
 package com.elog.service.impl;
 
+import com.elog.dto.request.RecalculateEtaRequest;
+import com.elog.dto.request.StopUpdateRequest;
 import com.elog.dto.response.*;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
 import com.elog.repository.*;
+import com.elog.service.EtaCalculationService;
 import com.elog.service.TripDraftService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -29,6 +33,8 @@ public class TripDraftServiceImpl implements TripDraftService {
     private final TripDraftRepository tripDraftRepository;
     private final TripDraftStopRepository tripDraftStopRepository;
     private final RouteRepository routeRepository;
+    private final UserRepository userRepository;
+    private final EtaCalculationService etaCalculationService;
 
     @Override
     @Transactional
@@ -229,9 +235,183 @@ public class TripDraftServiceImpl implements TripDraftService {
         return toResponse(draft, stopResponses);
     }
 
+    // ── US-11: Stop Filtering & Manual Adjustment (TASK-02) ─────
+
+    @Override
+    @Transactional(readOnly = true)
+    public TripDraftResponse getStopsForReview(Long tripDraftId) {
+        // Reuse existing getTripDraftById — same logic, same response
+        return getTripDraftById(tripDraftId);
+    }
+
+    @Override
+    @Transactional
+    public TripDraftStopResponse updateStop(Long tripDraftId, Long stopId, StopUpdateRequest request) {
+        TripDraft draft = findDraftOrThrow(tripDraftId);
+
+        // DC-07: block changes after PLANNED
+        if (!"DRAFT".equals(draft.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.TRIP_DRAFT_LOCKED,
+                    "Trip Draft already confirmed (status=" + draft.getStatus() + "). Stop adjustment not allowed.",
+                    HttpStatus.CONFLICT);
+        }
+
+        TripDraftStop stop = tripDraftStopRepository.findById(stopId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "TripDraftStop not found with id: " + stopId,
+                        HttpStatus.NOT_FOUND));
+
+        // Verify stop belongs to this trip draft
+        if (!stop.getTripDraft().getId().equals(tripDraftId)) {
+            throw new BusinessException(
+                    ErrorCode.RESOURCE_NOT_FOUND,
+                    "Stop " + stopId + " does not belong to Trip Draft " + tripDraftId,
+                    HttpStatus.NOT_FOUND);
+        }
+
+        // [ASSUMPTION]: Cannot activate a stop with no orders
+        if (Boolean.TRUE.equals(request.getIsActive()) && stop.getOrderCount() == 0) {
+            throw new BusinessException(
+                    ErrorCode.CANNOT_ACTIVATE_EMPTY_STOP,
+                    "Stop " + stop.getStore().getCode() + " has no orders for " + draft.getDeliveryDate()
+                            + ". Cannot activate.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // Update stop
+        stop.setIsActive(request.getIsActive());
+        stop.setOverrideNote(request.getOverrideNote());
+        // Clear planned_eta when stop status changes (needs recalculation)
+        stop.setPlannedEta(null);
+        tripDraftStopRepository.save(stop);
+
+        // Update counts on TripDraft
+        int activeCount = tripDraftStopRepository.countByTripDraftIdAndIsActiveTrue(tripDraftId);
+        int totalStops = draft.getStops().size();
+        draft.setActiveStopCount(activeCount);
+        draft.setSkippedStopCount(totalStops - activeCount);
+        tripDraftRepository.save(draft);
+
+        // Clear all planned_eta for active stops (force recalculation)
+        List<TripDraftStop> activeStops = tripDraftStopRepository
+                .findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);
+        for (TripDraftStop activeStop : activeStops) {
+            activeStop.setPlannedEta(null);
+        }
+        tripDraftStopRepository.saveAll(activeStops);
+
+        log.info("US-11: Stop {} (store={}) updated to isActive={} for TripDraft {}",
+                stopId, stop.getStore().getCode(), request.getIsActive(), tripDraftId);
+
+        return toStopResponse(stop);
+    }
+
+    // ── US-11: ETA Recalculation (TASK-03) ─────────────────────
+
+    @Override
+    @Transactional
+    public RecalculateEtaResponse recalculateEta(Long tripDraftId, RecalculateEtaRequest request) {
+        // Delegate to EtaCalculationService (Haversine implementation)
+        List<StopEtaResponse> results = etaCalculationService
+                .calculateAndPersist(tripDraftId, request.getPlannedDepartureTime());
+
+        return RecalculateEtaResponse.builder()
+                .tripDraftId(tripDraftId)
+                .message("ETA recalculated for " + results.size() + " active stops.")
+                .stops(results)
+                .build();
+    }
+
+    // ── US-11: Dispatcher Confirm API — DC-07 Gate (TASK-04) ───
+
+    @Override
+    @Transactional
+    public ConfirmResponse confirmTripDraft(Long tripDraftId, String currentUsername) {
+        TripDraft draft = findDraftOrThrow(tripDraftId);
+
+        // Pre-condition 1: status must be DRAFT
+        if (!"DRAFT".equals(draft.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.ALREADY_CONFIRMED,
+                    "Trip Draft " + tripDraftId + " is already in " + draft.getStatus() + " status.",
+                    HttpStatus.CONFLICT);
+        }
+
+        // Pre-condition 2: must have ≥1 active stop
+        int activeCount = tripDraftStopRepository.countByTripDraftIdAndIsActiveTrue(tripDraftId);
+        if (activeCount == 0) {
+            throw new BusinessException(
+                    ErrorCode.NO_ACTIVE_STOP,
+                    "Trip Draft has no active stops. At least 1 active stop required before confirmation.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // Pre-condition 3: all active stops must have planned_eta
+        int missingEtaCount = tripDraftStopRepository
+                .countByTripDraftIdAndIsActiveTrueAndPlannedEtaIsNull(tripDraftId);
+        if (missingEtaCount > 0) {
+            throw new BusinessException(
+                    ErrorCode.ETA_NOT_CALCULATED,
+                    "All active stops must have ETA calculated before confirming. "
+                            + missingEtaCount + " stops missing ETA. Call POST /recalculate-eta first.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // Resolve current user
+        User confirmer = userRepository.findByUsername(currentUsername)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "User not found: " + currentUsername,
+                        HttpStatus.NOT_FOUND));
+
+        // Execute state transition: DRAFT → PLANNED
+        LocalDateTime now = LocalDateTime.now();
+        draft.setStatus("PLANNED");
+        draft.setConfirmedAt(now);
+        draft.setConfirmedBy(confirmer);
+        tripDraftRepository.save(draft);
+
+        log.info("US-11 DC-07: TripDraft id={} confirmed by {} at {}",
+                tripDraftId, currentUsername, now);
+
+        return ConfirmResponse.builder()
+                .tripDraftId(tripDraftId)
+                .fixedRouteCode(draft.getRoute().getCode())
+                .deliveryDate(draft.getDeliveryDate())
+                .status("PLANNED")
+                .confirmedAt(now)
+                .confirmedBy(ConfirmedByDto.builder()
+                        .userId(confirmer.getId())
+                        .fullName(confirmer.getFullName())
+                        .build())
+                .activeStopCount(activeCount)
+                .summary("Trip Draft confirmed. Capacity validation (US-12) is now unlocked.")
+                .build();
+    }
+
+    // ── Shared helpers ───────────────────────────────────────────
+
+    private TripDraft findDraftOrThrow(Long id) {
+        return tripDraftRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.TRIP_DRAFT_NOT_FOUND,
+                        "Trip Draft not found with id: " + id,
+                        HttpStatus.NOT_FOUND));
+    }
+
     // ── Mapping helpers ─────────────────────────────────────────
 
     private TripDraftResponse toResponse(TripDraft draft, List<TripDraftStopResponse> stops) {
+        ConfirmedByDto confirmedByDto = null;
+        if (draft.getConfirmedBy() != null) {
+            confirmedByDto = ConfirmedByDto.builder()
+                    .userId(draft.getConfirmedBy().getId())
+                    .fullName(draft.getConfirmedBy().getFullName())
+                    .build();
+        }
+
         return TripDraftResponse.builder()
                 .id(draft.getId())
                 .routeId(draft.getRoute().getId())
@@ -242,18 +422,24 @@ public class TripDraftServiceImpl implements TripDraftService {
                 .activeStopCount(draft.getActiveStopCount())
                 .skippedStopCount(draft.getSkippedStopCount())
                 .status(draft.getStatus())
+                .plannedDepartureTime(draft.getPlannedDepartureTime())
+                .confirmedAt(draft.getConfirmedAt())
+                .confirmedBy(confirmedByDto)
                 .stops(stops)
                 .build();
     }
 
     private TripDraftStopResponse toStopResponse(TripDraftStop stop) {
         return TripDraftStopResponse.builder()
+                .tripDraftStopId(stop.getId())
                 .sequenceNo(stop.getSequenceNo())
                 .storeId(stop.getStore().getId())
                 .storeCode(stop.getStore().getCode())
                 .storeName(stop.getStore().getName())
                 .isActive(stop.getIsActive())
                 .orderCount(stop.getOrderCount())
+                .plannedEta(stop.getPlannedEta())
+                .overrideNote(stop.getOverrideNote())
                 .build();
     }
 }

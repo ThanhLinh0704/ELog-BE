@@ -4,6 +4,8 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Getter
@@ -21,5 +23,8 @@ public class TripDraftResponse {
     private Integer activeStopCount;
     private Integer skippedStopCount;
     private String status;
+    private LocalTime plannedDepartureTime;
+    private LocalDateTime confirmedAt;
+    private ConfirmedByDto confirmedBy;
     private List<TripDraftStopResponse> stops;
 }
