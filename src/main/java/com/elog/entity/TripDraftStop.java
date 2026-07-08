@@ -3,6 +3,8 @@ package com.elog.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "trip_draft_stops",
         uniqueConstraints = @UniqueConstraint(
@@ -40,4 +42,10 @@ public class TripDraftStop {
     @Column(name = "order_count", nullable = false)
     @Builder.Default
     private Integer orderCount = 0;
+
+    @Column(name = "planned_eta")
+    private LocalDateTime plannedEta;
+
+    @Column(name = "override_note", length = 255)
+    private String overrideNote;
 }

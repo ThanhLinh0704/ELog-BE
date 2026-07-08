@@ -30,6 +30,10 @@ public class RouteStop {
     @Column(name = "sequence_order", nullable = false)
     private Integer sequenceOrder;
 
+    @Column(name = "avg_service_time_min", nullable = false)
+    @Builder.Default
+    private Integer avgServiceTimeMin = 15;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
