@@ -10,5 +10,7 @@ import lombok.*;
 public class ImportErrorResponse {
     private Integer rowNumber;
     private String rawData;
+    private String errorCode;
+    private String fieldName;
     private String errorReason;
 }

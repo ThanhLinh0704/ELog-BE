@@ -29,6 +29,12 @@ public class ImportError {
     @Column(name = "raw_data", columnDefinition = "TEXT")
     private String rawData;
 
+    @Column(name = "error_code", nullable = false)
+    private String errorCode;
+
+    @Column(name = "field_name")
+    private String fieldName;
+
     @Column(name = "error_reason", nullable = false)
     private String errorReason;
 

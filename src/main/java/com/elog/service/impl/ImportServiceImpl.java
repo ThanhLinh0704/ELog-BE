@@ -47,7 +47,10 @@ public class ImportServiceImpl implements ImportService {
         // Step 1: Validate file format (BEFORE transaction — nothing to rollback)
         validateFile(file);
 
-        // Step 2: Check existing active batch for this delivery date
+        // Step 2: Parse Excel rows (so size check throws BEFORE creating db batch)
+        List<RowData> rows = parseExcelFile(file);
+
+        // Step 3: Check existing active batch for this delivery date
         Optional<ImportBatch> existingBatch = batchRepository.findActiveByDate(deliveryDate);
         if (existingBatch.isPresent()) {
             if (!confirmReplace) {
@@ -59,7 +62,7 @@ public class ImportServiceImpl implements ImportService {
             batchRepository.save(oldBatch);
         }
 
-        // Step 3: Create new batch
+        // Step 4: Create new batch
         ImportBatch batch;
         try {
             batch = ImportBatch.builder()
@@ -78,9 +81,6 @@ public class ImportServiceImpl implements ImportService {
                     HttpStatus.CONFLICT);
         }
 
-        // Step 4: Parse Excel rows
-        List<RowData> rows = parseExcelFile(file);
-
         int totalRows = rows.size();
         int acceptedRows = 0;
         int rejectedRows = 0;
@@ -90,10 +90,16 @@ public class ImportServiceImpl implements ImportService {
         Map<String, Product> productCache = new HashMap<>();
         // Cache for orders: key = orderRef + "|" + storeId
         Map<String, Order> orderCache = new HashMap<>();
+        // Cache for tracking orderRef store mapped in this batch to detect ORDER_REF_STORE_MISMATCH
+        Map<String, Store> orderRefStoreCache = new HashMap<>();
+        // Cache for tracking orderRef first row number for the error message
+        Map<String, Integer> orderRefFirstRow = new HashMap<>();
+        // Cache for tracking created order items to accumulate duplicates
+        Map<String, OrderItem> orderItemCache = new HashMap<>();
 
         for (RowData row : rows) {
             try {
-                processRow(row, batch, deliveryDate, storeCache, productCache, orderCache);
+                processRow(row, batch, deliveryDate, storeCache, productCache, orderCache, orderRefStoreCache, orderRefFirstRow, orderItemCache);
                 acceptedRows++;
             } catch (RowRejectedException ex) {
                 rejectedRows++;
@@ -101,6 +107,8 @@ public class ImportServiceImpl implements ImportService {
                         .importBatch(batch)
                         .rowNumber(row.rowNumber)
                         .rawData(row.toRawString())
+                        .errorCode(ex.getErrorCode())
+                        .fieldName(ex.getFieldName())
                         .errorReason(ex.getMessage())
                         .build();
                 errorRepository.save(error);
@@ -159,24 +167,93 @@ public class ImportServiceImpl implements ImportService {
         return toResponse(batch, ordersCreated);
     }
 
-    // ── GET /api/imports/{batchId}/errors ──────────────────────────────────────
-
     @Override
     @Transactional(readOnly = true)
-    public List<ImportErrorResponse> getBatchErrors(Long batchId) {
+    public ApiResponse<List<ImportErrorResponse>> getBatchErrors(Long batchId, String errorCode, Pageable pageable) {
         // Verify batch exists
         if (!batchRepository.existsById(batchId)) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
                     "Import batch not found: " + batchId, HttpStatus.NOT_FOUND);
         }
 
-        return errorRepository.findByImportBatchIdOrderByRowNumberAsc(batchId).stream()
+        String filterCode = (errorCode == null || errorCode.trim().isEmpty()) ? null : errorCode.trim();
+        Page<ImportError> page = errorRepository.findByImportBatchIdAndErrorCode(batchId, filterCode, pageable);
+
+        List<ImportErrorResponse> items = page.getContent().stream()
                 .map(e -> ImportErrorResponse.builder()
                         .rowNumber(e.getRowNumber())
                         .rawData(e.getRawData())
+                        .errorCode(e.getErrorCode())
+                        .fieldName(e.getFieldName())
                         .errorReason(e.getErrorReason())
                         .build())
                 .toList();
+
+        return ApiResponse.<List<ImportErrorResponse>>builder()
+                .success(true)
+                .data(items)
+                .pagination(ApiResponse.PaginationInfo.builder()
+                        .page(page.getNumber())
+                        .size(page.getSize())
+                        .totalElements(page.getTotalElements())
+                        .totalPages(page.getTotalPages())
+                        .build())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] exportBatchErrors(Long batchId) {
+        if (!batchRepository.existsById(batchId)) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+                    "Import batch not found: " + batchId, HttpStatus.NOT_FOUND);
+        }
+
+        try (Workbook workbook = new XSSFWorkbook();
+             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+
+            List<ImportError> errors = errorRepository.findByImportBatchIdOrderByRowNumberAsc(batchId);
+            Sheet sheet = workbook.createSheet("Import Errors");
+
+            // Create header row
+            Row headerRow = sheet.createRow(0);
+            String[] headers = {"Dòng", "Mã lỗi", "Trường", "Dữ liệu gốc", "Lý do"};
+            
+            // Header style
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font font = workbook.createFont();
+            font.setBold(true);
+            headerStyle.setFont(font);
+
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // Fill data rows
+            int rowIdx = 1;
+            for (ImportError error : errors) {
+                Row row = sheet.createRow(rowIdx++);
+                row.createCell(0).setCellValue(error.getRowNumber());
+                row.createCell(1).setCellValue(error.getErrorCode());
+                row.createCell(2).setCellValue(error.getFieldName() != null ? error.getFieldName() : "");
+                row.createCell(3).setCellValue(error.getRawData() != null ? error.getRawData() : "");
+                row.createCell(4).setCellValue(error.getErrorReason());
+            }
+
+            // Auto-size columns
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (Exception e) {
+            log.error("Error exporting import batch errors: {}", e.getMessage(), e);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR,
+                    "Không thể xuất file báo cáo lỗi", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -203,6 +280,19 @@ public class ImportServiceImpl implements ImportService {
             if (sheet == null) {
                 throw new BusinessException(ErrorCode.EXCEL_PARSE_ERROR,
                         "File Excel không có sheet nào", HttpStatus.BAD_REQUEST);
+            }
+
+            // Pre-check size
+            int rowCount = 0;
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row != null && !isEmptyRow(row)) {
+                    rowCount++;
+                }
+            }
+            if (rowCount > 5000) {
+                throw new BusinessException(ErrorCode.FILE_TOO_LARGE,
+                        "File Excel vượt quá giới hạn 5.000 dòng dữ liệu", HttpStatus.BAD_REQUEST);
             }
 
             // Skip header row (row 0)
@@ -232,55 +322,76 @@ public class ImportServiceImpl implements ImportService {
 
     private void processRow(RowData row, ImportBatch batch, LocalDate deliveryDate,
                             Map<String, Store> storeCache, Map<String, Product> productCache,
-                            Map<String, Order> orderCache) {
+                            Map<String, Order> orderCache, Map<String, Store> orderRefStoreCache,
+                            Map<String, Integer> orderRefFirstRow, Map<String, OrderItem> orderItemCache) {
 
-        // 4a: Validate quantity
+        // Validate required fields (MISSING_FIELD)
+        String storeCode = row.storeCode != null ? row.storeCode.trim() : "";
+        if (storeCode.isEmpty()) {
+            throw new RowRejectedException("Mã cửa hàng không được để trống", "MISSING_FIELD", "store_code");
+        }
+
+        String sku = row.sku != null ? row.sku.trim() : "";
+        if (sku.isEmpty()) {
+            throw new RowRejectedException("SKU không được để trống", "MISSING_FIELD", "sku");
+        }
+
+        String quantityRaw = row.quantityRaw != null ? row.quantityRaw.trim() : "";
+        if (quantityRaw.isEmpty()) {
+            throw new RowRejectedException("Thiếu giá trị Số lượng", "MISSING_FIELD", "quantity");
+        }
+
+        // Validate quantity format (INVALID_QUANTITY)
         int quantity;
         try {
-            double dVal = Double.parseDouble(row.quantityRaw.trim());
+            double dVal = Double.parseDouble(quantityRaw);
             if (dVal != Math.floor(dVal) || dVal <= 0) {
                 throw new NumberFormatException();
             }
             quantity = (int) dVal;
         } catch (NumberFormatException | NullPointerException e) {
-            throw new RowRejectedException("Số lượng phải là số nguyên dương (giá trị: '" + row.quantityRaw + "')");
+            throw new RowRejectedException("Số lượng phải là số nguyên dương (giá trị: '" + row.quantityRaw + "')", "INVALID_QUANTITY", "quantity");
         }
 
-        // 4b: Lookup store (cache cả null để tránh N+1 queries)
-        String storeCode = row.storeCode != null ? row.storeCode.trim() : "";
-        if (storeCode.isEmpty()) {
-            throw new RowRejectedException("Mã cửa hàng không được để trống");
-        }
+        // Lookup store (STORE_NOT_FOUND)
         if (!storeCache.containsKey(storeCode)) {
             storeCache.put(storeCode, storeRepository.findByCode(storeCode).orElse(null));
         }
         Store store = storeCache.get(storeCode);
         if (store == null) {
-            throw new RowRejectedException("Mã cửa hàng '" + storeCode + "' không tồn tại trong hệ thống");
+            throw new RowRejectedException("Mã cửa hàng '" + storeCode + "' không tồn tại trong hệ thống", "STORE_NOT_FOUND", "store_code");
         }
 
-        // 4c: Lookup product by SKU
-        String sku = row.sku != null ? row.sku.trim() : "";
-        if (sku.isEmpty()) {
-            throw new RowRejectedException("SKU không được để trống");
-        }
+        // Lookup product by SKU (SKU_NOT_FOUND, SKU_INACTIVE)
         if (!productCache.containsKey(sku)) {
             productCache.put(sku, productRepository.findBySku(sku).orElse(null));
         }
         Product product = productCache.get(sku);
         if (product == null) {
-            throw new RowRejectedException("SKU '" + sku + "' chưa có trong danh mục sản phẩm");
+            throw new RowRejectedException("SKU '" + sku + "' chưa có trong danh mục sản phẩm", "SKU_NOT_FOUND", "sku");
         }
         if (!Boolean.TRUE.equals(product.getIsActive())) {
-            throw new RowRejectedException("SKU '" + sku + "' đã ngừng kinh doanh");
+            throw new RowRejectedException("SKU '" + sku + "' đã ngừng kinh doanh", "SKU_INACTIVE", "sku");
         }
 
-        // 4d: Determine order_ref
+        // Determine order_ref
         String orderRef = (row.orderRef != null && !row.orderRef.trim().isEmpty())
                 ? row.orderRef.trim()
                 : "AUTO-" + batch.getId() + "-" + row.rowNumber;
 
-        // 4e: Find or create Order
+        // Check ORDER_REF_STORE_MISMATCH
+        if (orderRefStoreCache.containsKey(orderRef)) {
+            Store existingStore = orderRefStoreCache.get(orderRef);
+            if (!existingStore.getId().equals(store.getId())) {
+                Integer firstRow = orderRefFirstRow.get(orderRef);
+                throw new RowRejectedException("Mã đơn '" + orderRef + "' đã dùng cho cửa hàng '" + existingStore.getCode() + "' (dòng " + firstRow + ") — không thể dùng lại cho cửa hàng khác", "ORDER_REF_STORE_MISMATCH", "order_ref");
+            }
+        } else {
+            orderRefStoreCache.put(orderRef, store);
+            orderRefFirstRow.put(orderRef, row.rowNumber);
+        }
+
+        // Find or create Order
         String orderKey = orderRef + "|" + store.getId();
         Order order = orderCache.computeIfAbsent(orderKey, k -> {
             Optional<Order> existing = orderRepository.findByBatchAndOrderRefAndStore(
@@ -296,22 +407,36 @@ public class ImportServiceImpl implements ImportService {
             });
         });
 
-        // 4f: Create OrderItem with snapshot
+        // Create or update OrderItem with snapshot (Accumulation for identical product in same order)
+        String orderItemKey = order.getId() + "|" + product.getId();
         BigDecimal unitWeight = product.getWeightKg();
         BigDecimal unitVolume = product.getVolumeM3();
-        BigDecimal qty = BigDecimal.valueOf(quantity);
 
-        OrderItem item = OrderItem.builder()
-                .order(order)
-                .product(product)
-                .sku(sku)
-                .quantity(quantity)
-                .unitWeightKg(unitWeight)
-                .unitVolumeM3(unitVolume)
-                .lineWeightKg(unitWeight.multiply(qty).setScale(3, RoundingMode.HALF_UP))
-                .lineVolumeM3(unitVolume.multiply(qty).setScale(6, RoundingMode.HALF_UP))
-                .build();
-        orderItemRepository.save(item);
+        if (orderItemCache.containsKey(orderItemKey)) {
+            OrderItem existingItem = orderItemCache.get(orderItemKey);
+            int newQuantity = existingItem.getQuantity() + quantity;
+            existingItem.setQuantity(newQuantity);
+            BigDecimal newQtyDecimal = BigDecimal.valueOf(newQuantity);
+            existingItem.setLineWeightKg(unitWeight.multiply(newQtyDecimal).setScale(3, RoundingMode.HALF_UP));
+            existingItem.setLineVolumeM3(unitVolume.multiply(newQtyDecimal).setScale(6, RoundingMode.HALF_UP));
+            
+            orderItemRepository.save(existingItem);
+            log.warn("Dòng trùng SKU '{}' cho đơn hàng '{}'. Tiến hành cộng dồn số lượng. Số lượng mới: {}", sku, orderRef, newQuantity);
+        } else {
+            BigDecimal qty = BigDecimal.valueOf(quantity);
+            OrderItem item = OrderItem.builder()
+                    .order(order)
+                    .product(product)
+                    .sku(sku)
+                    .quantity(quantity)
+                    .unitWeightKg(unitWeight)
+                    .unitVolumeM3(unitVolume)
+                    .lineWeightKg(unitWeight.multiply(qty).setScale(3, RoundingMode.HALF_UP))
+                    .lineVolumeM3(unitVolume.multiply(qty).setScale(6, RoundingMode.HALF_UP))
+                    .build();
+            OrderItem savedItem = orderItemRepository.save(item);
+            orderItemCache.put(orderItemKey, savedItem != null ? savedItem : item);
+        }
     }
 
     private boolean isEmptyRow(Row row) {
@@ -372,8 +497,21 @@ public class ImportServiceImpl implements ImportService {
     // ── Inner exception for per-row rejection ─────────────────────────────────
 
     private static class RowRejectedException extends RuntimeException {
-        RowRejectedException(String message) {
+        private final String errorCode;
+        private final String fieldName;
+
+        RowRejectedException(String message, String errorCode, String fieldName) {
             super(message);
+            this.errorCode = errorCode;
+            this.fieldName = fieldName;
+        }
+
+        public String getErrorCode() {
+            return errorCode;
+        }
+
+        public String getFieldName() {
+            return fieldName;
         }
     }
 
