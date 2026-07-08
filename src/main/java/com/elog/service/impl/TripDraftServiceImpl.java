@@ -1,0 +1,259 @@
+package com.elog.service.impl;
+
+import com.elog.dto.response.*;
+import com.elog.entity.*;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.*;
+import com.elog.service.TripDraftService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class TripDraftServiceImpl implements TripDraftService {
+
+    private final OrderRepository orderRepository;
+    private final RouteStopRepository routeStopRepository;
+    private final TripDraftRepository tripDraftRepository;
+    private final TripDraftStopRepository tripDraftStopRepository;
+    private final RouteRepository routeRepository;
+
+    @Override
+    @Transactional
+    public ConsolidateResponse consolidate(LocalDate deliveryDate) {
+        // 1. Fetch all ACCEPTED orders for this date (active batch only)
+        List<Order> acceptedOrders = orderRepository
+                .findByDeliveryDateAndStatus(deliveryDate, "ACCEPTED");
+
+        if (acceptedOrders.isEmpty()) {
+            return ConsolidateResponse.builder()
+                    .deliveryDate(deliveryDate)
+                    .tripDraftsCreatedOrUpdated(0)
+                    .tripDrafts(Collections.emptyList())
+                    .skippedRoutes(Collections.emptyList())
+                    .build();
+        }
+
+        // 2. Deduplicate orders (JOIN FETCH on items may produce duplicates)
+        acceptedOrders = new ArrayList<>(
+                acceptedOrders.stream()
+                        .collect(Collectors.toMap(Order::getId, o -> o, (a, b) -> a,
+                                LinkedHashMap::new))
+                        .values());
+
+        // 3. Build store → route mapping via route_stops table
+        Set<Long> storeIds = acceptedOrders.stream()
+                .map(o -> o.getStore().getId())
+                .collect(Collectors.toSet());
+
+        Map<Long, RouteStop> storeToRouteStop = new HashMap<>();
+        for (Long storeId : storeIds) {
+            routeStopRepository.findFirstByStoreId(storeId)
+                    .ifPresent(rs -> storeToRouteStop.put(storeId, rs));
+        }
+
+        // 4. Group orders by route_id
+        Map<Long, List<Order>> ordersByRoute = new LinkedHashMap<>();
+        List<Order> unmappedOrders = new ArrayList<>();
+
+        for (Order order : acceptedOrders) {
+            RouteStop rs = storeToRouteStop.get(order.getStore().getId());
+            if (rs != null) {
+                ordersByRoute.computeIfAbsent(rs.getRoute().getId(), k -> new ArrayList<>())
+                        .add(order);
+            } else {
+                unmappedOrders.add(order);
+            }
+        }
+
+        if (!unmappedOrders.isEmpty()) {
+            log.warn("US-10: {} orders have stores not mapped to any route (skipped)",
+                    unmappedOrders.size());
+        }
+
+        // 5. Process each route
+        List<TripDraftResponse> results = new ArrayList<>();
+        List<ConsolidateResponse.SkippedRouteInfo> skippedRoutes = new ArrayList<>();
+
+        for (Map.Entry<Long, List<Order>> entry : ordersByRoute.entrySet()) {
+            Long routeId = entry.getKey();
+            List<Order> routeOrders = entry.getValue();
+
+            Route route = routeRepository.findById(routeId).orElse(null);
+            if (route == null) {
+                log.error("US-10: Route id={} not found in DB", routeId);
+                continue;
+            }
+
+            // 5a. Guard: route must have RouteStops (NAC-10a)
+            List<RouteStop> routeStops = routeStopRepository
+                    .findByRouteIdOrderBySequenceOrderAsc(routeId);
+            if (routeStops.isEmpty()) {
+                log.warn("US-10 NAC-10a: Route {} has no RouteStops, skipping", route.getCode());
+                skippedRoutes.add(ConsolidateResponse.SkippedRouteInfo.builder()
+                        .routeId(routeId)
+                        .routeCode(route.getCode())
+                        .reason("Route reference data incomplete — no RouteStop defined")
+                        .build());
+                continue;
+            }
+
+            // 5b. Guard: if TripDraft exists and status != DRAFT → block (NAC-10b)
+            TripDraft existing = tripDraftRepository
+                    .findByRouteIdAndDeliveryDate(routeId, deliveryDate).orElse(null);
+            if (existing != null && !"DRAFT".equals(existing.getStatus())) {
+                throw new BusinessException(
+                        ErrorCode.TRIP_DRAFT_LOCKED,
+                        String.format("Trip Draft cho route %s ngày %s đã được xác nhận (status=%s), " +
+                                "không thể tự động cập nhật lại. Vui lòng reset thủ công trước khi consolidate lại.",
+                                route.getCode(), deliveryDate, existing.getStatus()),
+                        HttpStatus.CONFLICT);
+            }
+
+            // 5c. Calculate totals from pre-computed line values on OrderItem
+            BigDecimal totalVolume = BigDecimal.ZERO;
+            BigDecimal totalWeight = BigDecimal.ZERO;
+            for (Order order : routeOrders) {
+                for (OrderItem item : order.getItems()) {
+                    totalVolume = totalVolume.add(item.getLineVolumeM3());
+                    totalWeight = totalWeight.add(item.getLineWeightKg());
+                }
+            }
+
+            // 5d. Determine active/skipped stops (BR-06)
+            Set<Long> storeIdsWithOrder = routeOrders.stream()
+                    .map(o -> o.getStore().getId())
+                    .collect(Collectors.toSet());
+
+            int activeCount = 0;
+            for (RouteStop rs : routeStops) {
+                if (storeIdsWithOrder.contains(rs.getStore().getId())) {
+                    activeCount++;
+                }
+            }
+            int skippedCount = routeStops.size() - activeCount;
+
+            // 5e. Upsert TripDraft
+            TripDraft draft = (existing != null) ? existing : new TripDraft();
+            draft.setRoute(route);
+            draft.setDeliveryDate(deliveryDate);
+            draft.setTotalVolumeM3(totalVolume);
+            draft.setTotalWeightKg(totalWeight);
+            draft.setActiveStopCount(activeCount);
+            draft.setSkippedStopCount(skippedCount);
+            draft.setStatus("DRAFT");
+            tripDraftRepository.save(draft);
+
+            // 5f. Refresh TripDraftStops (delete old, recreate — idempotent)
+            tripDraftStopRepository.deleteByTripDraftId(draft.getId());
+            tripDraftRepository.flush();
+
+            for (RouteStop rs : routeStops) {
+                boolean isActive = storeIdsWithOrder.contains(rs.getStore().getId());
+                int orderCountAtStop = (int) routeOrders.stream()
+                        .filter(o -> o.getStore().getId().equals(rs.getStore().getId()))
+                        .count();
+
+                TripDraftStop stop = TripDraftStop.builder()
+                        .tripDraft(draft)
+                        .routeStop(rs)
+                        .store(rs.getStore())
+                        .sequenceNo(rs.getSequenceOrder())
+                        .isActive(isActive)
+                        .orderCount(orderCountAtStop)
+                        .build();
+                tripDraftStopRepository.save(stop);
+            }
+
+            // 5g. Link orders back to this TripDraft
+            List<Long> orderIds = routeOrders.stream().map(Order::getId).toList();
+            orderRepository.updateTripDraftId(orderIds, draft.getId());
+
+            results.add(toResponse(draft, null));
+        }
+
+        return ConsolidateResponse.builder()
+                .deliveryDate(deliveryDate)
+                .tripDraftsCreatedOrUpdated(results.size())
+                .tripDrafts(results)
+                .skippedRoutes(skippedRoutes)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse<List<TripDraftResponse>> getTripDrafts(LocalDate deliveryDate, Pageable pageable) {
+        Page<TripDraft> page = tripDraftRepository.findByDeliveryDate(deliveryDate, pageable);
+
+        List<TripDraftResponse> data = page.getContent().stream()
+                .map(td -> toResponse(td, null))
+                .toList();
+
+        return ApiResponse.<List<TripDraftResponse>>builder()
+                .success(true)
+                .data(data)
+                .pagination(ApiResponse.PaginationInfo.builder()
+                        .page(page.getNumber())
+                        .size(page.getSize())
+                        .totalElements(page.getTotalElements())
+                        .totalPages(page.getTotalPages())
+                        .build())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TripDraftResponse getTripDraftById(Long id) {
+        TripDraft draft = tripDraftRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.TRIP_DRAFT_NOT_FOUND,
+                        "Trip Draft not found with id: " + id,
+                        HttpStatus.NOT_FOUND));
+
+        List<TripDraftStopResponse> stopResponses = draft.getStops().stream()
+                .map(this::toStopResponse)
+                .toList();
+
+        return toResponse(draft, stopResponses);
+    }
+
+    // ── Mapping helpers ─────────────────────────────────────────
+
+    private TripDraftResponse toResponse(TripDraft draft, List<TripDraftStopResponse> stops) {
+        return TripDraftResponse.builder()
+                .id(draft.getId())
+                .routeId(draft.getRoute().getId())
+                .routeCode(draft.getRoute().getCode())
+                .deliveryDate(draft.getDeliveryDate())
+                .totalVolumeM3(draft.getTotalVolumeM3())
+                .totalWeightKg(draft.getTotalWeightKg())
+                .activeStopCount(draft.getActiveStopCount())
+                .skippedStopCount(draft.getSkippedStopCount())
+                .status(draft.getStatus())
+                .stops(stops)
+                .build();
+    }
+
+    private TripDraftStopResponse toStopResponse(TripDraftStop stop) {
+        return TripDraftStopResponse.builder()
+                .sequenceNo(stop.getSequenceNo())
+                .storeId(stop.getStore().getId())
+                .storeCode(stop.getStore().getCode())
+                .storeName(stop.getStore().getName())
+                .isActive(stop.getIsActive())
+                .orderCount(stop.getOrderCount())
+                .build();
+    }
+}
