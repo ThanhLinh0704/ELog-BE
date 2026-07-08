@@ -50,6 +50,8 @@ public enum ErrorCode {
 
     // Import
     EXCEL_PARSE_ERROR("EXCEL_PARSE_ERROR"),
+    DUPLICATE_DELIVERY_DATE("DUPLICATE_DELIVERY_DATE"),
+    INVALID_FILE_FORMAT("INVALID_FILE_FORMAT"),
 
     // Validation
     FIELD_REQUIRED("Field cannot be blank"),

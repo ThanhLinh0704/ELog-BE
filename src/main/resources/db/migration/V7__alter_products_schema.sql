@@ -29,11 +29,11 @@ ALTER TABLE products
 
 -- ── Step 3: Seed canonical product data ──────────────────────────────────────
 -- volume_m3 = length_m × width_m × height_m (pre-computed)
-INSERT INTO products (sku, product_name, weight_kg, length_m, width_m, height_m, volume_m3) VALUES
-('TV-SAM-55',   'Tivi Samsung 55" Crystal UHD',    28.500, 1.3500, 0.1800, 0.8200, 0.199260),
-('TV-SAM-43',   'Tivi Samsung 43" Crystal UHD',    18.500, 1.0700, 0.1700, 0.6800, 0.123692),
-('PHN-APL-14',  'iPhone 14 128GB (hộp)',             0.450, 0.2200, 0.1200, 0.0800, 0.002112),
-('PHN-SAM-S23', 'Samsung Galaxy S23 (hộp)',          0.400, 0.2000, 0.1200, 0.0800, 0.001920),
-('REF-SAM-300', 'Tủ lạnh Samsung 300L',            65.000, 0.6000, 0.6800, 1.7500, 0.714000),
-('GEN-DNY-5K',  'Máy phát điện Denyo 5KVA',       190.000, 0.7500, 0.5500, 0.6800, 0.280500),
-('ACC-USB-C1',  'Cáp sạc USB-C 1m (hộp)',           0.120, 0.2500, 0.1500, 0.0500, 0.001875);
+INSERT INTO products (id, sku, product_name, weight_kg, length_m, width_m, height_m, volume_m3) VALUES
+(1, 'TV-SAM-55',   'Tivi Samsung 55" Crystal UHD',    28.500, 1.3500, 0.1800, 0.8200, 0.199260),
+(2, 'TV-SAM-43',   'Tivi Samsung 43" Crystal UHD',    18.500, 1.0700, 0.1700, 0.6800, 0.123692),
+(3, 'PHN-APL-14',  'iPhone 14 128GB (hộp)',             0.450, 0.2200, 0.1200, 0.0800, 0.002112),
+(4, 'PHN-SAM-S23', 'Samsung Galaxy S23 (hộp)',          0.400, 0.2000, 0.1200, 0.0800, 0.001920),
+(5, 'REF-SAM-300', 'Tủ lạnh Samsung 300L',            65.000, 0.6000, 0.6800, 1.7500, 0.714000),
+(6, 'GEN-DNY-5K',  'Máy phát điện Denyo 5KVA',       190.000, 0.7500, 0.5500, 0.6800, 0.280500),
+(7, 'ACC-USB-C1',  'Cáp sạc USB-C 1m (hộp)',           0.120, 0.2500, 0.1500, 0.0500, 0.001875);

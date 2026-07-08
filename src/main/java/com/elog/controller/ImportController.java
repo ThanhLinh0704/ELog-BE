@@ -1,0 +1,93 @@
+package com.elog.controller;
+
+import com.elog.dto.response.ApiResponse;
+import com.elog.dto.response.DuplicateBatchResponse;
+import com.elog.dto.response.ImportBatchResponse;
+import com.elog.dto.response.ImportErrorResponse;
+import com.elog.entity.User;
+import com.elog.repository.UserRepository;
+import com.elog.service.ImportService;
+import com.elog.service.impl.ImportServiceImpl;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/imports")
+@RequiredArgsConstructor
+@Tag(name = "Import", description = "Excel import APIs for order management")
+public class ImportController {
+
+    private final ImportService importService;
+    private final UserRepository userRepository;
+
+    @PostMapping(consumes = "multipart/form-data")
+    @Operation(summary = "Upload Excel file to import orders for a delivery date")
+    @PreAuthorize("hasRole('DISPATCHER')")
+    public ResponseEntity<?> importOrders(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("deliveryDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
+            @RequestParam(value = "confirmReplace", required = false, defaultValue = "false") boolean confirmReplace,
+            Authentication authentication) {
+
+        // Get user ID from authenticated username
+        String username = authentication.getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
+        Long userId = user.getId();
+
+        try {
+            ImportBatchResponse response = importService.importExcel(file, deliveryDate, confirmReplace, userId);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(ApiResponse.success(response, "Import hoàn tất"));
+        } catch (ImportServiceImpl.DuplicateBatchException e) {
+            DuplicateBatchResponse body = DuplicateBatchResponse.builder()
+                    .error("DUPLICATE_DELIVERY_DATE")
+                    .message("Đã có dữ liệu nhập cho ngày " + e.getDeliveryDate()
+                            + " (batch #" + e.getExistingBatchId()
+                            + "). Gửi lại với confirmReplace=true để thay thế.")
+                    .existingBatchId(e.getExistingBatchId())
+                    .build();
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        }
+    }
+
+    @GetMapping
+    @Operation(summary = "Get import batch history (paginated, optionally filter by date)")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'SYSTEM_ADMIN')")
+    public ResponseEntity<ApiResponse<List<ImportBatchResponse>>> getBatches(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
+            @PageableDefault(size = 20) Pageable pageable) {
+
+        ApiResponse<List<ImportBatchResponse>> response = importService.getBatches(deliveryDate, pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{batchId}")
+    @Operation(summary = "Get import batch detail by ID")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'SYSTEM_ADMIN')")
+    public ResponseEntity<ApiResponse<ImportBatchResponse>> getBatchById(@PathVariable Long batchId) {
+        ImportBatchResponse response = importService.getBatchById(batchId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{batchId}/errors")
+    @Operation(summary = "Get error list for a specific import batch")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')")
+    public ResponseEntity<ApiResponse<List<ImportErrorResponse>>> getBatchErrors(@PathVariable Long batchId) {
+        List<ImportErrorResponse> errors = importService.getBatchErrors(batchId);
+        return ResponseEntity.ok(ApiResponse.success(errors));
+    }
+}
