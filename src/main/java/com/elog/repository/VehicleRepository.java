@@ -6,12 +6,15 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public interface VehicleRepository extends JpaRepository<Vehicle, Long>, JpaSpecificationExecutor<Vehicle> {
 
     boolean existsByPlateNumber(String plateNumber);
 
     long countByIsActiveTrue();
+
+    List<Vehicle> findByIsActiveTrue();
 
     @Query("select sum(v.maxWeightKg) from Vehicle v where v.isActive = true")
     BigDecimal sumActiveMaxWeightKg();
