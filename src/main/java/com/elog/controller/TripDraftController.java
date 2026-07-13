@@ -4,6 +4,8 @@ import com.elog.dto.request.ConsolidateRequest;
 import com.elog.dto.request.RecalculateEtaRequest;
 import com.elog.dto.request.StopUpdateRequest;
 import com.elog.dto.response.*;
+import com.elog.service.CapacityValidationService;
+import com.elog.service.ManifestService;
 import com.elog.service.TripDraftService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,10 +26,12 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/trip-drafts")
 @RequiredArgsConstructor
-@Tag(name = "Trip Drafts", description = "US-10 Route Consolidation & US-11 Trip Draft Review APIs")
+@Tag(name = "Trip Drafts", description = "US-10 Route Consolidation, US-11 Trip Draft Review, US-12 Capacity Validation & US-13 LIFO Manifest APIs")
 public class TripDraftController {
 
     private final TripDraftService tripDraftService;
+    private final CapacityValidationService capacityValidationService;
+    private final ManifestService manifestService;
 
     // ── US-10 endpoints ──────────────────────────────────────────
 
@@ -101,5 +106,56 @@ public class TripDraftController {
         ConfirmResponse response = tripDraftService.confirmTripDraft(id, currentUsername);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
-}
 
+    // ── US-12 endpoints ──────────────────────────────────────────
+
+    @PostMapping("/{id}/validate-capacity")
+    @Operation(summary = "Trigger capacity validation for a trip draft against the vehicle fleet")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'SYSTEM_ADMIN')")
+    public ResponseEntity<ApiResponse<CapacityValidationResultResponse>> validateCapacity(
+            @PathVariable Long id) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        CapacityValidationResultResponse response = capacityValidationService.validate(id, currentUsername);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{id}/validation-result")
+    @Operation(summary = "Get stored capacity validation result")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF', 'SYSTEM_ADMIN')")
+    public ResponseEntity<ApiResponse<CapacityValidationResultResponse>> getValidationResult(
+            @PathVariable Long id) {
+        CapacityValidationResultResponse response = capacityValidationService.getValidationResult(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // ── US-13 endpoints ──────────────────────────────────────────
+
+    @PostMapping("/{id}/generate-manifest")
+    @Operation(summary = "Generate LIFO loading manifest for a validated trip draft")
+    @PreAuthorize("hasRole('DISPATCHER')")
+    public ResponseEntity<ApiResponse<ManifestResponse>> generateManifest(
+            @PathVariable Long id) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        ManifestResponse response = manifestService.generateManifest(id, currentUsername);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response, response.getMessage()));
+    }
+
+    @GetMapping("/{id}/manifest")
+    @Operation(summary = "Get LIFO manifest flat list for a trip draft")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER')")
+    public ResponseEntity<ApiResponse<ManifestResponse>> getManifest(
+            @PathVariable Long id) {
+        ManifestResponse response = manifestService.getManifest(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{id}/manifest/by-stop")
+    @Operation(summary = "Get LIFO manifest grouped by stop (for Warehouse Staff)")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<ApiResponse<ManifestByStopResponse>> getManifestByStop(
+            @PathVariable Long id) {
+        ManifestByStopResponse response = manifestService.getManifestByStop(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+}

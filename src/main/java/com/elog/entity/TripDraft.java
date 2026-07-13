@@ -65,6 +65,23 @@ public class TripDraft {
     @JoinColumn(name = "confirmed_by")
     private User confirmedBy;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "volume_check_result", nullable = false, length = 20)
+    @Builder.Default
+    private ConstraintResult volumeCheckResult = ConstraintResult.NOT_CHECKED;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "weight_check_result", nullable = false, length = 20)
+    @Builder.Default
+    private ConstraintResult weightCheckResult = ConstraintResult.NOT_CHECKED;
+
+    @Column(name = "validated_at")
+    private LocalDateTime validatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "validated_by")
+    private User validatedBy;
+
     @OneToMany(mappedBy = "tripDraft", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequenceNo ASC")
     @Builder.Default
