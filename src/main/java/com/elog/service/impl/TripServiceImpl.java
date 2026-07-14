@@ -2,6 +2,7 @@ package com.elog.service.impl;
 
 import com.elog.dto.request.TripAssignRequest;
 import com.elog.dto.request.TripSplitAssignRequest;
+import com.elog.dto.request.TripAssignmentPatchRequest;
 import com.elog.dto.response.*;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
@@ -41,7 +42,7 @@ public class TripServiceImpl implements TripService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<EligibleVehicleDto> getEligibleVehicles(Long tripDraftId) {
+    public EligibleVehiclesResponse getEligibleVehicles(Long tripDraftId) {
         TripDraft td = findTripDraftOrThrow(tripDraftId);
         if (!"VALIDATED".equals(td.getStatus())) {
             throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
@@ -49,10 +50,19 @@ public class TripServiceImpl implements TripService {
         }
 
         List<Vehicle> activeVehicles = vehicleRepository.findByIsActiveTrue();
-        return activeVehicles.stream()
-                .filter(v -> v.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) >= 0
-                          && v.getMaxWeightKg().compareTo(td.getTotalWeightKg()) >= 0)
-                .map(v -> EligibleVehicleDto.builder()
+        List<EligibleVehicleDto> eligibleVehicles = new ArrayList<>();
+        List<IneligibleVehicleDto> ineligibleVehicles = new ArrayList<>();
+
+        for (Vehicle v : activeVehicles) {
+            if (v.getMaxVolumeM3() == null || v.getMaxWeightKg() == null) {
+                continue;
+            }
+
+            boolean volumeOk = v.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) >= 0;
+            boolean weightOk = v.getMaxWeightKg().compareTo(td.getTotalWeightKg()) >= 0;
+
+            if (volumeOk && weightOk) {
+                eligibleVehicles.add(EligibleVehicleDto.builder()
                         .vehicleId(v.getId())
                         .plateNumber(v.getPlateNumber())
                         .vehicleType(v.getVehicleType())
@@ -60,8 +70,38 @@ public class TripServiceImpl implements TripService {
                         .maxWeightKg(v.getMaxWeightKg())
                         .remainingVolumeM3(v.getMaxVolumeM3().subtract(td.getTotalVolumeM3()))
                         .remainingWeightKg(v.getMaxWeightKg().subtract(td.getTotalWeightKg()))
-                        .build())
-                .toList();
+                        .build());
+            } else {
+                StringBuilder reason = new StringBuilder();
+                if (!volumeOk) {
+                    reason.append("Volume exceeds capacity (")
+                          .append(td.getTotalVolumeM3()).append(" m³ > ").append(v.getMaxVolumeM3()).append(" m³)");
+                }
+                if (!weightOk) {
+                    if (reason.length() > 0) reason.append(" and ");
+                    reason.append("Weight exceeds capacity (")
+                          .append(td.getTotalWeightKg()).append(" kg > ").append(v.getMaxWeightKg()).append(" kg)");
+                }
+
+                ineligibleVehicles.add(IneligibleVehicleDto.builder()
+                        .vehicleId(v.getId())
+                        .plateNumber(v.getPlateNumber())
+                        .vehicleType(v.getVehicleType())
+                        .maxVolumeM3(v.getMaxVolumeM3())
+                        .maxWeightKg(v.getMaxWeightKg())
+                        .volumeCheckResult(volumeOk ? ConstraintResult.PASS : ConstraintResult.FAIL)
+                        .weightCheckResult(weightOk ? ConstraintResult.PASS : ConstraintResult.FAIL)
+                        .failureReason(reason.toString())
+                        .build());
+            }
+        }
+
+        eligibleVehicles.sort(Comparator.comparing(EligibleVehicleDto::getMaxVolumeM3));
+
+        return EligibleVehiclesResponse.builder()
+                .eligibleVehicles(eligibleVehicles)
+                .ineligibleVehicles(ineligibleVehicles)
+                .build();
     }
 
     @Override
@@ -92,6 +132,11 @@ public class TripServiceImpl implements TripService {
     public TripResponse assignVehicleAndDriver(Long tripDraftId, TripAssignRequest request,
                                                 String currentUsername) {
         TripDraft td = findTripDraftOrThrow(tripDraftId);
+
+        if (tripRepository.existsByTripDraftId(tripDraftId)) {
+            throw new BusinessException(ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED,
+                    "Trip Draft has already been assigned.", HttpStatus.CONFLICT);
+        }
 
         // Guard 1: TripDraft must be VALIDATED
         if (!"VALIDATED".equals(td.getStatus())) {
@@ -169,6 +214,12 @@ public class TripServiceImpl implements TripService {
     public TripSplitResponse assignSplit(Long tripDraftId, TripSplitAssignRequest request,
                                           String currentUsername) {
         TripDraft td = findTripDraftOrThrow(tripDraftId);
+
+        if (tripRepository.existsByTripDraftId(tripDraftId)) {
+            throw new BusinessException(ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED,
+                    "Trip Draft has already been assigned.", HttpStatus.CONFLICT);
+        }
+
         if (!"VALIDATED".equals(td.getStatus())) {
             throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
                     "Trip Draft must be VALIDATED before assignment.", HttpStatus.BAD_REQUEST);
@@ -560,6 +611,82 @@ public class TripServiceImpl implements TripService {
                 .stopVolumeM3(ts.getStopVolumeM3())
                 .notes(ts.getNotes())
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TripResponse getTripById(Long tripId) {
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_NOT_FOUND,
+                        "Trip not found with id: " + tripId, HttpStatus.NOT_FOUND));
+        return buildTripResponse(trip, null);
+    }
+
+    @Override
+    @Transactional
+    public TripResponse updateAssignment(Long tripId, TripAssignmentPatchRequest request, String currentUsername) {
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_NOT_FOUND,
+                        "Trip not found with id: " + tripId, HttpStatus.NOT_FOUND));
+
+        // Guard 1: Status must be VALIDATED
+        if (trip.getStatus() != TripStatus.VALIDATED) {
+            throw new BusinessException(ErrorCode.TRIP_LOCKED,
+                    "Trip " + tripId + " is already dispatched or completed and cannot be modified.",
+                    HttpStatus.CONFLICT);
+        }
+
+        // Fetch new vehicle and driver
+        Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.VEHICLE_NOT_FOUND,
+                        "Vehicle not found with id: " + request.getVehicleId(), HttpStatus.NOT_FOUND));
+
+        User driver = userRepository.findById(request.getDriverId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.DRIVER_NOT_FOUND,
+                        "Driver not found with id: " + request.getDriverId(), HttpStatus.NOT_FOUND));
+
+        // Check if driver has role DRIVER
+        boolean isDriver = driver.getRoles().stream()
+                .anyMatch(r -> "ROLE_DRIVER".equals(r.getName()) || "DRIVER".equals(r.getName()));
+        if (!isDriver) {
+            throw new BusinessException(ErrorCode.DRIVER_NOT_FOUND,
+                    "User " + driver.getFullName() + " is not a driver.", HttpStatus.BAD_REQUEST);
+        }
+
+        // Guard 2: Capacity check (trip total load vs vehicle max capacity)
+        if (vehicle.getMaxVolumeM3().compareTo(trip.getTotalVolumeM3()) < 0
+                || vehicle.getMaxWeightKg().compareTo(trip.getTotalWeightKg()) < 0) {
+            throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
+                    "Vehicle " + vehicle.getPlateNumber() + " capacity is insufficient for the trip load.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // Guard 3: Vehicle busy check on the same day (excluding current trip)
+        List<TripStatus> busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+        if (tripRepository.existsByVehicleIdAndDeliveryDateAndStatusInAndTripIdNot(
+                vehicle.getId(), trip.getDeliveryDate(), busyStatuses, tripId)) {
+            throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,
+                    "Vehicle " + vehicle.getPlateNumber() + " is already assigned to another active trip on " + trip.getDeliveryDate(),
+                    HttpStatus.CONFLICT);
+        }
+
+        // Guard 4: Driver busy check on the same day (excluding current trip)
+        if (tripRepository.existsByDriverIdAndDeliveryDateAndStatusInAndTripIdNot(
+                driver.getId(), trip.getDeliveryDate(), busyStatuses, tripId)) {
+            throw new BusinessException(ErrorCode.DRIVER_CONFLICT,
+                    "Driver " + driver.getFullName() + " is already assigned to another active trip on " + trip.getDeliveryDate(),
+                    HttpStatus.CONFLICT);
+        }
+
+        // Update and save
+        trip.setVehicle(vehicle);
+        trip.setDriver(driver);
+        tripRepository.save(trip);
+
+        log.info("Trip {} assignment updated by {}: Vehicle={}, Driver={}",
+                tripId, currentUsername, vehicle.getPlateNumber(), driver.getFullName());
+
+        return buildTripResponse(trip, null);
     }
 }
 

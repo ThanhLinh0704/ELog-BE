@@ -35,6 +35,7 @@ public class TripDraftServiceImpl implements TripDraftService {
     private final RouteRepository routeRepository;
     private final UserRepository userRepository;
     private final EtaCalculationService etaCalculationService;
+    private final OrderItemRepository orderItemRepository;
 
     @Override
     @Transactional
@@ -428,18 +429,39 @@ public class TripDraftServiceImpl implements TripDraftService {
                 .stops(stops)
                 .build();
     }
-
     private TripDraftStopResponse toStopResponse(TripDraftStop stop) {
+        Long draftId = (stop.getTripDraft() != null) ? stop.getTripDraft().getId() : null;
+        Long routeStopId = (stop.getRouteStop() != null) ? stop.getRouteStop().getId() : null;
+        
+        BigDecimal stopWeight = BigDecimal.ZERO;
+        BigDecimal stopVolume = BigDecimal.ZERO;
+        
+        if (draftId != null && stop.getStore() != null) {
+            List<OrderItem> items = orderItemRepository.findByStopForManifest(
+                    stop.getStore().getId(), draftId);
+            if (items != null) {
+                stopWeight = items.stream()
+                        .map(OrderItem::getLineWeightKg)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                stopVolume = items.stream()
+                        .map(OrderItem::getLineVolumeM3)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+            }
+        }
+
         return TripDraftStopResponse.builder()
                 .tripDraftStopId(stop.getId())
                 .sequenceNo(stop.getSequenceNo())
-                .storeId(stop.getStore().getId())
-                .storeCode(stop.getStore().getCode())
-                .storeName(stop.getStore().getName())
+                .storeId(stop.getStore() != null ? stop.getStore().getId() : null)
+                .storeCode(stop.getStore() != null ? stop.getStore().getCode() : null)
+                .storeName(stop.getStore() != null ? stop.getStore().getName() : null)
                 .isActive(stop.getIsActive())
                 .orderCount(stop.getOrderCount())
                 .plannedEta(stop.getPlannedEta())
                 .overrideNote(stop.getOverrideNote())
+                .routeStopId(routeStopId)
+                .stopVolumeM3(stopVolume)
+                .stopWeightKg(stopWeight)
                 .build();
     }
 }

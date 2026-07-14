@@ -2,6 +2,7 @@ package com.elog.controller;
 
 import com.elog.dto.request.TripAssignRequest;
 import com.elog.dto.request.TripSplitAssignRequest;
+import com.elog.dto.request.TripAssignmentPatchRequest;
 import com.elog.dto.response.*;
 import com.elog.service.TripService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,12 +30,12 @@ public class TripController {
     // ── US-15 TASK-02 — Vehicle Assignment ─────────────────────────
 
     @GetMapping("/api/trip-drafts/{id}/eligible-vehicles")
-    @Operation(summary = "Get eligible vehicles for a validated trip draft")
+    @Operation(summary = "Get eligible and ineligible vehicles for a validated trip draft")
     @PreAuthorize("hasRole('DISPATCHER')")
-    public ResponseEntity<ApiResponse<List<EligibleVehicleDto>>> getEligibleVehicles(
+    public ResponseEntity<ApiResponse<EligibleVehiclesResponse>> getEligibleVehicles(
             @PathVariable Long id) {
-        List<EligibleVehicleDto> vehicles = tripService.getEligibleVehicles(id);
-        return ResponseEntity.ok(ApiResponse.success(vehicles));
+        EligibleVehiclesResponse response = tripService.getEligibleVehicles(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/api/drivers/available")
@@ -107,6 +108,25 @@ public class TripController {
     public ResponseEntity<String> getHandoverSlip(@PathVariable Long id) {
         String html = tripService.getHandoverSlipHtml(id);
         return ResponseEntity.ok(html);
+    }
+
+    @GetMapping("/api/trips/{tripId}")
+    @Operation(summary = "Get trip detail by trip ID")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF', 'DRIVER')")
+    public ResponseEntity<ApiResponse<TripResponse>> getTripById(@PathVariable Long tripId) {
+        TripResponse response = tripService.getTripById(tripId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PatchMapping("/api/trips/{id}/assignment")
+    @Operation(summary = "Update vehicle and driver assignment for a validated trip before dispatch")
+    @PreAuthorize("hasRole('DISPATCHER')")
+    public ResponseEntity<ApiResponse<TripResponse>> updateAssignment(
+            @PathVariable Long id,
+            @Valid @RequestBody TripAssignmentPatchRequest request) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        TripResponse response = tripService.updateAssignment(id, request, username);
+        return ResponseEntity.ok(ApiResponse.success(response, "Assignment updated successfully."));
     }
 
     // ── US-16 — Driver view ───────────────────────────────────────

@@ -2,6 +2,7 @@ package com.elog.service;
 
 import com.elog.dto.request.TripAssignRequest;
 import com.elog.dto.request.TripSplitAssignRequest;
+import com.elog.dto.request.TripAssignmentPatchRequest;
 import com.elog.dto.response.*;
 
 import java.time.LocalDate;
@@ -10,7 +11,7 @@ import java.util.List;
 public interface TripService {
 
     // US-15 TASK-02 — Vehicle Assignment
-    List<EligibleVehicleDto> getEligibleVehicles(Long tripDraftId);
+    EligibleVehiclesResponse getEligibleVehicles(Long tripDraftId);
 
     List<AvailableDriverResponse> getAvailableDrivers(LocalDate date);
 
@@ -31,5 +32,9 @@ public interface TripService {
 
     // US-16 — Driver view
     List<TripResponse> getDriverTrips(String username, LocalDate date, String status);
+
+    TripResponse getTripById(Long tripId);
+
+    TripResponse updateAssignment(Long tripId, TripAssignmentPatchRequest request, String currentUsername);
 }
 
