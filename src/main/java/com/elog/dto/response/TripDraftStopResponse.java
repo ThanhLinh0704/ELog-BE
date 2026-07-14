@@ -2,6 +2,7 @@ package com.elog.dto.response;
 
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Getter
@@ -19,4 +20,7 @@ public class TripDraftStopResponse {
     private Integer orderCount;
     private LocalDateTime plannedEta;
     private String overrideNote;
+    private Long routeStopId;
+    private BigDecimal stopVolumeM3;
+    private BigDecimal stopWeightKg;
 }

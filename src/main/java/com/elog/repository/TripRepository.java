@@ -13,11 +13,19 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
 
     List<Trip> findByTripDraftId(Long tripDraftId);
 
+    boolean existsByTripDraftId(Long tripDraftId);
+
     boolean existsByVehicleIdAndDeliveryDateAndStatusIn(
             Long vehicleId, LocalDate deliveryDate, List<TripStatus> statuses);
 
+    boolean existsByVehicleIdAndDeliveryDateAndStatusInAndTripIdNot(
+            Long vehicleId, LocalDate deliveryDate, List<TripStatus> statuses, Long tripIdNot);
+
     boolean existsByDriverIdAndDeliveryDateAndStatusIn(
             Long driverId, LocalDate deliveryDate, List<TripStatus> statuses);
+
+    boolean existsByDriverIdAndDeliveryDateAndStatusInAndTripIdNot(
+            Long driverId, LocalDate deliveryDate, List<TripStatus> statuses, Long tripIdNot);
 
     @Query("SELECT t FROM Trip t " +
            "JOIN FETCH t.vehicle " +
