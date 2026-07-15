@@ -45,6 +45,9 @@ public class TripStop {
     @Column(name = "actual_arrival_time")
     private LocalDateTime actualArrivalTime;
 
+    @Column(name = "actual_departure_time")
+    private LocalDateTime actualDepartureTime;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
