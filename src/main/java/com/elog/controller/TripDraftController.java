@@ -107,6 +107,16 @@ public class TripDraftController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @PostMapping("/{id}/revert")
+    @Operation(summary = "Revert trip draft — (PLANNED/VALIDATED → DRAFT)")
+    @PreAuthorize("hasRole('DISPATCHER')")
+    public ResponseEntity<ApiResponse<Void>> revertToDraft(
+            @PathVariable Long id) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        tripDraftService.revertToDraft(id, currentUsername);
+        return ResponseEntity.ok(ApiResponse.success(null, "Trip draft reverted to DRAFT successfully."));
+    }
+
     // ── US-12 endpoints ──────────────────────────────────────────
 
     @PostMapping("/{id}/validate-capacity")

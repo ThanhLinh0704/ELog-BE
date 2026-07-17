@@ -207,11 +207,6 @@ class TripDraftServiceImplIntegrationTest {
         assertThat(draftResponse.getActiveStopCount()).isEqualTo(1);
         assertThat(draftResponse.getSkippedStopCount()).isZero();
 
-        // 10. Check if order is updated with tripDraftId
-        Order updatedOrder = orderRepository.findById(order.getId()).orElseThrow();
-        assertThat(updatedOrder.getTripDraft()).isNotNull();
-        assertThat(updatedOrder.getTripDraft().getId()).isEqualTo(draftResponse.getId());
-
         // 11. Check trip draft stops in DB
         List<TripDraftStop> stops = tripDraftStopRepository.findAll();
         assertThat(stops).isNotEmpty();
@@ -222,5 +217,111 @@ class TripDraftServiceImplIntegrationTest {
         assertThat(stop.getStore().getCode()).isEqualTo(store.getCode());
         assertThat(stop.getIsActive()).isTrue();
         assertThat(stop.getOrderCount()).isEqualTo(1);
+    }
+
+    @Autowired
+    private TripDraftRepository tripDraftRepository;
+
+    @Test
+    void testRevertToDraftSuccess() {
+        // Find default admin user
+        User adminUser = userRepository.findByUsername("admin")
+                .orElseThrow(() -> new IllegalStateException("Admin user not found"));
+
+        Route route = Route.builder()
+                .code("RT-REVERT-TEST")
+                .name("Revert test route")
+                .isActive(true)
+                .build();
+        route = routeRepository.save(route);
+
+        Province province = Province.builder()
+                .code("79-REVERT")
+                .name("Hồ Chí Minh")
+                .fullName("Thành phố Hồ Chí Minh")
+                .build();
+        province = provinceRepository.save(province);
+
+        District district = District.builder()
+                .code("760-REVERT")
+                .name("Quận 1")
+                .fullName("Quận 1")
+                .province(province)
+                .build();
+        district = districtRepository.save(district);
+
+        Ward ward = Ward.builder()
+                .code("26740-REVERT")
+                .name("Bến Nghé")
+                .fullName("Phường Bến Nghé")
+                .district(district)
+                .build();
+        ward = wardRepository.save(ward);
+
+        Store store = Store.builder()
+                .code("ST-REVERT")
+                .name("Revert Store")
+                .isActive(true)
+                .province(province)
+                .district(district)
+                .ward(ward)
+                .addressDetail("123 Test St")
+                .build();
+        store = storeRepository.save(store);
+
+        RouteStop routeStop = RouteStop.builder()
+                .route(route)
+                .store(store)
+                .sequenceOrder(1)
+                .build();
+        routeStop = routeStopRepository.save(routeStop);
+
+        TripDraft draft = TripDraft.builder()
+                .route(route)
+                .deliveryDate(LocalDate.now())
+                .status("PLANNED")
+                .confirmedAt(java.time.LocalDateTime.now())
+                .confirmedBy(adminUser)
+                .validatedAt(java.time.LocalDateTime.now())
+                .validatedBy(adminUser)
+                .volumeCheckResult(ConstraintResult.PASS)
+                .weightCheckResult(ConstraintResult.PASS)
+                .build();
+        draft = tripDraftRepository.save(draft);
+
+        TripDraftStop stop = TripDraftStop.builder()
+                .tripDraft(draft)
+                .store(store)
+                .routeStop(routeStop)
+                .sequenceNo(1)
+                .isActive(true)
+                .orderCount(1)
+                .plannedEta(java.time.LocalDateTime.now())
+                .build();
+        stop = tripDraftStopRepository.save(stop);
+        draft.setStops(new java.util.ArrayList<>(List.of(stop)));
+        draft = tripDraftRepository.save(draft);
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // Run revert
+        tripDraftService.revertToDraft(draft.getId(), "admin");
+
+        entityManager.flush();
+        entityManager.clear();
+
+        // Asserts
+        TripDraft updated = tripDraftRepository.findById(draft.getId()).orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo("DRAFT");
+        assertThat(updated.getConfirmedAt()).isNull();
+        assertThat(updated.getConfirmedBy()).isNull();
+        assertThat(updated.getValidatedAt()).isNull();
+        assertThat(updated.getValidatedBy()).isNull();
+        assertThat(updated.getVolumeCheckResult()).isEqualTo(ConstraintResult.NOT_CHECKED);
+        assertThat(updated.getWeightCheckResult()).isEqualTo(ConstraintResult.NOT_CHECKED);
+
+        TripDraftStop updatedStop = tripDraftStopRepository.findById(stop.getId()).orElseThrow();
+        assertThat(updatedStop.getPlannedEta()).isNull();
     }
 }

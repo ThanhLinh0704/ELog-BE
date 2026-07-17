@@ -36,6 +36,8 @@ public class TripDraftServiceImpl implements TripDraftService {
     private final UserRepository userRepository;
     private final EtaCalculationService etaCalculationService;
     private final OrderItemRepository orderItemRepository;
+    private final TripRepository tripRepository;
+    private final ManifestRepository manifestRepository;
 
     @Override
     @Transactional
@@ -390,6 +392,43 @@ public class TripDraftServiceImpl implements TripDraftService {
                 .activeStopCount(activeCount)
                 .summary("Trip Draft confirmed. Capacity validation (US-12) is now unlocked.")
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void revertToDraft(Long tripDraftId, String currentUsername) {
+        TripDraft draft = findDraftOrThrow(tripDraftId);
+
+        // Guard: cannot revert if already assigned to a Trip
+        if (tripRepository.existsByTripDraftId(tripDraftId)) {
+            throw new BusinessException(
+                    ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED,
+                    "Trip Draft already assigned to a Trip. Cannot revert to DRAFT.",
+                    HttpStatus.CONFLICT);
+        }
+
+        // Delete the generated Manifest associated with this TripDraft if any exists
+        manifestRepository.findByTripDraftId(tripDraftId).ifPresent(m -> {
+            manifestRepository.delete(m);
+            log.info("US-11: Deleted manifest associated with TripDraft id={}", tripDraftId);
+        });
+
+        // Revert status to DRAFT
+        draft.setStatus("DRAFT");
+        draft.setConfirmedAt(null);
+        draft.setConfirmedBy(null);
+        draft.setValidatedAt(null);
+        draft.setValidatedBy(null);
+        draft.setVolumeCheckResult(ConstraintResult.NOT_CHECKED);
+        draft.setWeightCheckResult(ConstraintResult.NOT_CHECKED);
+
+        // Reset planned_eta of stops to null
+        for (TripDraftStop stop : draft.getStops()) {
+            stop.setPlannedEta(null);
+        }
+
+        tripDraftRepository.save(draft);
+        log.info("US-11: TripDraft id={} reverted to DRAFT status by {}", tripDraftId, currentUsername);
     }
 
     // ── Shared helpers ───────────────────────────────────────────
