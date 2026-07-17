@@ -4,6 +4,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- 1. Clean existing transactional and reference data
 TRUNCATE TABLE trip_stops;
 TRUNCATE TABLE trips;
+TRUNCATE TABLE manifest_lines;
 TRUNCATE TABLE manifests;
 TRUNCATE TABLE trip_draft_stops;
 TRUNCATE TABLE trip_drafts;
