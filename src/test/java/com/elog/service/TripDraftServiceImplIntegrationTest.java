@@ -35,6 +35,15 @@ class TripDraftServiceImplIntegrationTest {
     private StoreRepository storeRepository;
 
     @Autowired
+    private ProvinceRepository provinceRepository;
+
+    @Autowired
+    private DistrictRepository districtRepository;
+
+    @Autowired
+    private WardRepository wardRepository;
+
+    @Autowired
     private RouteRepository routeRepository;
 
     @Autowired
@@ -80,12 +89,39 @@ class TripDraftServiceImplIntegrationTest {
                 .build();
         route = routeRepository.save(route);
 
+        // 1a. Create Province, District, Ward
+        Province province = Province.builder()
+                .code("79-" + uniqueSuffix)
+                .name("Hồ Chí Minh")
+                .fullName("Thành phố Hồ Chí Minh")
+                .build();
+        province = provinceRepository.save(province);
+
+        District district = District.builder()
+                .code("760-" + uniqueSuffix)
+                .name("Quận 1")
+                .fullName("Quận 1")
+                .province(province)
+                .build();
+        district = districtRepository.save(district);
+
+        Ward ward = Ward.builder()
+                .code("26740-" + uniqueSuffix)
+                .name("Bến Nghé")
+                .fullName("Phường Bến Nghé")
+                .district(district)
+                .build();
+        ward = wardRepository.save(ward);
+
         // 2. Create Store
         Store store = Store.builder()
                 .code("ST-INT-" + uniqueSuffix)
                 .name("Integration Store " + uniqueSuffix)
                 .isActive(true)
-                .address("123 Test St")
+                .province(province)
+                .district(district)
+                .ward(ward)
+                .addressDetail("123 Test St")
                 .build();
         store = storeRepository.save(store);
 

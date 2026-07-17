@@ -18,5 +18,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     List<OrderItem> findByStopForManifest(
             @Param("storeId") Long storeId,
             @Param("tripDraftId") Long tripDraftId);
+
+    void deleteByOrderId(Long orderId);
 }
 

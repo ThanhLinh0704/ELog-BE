@@ -144,18 +144,24 @@ class ImportServiceImplTest {
 
     // ── L1-IBS-02 ──────────────────────────────────────────
     @Test
-    void createBatch_activeBatchExists_confirmReplaceFalse_throwsException() throws IOException {
+    void createBatch_activeBatchExists_confirmReplaceFalse_success() throws IOException {
         LocalDate date = LocalDate.now();
         MultipartFile file = createMockExcelFile("import.xlsx", Collections.emptyList());
         ImportBatch existing = ImportBatch.builder().id(8L).deliveryDate(date).isActive(true).build();
 
         when(batchRepository.findActiveByDate(date)).thenReturn(Optional.of(existing));
+        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
+            ImportBatch b = invocation.getArgument(0);
+            b.setId(9L);
+            return b;
+        });
 
-        assertThatThrownBy(() -> importService.importExcel(file, date, false, 1L))
-                .isInstanceOf(DuplicateBatchException.class)
-                .hasMessageContaining("Đã có dữ liệu nhập cho ngày");
-        
-        verify(batchRepository, never()).save(any(ImportBatch.class));
+        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getBatchId()).isEqualTo(9L);
+        assertThat(existing.getIsActive()).isTrue(); // verify old remains active
+        verify(batchRepository, times(2)).save(any(ImportBatch.class));
     }
 
     // ── L1-IBS-03 ──────────────────────────────────────────
@@ -166,6 +172,7 @@ class ImportServiceImplTest {
         ImportBatch existing = ImportBatch.builder().id(8L).deliveryDate(date).isActive(true).build();
 
         when(batchRepository.findActiveByDate(date)).thenReturn(Optional.of(existing));
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of(existing));
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             if (b.getId() == null) b.setId(9L);
@@ -198,7 +205,7 @@ class ImportServiceImplTest {
         when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
         when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
         
-        when(orderRepository.findByBatchAndOrderRefAndStore(anyLong(), anyString(), anyLong()))
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(anyString(), any(LocalDate.class)))
                 .thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order o = invocation.getArgument(0);
@@ -324,7 +331,7 @@ class ImportServiceImplTest {
 
         when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
         when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        when(orderRepository.findByBatchAndOrderRefAndStore(anyLong(), anyString(), anyLong()))
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(anyString(), any(LocalDate.class)))
                 .thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order o = invocation.getArgument(0);
@@ -389,7 +396,7 @@ class ImportServiceImplTest {
         when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
 
         Order order = Order.builder().id(100L).orderRef("DH160325-01").store(storeBT001).build();
-        when(orderRepository.findByBatchAndOrderRefAndStore(1L, "DH160325-01", 1L))
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(eq("DH160325-01"), any(LocalDate.class)))
                 .thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
@@ -418,7 +425,7 @@ class ImportServiceImplTest {
         when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
         when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
 
-        when(orderRepository.findByBatchAndOrderRefAndStore(eq(1L), anyString(), eq(1L)))
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(anyString(), any(LocalDate.class)))
                 .thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order o = invocation.getArgument(0);
@@ -448,7 +455,7 @@ class ImportServiceImplTest {
 
         when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
         when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        when(orderRepository.findByBatchAndOrderRefAndStore(eq(1L), startsWith("AUTO-1-"), eq(1L)))
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(startsWith("AUTO-1-"), any(LocalDate.class)))
                 .thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order o = invocation.getArgument(0);
@@ -592,7 +599,7 @@ class ImportServiceImplTest {
         when(storeRepository.findByCode("ST-BT-002")).thenReturn(Optional.of(storeBT002));
         when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
 
-        when(orderRepository.findByBatchAndOrderRefAndStore(1L, "DH160325-01", 1L))
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(eq("DH160325-01"), any(LocalDate.class)))
                 .thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order o = invocation.getArgument(0);
@@ -632,7 +639,7 @@ class ImportServiceImplTest {
         when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
 
         Order order = Order.builder().id(100L).orderRef("DH160325-01").store(storeBT001).build();
-        when(orderRepository.findByBatchAndOrderRefAndStore(1L, "DH160325-01", 1L))
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(eq("DH160325-01"), any(LocalDate.class)))
                 .thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
@@ -654,6 +661,48 @@ class ImportServiceImplTest {
 
         verify(orderItemRepository, times(2)).save(any(OrderItem.class));
         assertThat(orderItem.getQuantity()).isEqualTo(5); // verify accumulated
+    }
+
+    @Test
+    void processRow_orderRefExists_cumulativeImport_overwritesOrder() throws IOException {
+        LocalDate date = LocalDate.now();
+        List<String[]> rowsData = new ArrayList<>();
+        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "4"});
+        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
+
+        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
+            ImportBatch b = invocation.getArgument(0);
+            b.setId(2L);
+            return b;
+        });
+
+        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
+        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
+
+        ImportBatch oldBatch = ImportBatch.builder().id(1L).deliveryDate(date).isActive(true).build();
+        Order existingOrder = Order.builder()
+                .id(100L)
+                .orderRef("DH160325-01")
+                .store(storeBT001)
+                .deliveryDate(date)
+                .importBatch(oldBatch)
+                .build();
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate("DH160325-01", date))
+                .thenReturn(Optional.of(existingOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderItem orderItem = OrderItem.builder().id(500L).sku("REF-SAM-300").quantity(4).unitWeightKg(BigDecimal.ONE).unitVolumeM3(BigDecimal.ONE).lineWeightKg(BigDecimal.ONE).lineVolumeM3(BigDecimal.ONE).build();
+        when(orderItemRepository.save(any(OrderItem.class))).thenReturn(orderItem);
+
+        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
+
+        assertThat(response.getAcceptedRows()).isEqualTo(1);
+        assertThat(response.getRejectedRows()).isEqualTo(0);
+
+        verify(orderRepository).save(argThat(o -> o.getId().equals(100L) && o.getImportBatch().getId().equals(2L)));
+        verify(orderItemRepository).deleteByOrderId(100L);
+        verify(orderItemRepository).save(any(OrderItem.class));
     }
 
     @Test
@@ -829,7 +878,7 @@ class ImportServiceImplTest {
 
         when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
         when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        when(orderRepository.findByBatchAndOrderRefAndStore(anyLong(), anyString(), anyLong()))
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(anyString(), any(LocalDate.class)))
                 .thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order o = invocation.getArgument(0);
@@ -877,12 +926,14 @@ class ImportServiceImplTest {
         when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
 
         Order existingOrder = Order.builder().id(100L).orderRef("DH160325-01").store(storeBT001).build();
-        when(orderRepository.findByBatchAndOrderRefAndStore(1L, "DH160325-01", 1L))
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(eq("DH160325-01"), any(LocalDate.class)))
                 .thenReturn(Optional.of(existingOrder));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         importService.importExcel(file, date, false, 1L);
 
-        verify(orderRepository, never()).save(any(Order.class));
+        verify(orderRepository).save(any(Order.class));
+        verify(orderItemRepository).deleteByOrderId(100L);
         verify(orderItemRepository).save(argThat(item -> item.getOrder().getId() == 100L));
     }
 
@@ -1065,7 +1116,7 @@ class ImportServiceImplTest {
 
         when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
         when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        when(orderRepository.findByBatchAndOrderRefAndStore(1L, "DH160325-01", 1L))
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(eq("DH160325-01"), any(LocalDate.class)))
                 .thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order o = invocation.getArgument(0);

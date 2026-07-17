@@ -15,6 +15,9 @@ public interface ImportBatchRepository extends JpaRepository<ImportBatch, Long> 
     @Query("SELECT b FROM ImportBatch b WHERE b.deliveryDate = :date AND b.isActive = true")
     Optional<ImportBatch> findActiveByDate(@Param("date") LocalDate date);
 
+    @Query("SELECT b FROM ImportBatch b WHERE b.deliveryDate = :date AND b.isActive = true")
+    java.util.List<ImportBatch> findAllActiveByDate(@Param("date") LocalDate date);
+
     @Query("SELECT b FROM ImportBatch b ORDER BY b.createdAt DESC")
     Page<ImportBatch> findAllBatches(Pageable pageable);
 
