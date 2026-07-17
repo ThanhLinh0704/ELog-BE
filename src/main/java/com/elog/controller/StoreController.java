@@ -26,7 +26,7 @@ public class StoreController {
 
     @PostMapping
     @Operation(summary = "Create a new store")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('store:write')")
     public ResponseEntity<ApiResponse<StoreResponse>> createStore(
             @Valid @RequestBody StoreCreateRequest request) {
         StoreResponse response = storeService.createStore(request);
@@ -36,7 +36,7 @@ public class StoreController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get store detail by ID")
-    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('store:read', 'store:write')")
     public ResponseEntity<ApiResponse<StoreResponse>> getStoreById(@PathVariable Long id) {
         StoreResponse response = storeService.getStoreById(id);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -44,7 +44,7 @@ public class StoreController {
 
     @GetMapping
     @Operation(summary = "Get paginated and filtered list of stores")
-    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('store:read', 'store:write')")
     public ResponseEntity<ApiResponse<List<StoreListItemResponse>>> getAllStores(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isActive,
@@ -57,7 +57,7 @@ public class StoreController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update store information")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('store:write')")
     public ResponseEntity<ApiResponse<StoreResponse>> updateStore(
             @PathVariable Long id,
             @Valid @RequestBody StoreUpdateRequest request) {
@@ -67,7 +67,7 @@ public class StoreController {
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Activate or deactivate a store")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('store:write')")
     public ResponseEntity<ApiResponse<StoreResponse>> updateStoreStatus(
             @PathVariable Long id,
             @Valid @RequestBody StoreStatusUpdateRequest request) {

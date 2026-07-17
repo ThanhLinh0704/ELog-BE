@@ -28,7 +28,7 @@ public class RouteController {
 
     @PostMapping
     @Operation(summary = "Create a new route")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('route:write')")
     public ResponseEntity<ApiResponse<RouteResponse>> createRoute(
             @Valid @RequestBody RouteCreateRequest request) {
         RouteResponse response = routeService.createRoute(request);
@@ -38,7 +38,7 @@ public class RouteController {
 
     @GetMapping
     @Operation(summary = "Get paginated and filtered list of routes")
-    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('route:read', 'route:write')")
     public ResponseEntity<ApiResponse<List<RouteResponse>>> getAllRoutes(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isActive,
@@ -50,7 +50,7 @@ public class RouteController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get route detail with stops")
-    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('route:read', 'route:write')")
     public ResponseEntity<ApiResponse<RouteDetailResponse>> getRouteById(@PathVariable Long id) {
         RouteDetailResponse response = routeService.getRouteById(id);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -58,7 +58,7 @@ public class RouteController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update route name and description")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('route:write')")
     public ResponseEntity<ApiResponse<RouteResponse>> updateRoute(
             @PathVariable Long id,
             @Valid @RequestBody RouteUpdateRequest request) {
@@ -68,7 +68,7 @@ public class RouteController {
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Activate or deactivate a route")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('route:write')")
     public ResponseEntity<ApiResponse<RouteResponse>> updateRouteStatus(
             @PathVariable Long id,
             @Valid @RequestBody RouteStatusUpdateRequest request) {
@@ -80,7 +80,7 @@ public class RouteController {
 
     @PostMapping("/{id}/stops")
     @Operation(summary = "Add a stop to the route")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('route:write')")
     public ResponseEntity<ApiResponse<RouteStopResponse>> addStop(
             @PathVariable Long id,
             @RequestBody RouteStopAddRequest request) {
@@ -91,7 +91,7 @@ public class RouteController {
 
     @PutMapping("/{id}/stops/reorder")
     @Operation(summary = "Reorder all stops in the route")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('route:write')")
     public ResponseEntity<ApiResponse<List<RouteStopResponse>>> reorderStops(
             @PathVariable Long id,
             @Valid @RequestBody RouteStopReorderRequest request) {
@@ -101,7 +101,7 @@ public class RouteController {
 
     @DeleteMapping("/{id}/stops/{stopId}")
     @Operation(summary = "Remove a stop from the route")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('route:write')")
     public ResponseEntity<ApiResponse<Void>> removeStop(
             @PathVariable Long id,
             @PathVariable Long stopId) {
