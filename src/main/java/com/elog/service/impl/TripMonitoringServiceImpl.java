@@ -13,11 +13,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,7 +35,6 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
     private final UserRepository userRepo;
     private final SystemConfigRepository systemConfigRepo;
     private final DeliveryExceptionRepository deliveryExceptionRepo;
-
 
     @Override
     public TripStartResponse startTrip(Long tripId, String currentUsername) {
@@ -219,8 +219,16 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
 
         List<Trip> trips = tripRepo.findActiveTripsByDate(date, activeStatuses);
 
+        List<Long> allStopIds = trips.stream()
+                .flatMap(t -> t.getStops().stream())
+                .map(TripStop::getTripStopId)
+                .toList();
+        Map<Long, List<DeliveryException>> exByStop = allStopIds.isEmpty() ? Map.of()
+                : deliveryExceptionRepo.findByTripStopIdInOrderByCreatedAtDesc(allStopIds)
+                        .stream().collect(Collectors.groupingBy(DeliveryException::getTripStopId));
+
         List<ActiveTripsResponse.TripSummary> summaries = trips.stream()
-                .map(this::buildTripSummary)
+                .map(trip -> buildTripSummary(trip, exByStop))
                 .toList();
 
         return ActiveTripsResponse.builder()
@@ -241,8 +249,13 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
 
         List<TripStop> stops = tripStopRepo.findByTripTripIdOrderBySequenceOrderAsc(tripId);
 
+        List<Long> stopIds = stops.stream().map(TripStop::getTripStopId).toList();
+        Map<Long, List<DeliveryException>> exByStop = stopIds.isEmpty() ? Map.of()
+                : deliveryExceptionRepo.findByTripStopIdInOrderByCreatedAtDesc(stopIds)
+                        .stream().collect(Collectors.groupingBy(DeliveryException::getTripStopId));
+
         List<TripProgressResponse.StopProgress> stopProgresses = stops.stream()
-                .map(this::buildStopProgress)
+                .map(stop -> buildStopProgress(stop, exByStop))
                 .toList();
 
         Vehicle v = trip.getVehicle();
@@ -268,7 +281,6 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                 .build();
     }
 
-
     private String getStoreCode(TripStop stop) {
         return stop.getRouteStop() != null && stop.getRouteStop().getStore() != null
                 ? stop.getRouteStop().getStore().getCode()
@@ -287,7 +299,7 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                 .orElse(15);
     }
 
-    /** Tạo TIME_EXCEPTION — idempotent, bỏ qua nếu đã có cho stop này. */
+    /** Idempotent — bỏ qua nếu TIME_EXCEPTION đã tồn tại cho stop này */
     private Long createTimeException(TripStop stop, long delayMinutes, int threshold, LocalDateTime now) {
         if (deliveryExceptionRepo.existsByTripStopIdAndExceptionType(
                 stop.getTripStopId(), ExceptionType.TIME_EXCEPTION)) {
@@ -319,13 +331,25 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                             || s.getStatus() == TripStopStatus.EXCEPTION);
     }
 
-    private ActiveTripsResponse.TripSummary buildTripSummary(Trip trip) {
+    private ActiveTripsResponse.TripSummary buildTripSummary(
+            Trip trip, Map<Long, List<DeliveryException>> exByStop) {
         List<TripStop> stops = trip.getStops();
-        int total = stops.size();
+        int total     = stops.size();
         int completed = (int) stops.stream().filter(s -> s.getStatus() == TripStopStatus.COMPLETED).count();
-        int pending = (int) stops.stream().filter(s -> s.getStatus() == TripStopStatus.PENDING).count();
+        int pending   = (int) stops.stream().filter(s -> s.getStatus() == TripStopStatus.PENDING).count();
         int exception = (int) stops.stream().filter(s -> s.getStatus() == TripStopStatus.EXCEPTION).count();
-        int progress = total == 0 ? 0 : (completed * 100 / total);
+        int progress  = total == 0 ? 0 : (completed * 100 / total);
+
+        List<ActiveTripsResponse.ExceptionSummary> exSummaries = stops.stream()
+                .flatMap(stop -> exByStop.getOrDefault(stop.getTripStopId(), List.of()).stream()
+                        .map(ex -> ActiveTripsResponse.ExceptionSummary.builder()
+                                .exceptionId(ex.getExceptionId())
+                                .type(ex.getExceptionType().name())
+                                .storeCode(getStoreCode(stop))
+                                .description(ex.getDescription())
+                                .resolvedAt(ex.getResolvedAt() != null ? ex.getResolvedAt().format(DT_FMT) : null)
+                                .build()))
+                .toList();
 
         return ActiveTripsResponse.TripSummary.builder()
                 .tripId(trip.getTripId())
@@ -342,19 +366,31 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                 .pendingStops(pending)
                 .exceptionStops(exception)
                 .progressPercent(progress)
-                .hasUnresolvedExceptions(exception > 0)
-                .exceptions(List.of()) // TODO: populate từ delivery_exceptions sau khi US-18 merge
+                .hasUnresolvedExceptions(exSummaries.stream().anyMatch(e -> e.getResolvedAt() == null))
+                .exceptions(exSummaries)
                 .gpsLocation(null)
                 .gpsNote(GPS_NOTE)
                 .build();
     }
 
-    private TripProgressResponse.StopProgress buildStopProgress(TripStop stop) {
+    private TripProgressResponse.StopProgress buildStopProgress(
+            TripStop stop, Map<Long, List<DeliveryException>> exByStop) {
         long delayMin = 0;
         if (stop.getActualArrivalTime() != null && stop.getPlannedEta() != null) {
             delayMin = ChronoUnit.MINUTES.between(stop.getPlannedEta(), stop.getActualArrivalTime());
             if (delayMin < 0) delayMin = 0;
         }
+
+        List<TripProgressResponse.ExceptionDetail> exDetails =
+                exByStop.getOrDefault(stop.getTripStopId(), List.of()).stream()
+                        .map(ex -> TripProgressResponse.ExceptionDetail.builder()
+                                .exceptionId(ex.getExceptionId())
+                                .type(ex.getExceptionType().name())
+                                .description(ex.getDescription())
+                                .createdAt(ex.getCreatedAt().format(DT_FMT))
+                                .resolvedAt(ex.getResolvedAt() != null ? ex.getResolvedAt().format(DT_FMT) : null)
+                                .build())
+                        .toList();
 
         return TripProgressResponse.StopProgress.builder()
                 .tripStopId(stop.getTripStopId())
@@ -369,7 +405,7 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                         ? stop.getActualDepartureTime().format(DT_FMT) : null)
                 .delayMinutes(stop.getActualArrivalTime() != null ? delayMin : null)
                 .hasException(stop.getStatus() == TripStopStatus.EXCEPTION)
-                .exceptions(List.of()) // TODO: populate từ delivery_exceptions sau khi US-18 merge
+                .exceptions(exDetails)
                 .build();
     }
 
