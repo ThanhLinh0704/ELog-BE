@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManifestServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.service.impl</a> &gt; <span class="el_source">ManifestServiceImpl.java</span></div><h1>ManifestServiceImpl.java</h1><pre class="source lang-java linenums">package com.elog.service.impl;
+
+import com.elog.dto.response.*;
+import com.elog.entity.*;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.*;
+import com.elog.service.ManifestService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L22">@Slf4j</span>
+public class ManifestServiceImpl implements ManifestService {
+
+    private final TripDraftRepository tripDraftRepo;
+    private final TripDraftStopRepository tripDraftStopRepo;
+    private final OrderItemRepository orderItemRepo;
+    private final ManifestRepository manifestRepo;
+    private final ManifestLineRepository manifestLineRepo;
+    private final UserRepository userRepo;
+
+    @Override
+    @Transactional
+    public ManifestResponse generateManifest(Long tripDraftId, String currentUsername) {
+        // 1. Guard: TripDraft must exist
+<span class="fc" id="L36">        TripDraft draft = tripDraftRepo.findById(tripDraftId)</span>
+<span class="fc" id="L37">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.TRIP_DRAFT_NOT_FOUND,
+                        &quot;Trip Draft not found with id: &quot; + tripDraftId,
+                        HttpStatus.NOT_FOUND));
+
+        // 2. Guard: TripDraft must be VALIDATED
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (!&quot;VALIDATED&quot;.equals(draft.getStatus())) {</span>
+<span class="fc" id="L44">            throw new BusinessException(</span>
+                    ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
+<span class="fc" id="L46">                    &quot;Trip Draft &quot; + tripDraftId + &quot; must pass capacity validation (status=VALIDATED) before manifest generation. Current status: &quot; + draft.getStatus() + &quot;.&quot;,</span>
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // 3. Guard: no duplicate manifest
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (manifestRepo.existsByTripDraftId(tripDraftId)) {</span>
+<span class="fc" id="L52">            throw new BusinessException(</span>
+                    ErrorCode.MANIFEST_ALREADY_EXISTS,
+                    &quot;Manifest already generated for Trip Draft &quot; + tripDraftId + &quot;. View via GET /manifest.&quot;,
+                    HttpStatus.CONFLICT);
+        }
+
+        // 4. Get active stops sorted ascending
+<span class="fc" id="L59">        List&lt;TripDraftStop&gt; activeStops = tripDraftStopRepo</span>
+<span class="fc" id="L60">                .findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);</span>
+
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (activeStops.isEmpty()) {</span>
+<span class="fc" id="L63">            throw new BusinessException(</span>
+                    ErrorCode.NO_ACTIVE_STOP,
+                    &quot;Trip Draft &quot; + tripDraftId + &quot; has no active stops.&quot;,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // 5. Reverse → LIFO order
+<span class="fc" id="L70">        List&lt;TripDraftStop&gt; lifoStops = new ArrayList&lt;&gt;(activeStops);</span>
+<span class="fc" id="L71">        Collections.reverse(lifoStops);</span>
+
+        // 6. Resolve current user
+<span class="fc" id="L74">        User currentUser = userRepo.findByUsername(currentUsername)</span>
+<span class="fc" id="L75">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        &quot;User not found: &quot; + currentUsername,
+                        HttpStatus.NOT_FOUND));
+
+        // 7. Create Manifest header first (to get ID)
+<span class="fc" id="L81">        Manifest manifest = Manifest.builder()</span>
+<span class="fc" id="L82">                .tripDraft(draft)</span>
+<span class="fc" id="L83">                .generatedAt(LocalDateTime.now())</span>
+<span class="fc" id="L84">                .generatedBy(currentUser)</span>
+<span class="fc" id="L85">                .totalLines(0)</span>
+<span class="fc" id="L86">                .totalWeightKg(BigDecimal.ZERO)</span>
+<span class="fc" id="L87">                .totalVolumeM3(BigDecimal.ZERO)</span>
+<span class="fc" id="L88">                .build();</span>
+<span class="fc" id="L89">        manifestRepo.save(manifest);</span>
+
+        // 8. Build ManifestLines
+<span class="fc" id="L92">        List&lt;ManifestLine&gt; lines = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L93">        int counter = 1;</span>
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (TripDraftStop stop : lifoStops) {</span>
+<span class="fc" id="L96">            List&lt;OrderItem&gt; items = orderItemRepo</span>
+<span class="fc" id="L97">                    .findByStopForManifest(stop.getStore().getId(), tripDraftId);</span>
+
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">            if (items.isEmpty()) {</span>
+<span class="nc" id="L100">                log.warn(&quot;Active stop {} (store={}) has no order items — skipped in manifest&quot;,</span>
+<span class="nc" id="L101">                        stop.getId(), stop.getStore().getCode());</span>
+<span class="nc" id="L102">                continue;</span>
+            }
+
+<span class="fc bfc" id="L105" title="All 2 branches covered.">            for (OrderItem item : items) {</span>
+<span class="fc" id="L106">                ManifestLine line = ManifestLine.builder()</span>
+<span class="fc" id="L107">                        .manifest(manifest)</span>
+<span class="fc" id="L108">                        .lifoSequence(counter++)</span>
+<span class="fc" id="L109">                        .tripDraftStop(stop)</span>
+<span class="fc" id="L110">                        .orderItem(item)</span>
+<span class="fc" id="L111">                        .stopSequenceNo(stop.getSequenceNo())</span>
+<span class="fc" id="L112">                        .storeCode(stop.getStore().getCode())</span>
+<span class="fc" id="L113">                        .storeName(stop.getStore().getName())</span>
+<span class="fc" id="L114">                        .productCode(item.getProduct().getSku())</span>
+<span class="fc" id="L115">                        .productName(item.getProduct().getProductName())</span>
+<span class="fc" id="L116">                        .quantity(item.getQuantity())</span>
+<span class="fc" id="L117">                        .unitVolumeM3(item.getUnitVolumeM3())</span>
+<span class="fc" id="L118">                        .unitWeightKg(item.getUnitWeightKg())</span>
+<span class="fc" id="L119">                        .lineVolumeM3(item.getLineVolumeM3())</span>
+<span class="fc" id="L120">                        .lineWeightKg(item.getLineWeightKg())</span>
+<span class="fc" id="L121">                        .build();</span>
+<span class="fc" id="L122">                lines.add(line);</span>
+<span class="fc" id="L123">            }</span>
+<span class="fc" id="L124">        }</span>
+
+        // 9. Update manifest header totals
+<span class="fc" id="L127">        BigDecimal totalWeight = lines.stream()</span>
+<span class="fc" id="L128">                .map(ManifestLine::getLineWeightKg)</span>
+<span class="fc" id="L129">                .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L130">        BigDecimal totalVolume = lines.stream()</span>
+<span class="fc" id="L131">                .map(ManifestLine::getLineVolumeM3)</span>
+<span class="fc" id="L132">                .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+
+<span class="fc" id="L134">        manifest.setTotalLines(lines.size());</span>
+<span class="fc" id="L135">        manifest.setTotalWeightKg(totalWeight);</span>
+<span class="fc" id="L136">        manifest.setTotalVolumeM3(totalVolume);</span>
+
+        // 10. Batch insert lines
+<span class="fc" id="L139">        manifestLineRepo.saveAll(lines);</span>
+<span class="fc" id="L140">        manifestRepo.save(manifest);</span>
+
+        // 11. Build response
+<span class="fc" id="L143">        return ManifestResponse.builder()</span>
+<span class="fc" id="L144">                .manifestId(manifest.getManifestId())</span>
+<span class="fc" id="L145">                .tripDraftId(tripDraftId)</span>
+<span class="fc" id="L146">                .fixedRouteCode(draft.getRoute().getCode())</span>
+<span class="fc" id="L147">                .deliveryDate(draft.getDeliveryDate().toString())</span>
+<span class="fc" id="L148">                .generatedAt(manifest.getGeneratedAt())</span>
+<span class="fc" id="L149">                .generatedBy(ConfirmedByDto.builder()</span>
+<span class="fc" id="L150">                        .userId(currentUser.getId())</span>
+<span class="fc" id="L151">                        .fullName(currentUser.getFullName())</span>
+<span class="fc" id="L152">                        .build())</span>
+<span class="fc" id="L153">                .totalLines(manifest.getTotalLines())</span>
+<span class="fc" id="L154">                .totalWeightKg(totalWeight)</span>
+<span class="fc" id="L155">                .totalVolumeM3(totalVolume)</span>
+<span class="fc" id="L156">                .message(&quot;LIFO manifest generated. &quot; + lines.size() + &quot; manifest lines created for &quot; + activeStops.size() + &quot; active stops.&quot;)</span>
+<span class="fc" id="L157">                .build();</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ManifestResponse getManifest(Long tripDraftId) {
+<span class="fc" id="L163">        Manifest manifest = manifestRepo.findByTripDraftIdWithDetails(tripDraftId)</span>
+<span class="fc" id="L164">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.MANIFEST_NOT_FOUND,
+                        &quot;Manifest not found for Trip Draft &quot; + tripDraftId + &quot;. Call POST /generate-manifest first.&quot;,
+                        HttpStatus.NOT_FOUND));
+
+<span class="fc" id="L169">        List&lt;ManifestLine&gt; lines = manifestLineRepo</span>
+<span class="fc" id="L170">                .findByManifestManifestIdOrderByLifoSequenceAsc(manifest.getManifestId());</span>
+
+<span class="fc" id="L172">        List&lt;ManifestLineDto&gt; lineDtos = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        for (int i = 0; i &lt; lines.size(); i++) {</span>
+<span class="fc" id="L174">            ManifestLine line = lines.get(i);</span>
+<span class="fc" id="L175">            String loadingNote = null;</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">            if (i == 0) {</span>
+<span class="fc" id="L177">                loadingNote = &quot;Xếp VÀO xe đầu tiên — nằm sâu nhất&quot;;</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            } else if (i == lines.size() - 1) {</span>
+<span class="fc" id="L179">                loadingNote = &quot;Xếp VÀO xe cuối cùng — gần cửa xe nhất&quot;;</span>
+            }
+
+<span class="fc" id="L182">            lineDtos.add(ManifestLineDto.builder()</span>
+<span class="fc" id="L183">                    .lifoSequence(line.getLifoSequence())</span>
+<span class="fc" id="L184">                    .stopSequenceNo(line.getStopSequenceNo())</span>
+<span class="fc" id="L185">                    .storeCode(line.getStoreCode())</span>
+<span class="fc" id="L186">                    .storeName(line.getStoreName())</span>
+<span class="fc" id="L187">                    .productCode(line.getProductCode())</span>
+<span class="fc" id="L188">                    .productName(line.getProductName())</span>
+<span class="fc" id="L189">                    .quantity(line.getQuantity())</span>
+<span class="fc" id="L190">                    .unitWeightKg(line.getUnitWeightKg())</span>
+<span class="fc" id="L191">                    .unitVolumeM3(line.getUnitVolumeM3())</span>
+<span class="fc" id="L192">                    .lineWeightKg(line.getLineWeightKg())</span>
+<span class="fc" id="L193">                    .lineVolumeM3(line.getLineVolumeM3())</span>
+<span class="fc" id="L194">                    .loadingNote(loadingNote)</span>
+<span class="fc" id="L195">                    .build());</span>
+        }
+
+<span class="fc" id="L198">        TripDraft draft = manifest.getTripDraft();</span>
+<span class="fc" id="L199">        User generator = manifest.getGeneratedBy();</span>
+
+<span class="fc" id="L201">        return ManifestResponse.builder()</span>
+<span class="fc" id="L202">                .manifestId(manifest.getManifestId())</span>
+<span class="fc" id="L203">                .tripDraftId(draft.getId())</span>
+<span class="fc" id="L204">                .fixedRouteCode(draft.getRoute().getCode())</span>
+<span class="fc" id="L205">                .deliveryDate(draft.getDeliveryDate().toString())</span>
+<span class="fc" id="L206">                .generatedAt(manifest.getGeneratedAt())</span>
+<span class="fc" id="L207">                .generatedBy(ConfirmedByDto.builder()</span>
+<span class="fc" id="L208">                        .userId(generator.getId())</span>
+<span class="fc" id="L209">                        .fullName(generator.getFullName())</span>
+<span class="fc" id="L210">                        .build())</span>
+<span class="fc" id="L211">                .totalLines(manifest.getTotalLines())</span>
+<span class="fc" id="L212">                .totalWeightKg(manifest.getTotalWeightKg())</span>
+<span class="fc" id="L213">                .totalVolumeM3(manifest.getTotalVolumeM3())</span>
+<span class="fc" id="L214">                .lines(lineDtos)</span>
+<span class="fc" id="L215">                .build();</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ManifestByStopResponse getManifestByStop(Long tripDraftId) {
+<span class="fc" id="L221">        Manifest manifest = manifestRepo.findByTripDraftIdWithDetails(tripDraftId)</span>
+<span class="pc" id="L222">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.MANIFEST_NOT_FOUND,
+                        &quot;Manifest not found for Trip Draft &quot; + tripDraftId + &quot;. Call POST /generate-manifest first.&quot;,
+                        HttpStatus.NOT_FOUND));
+
+        // Sort by stop_sequence_no ASC (delivery order), then lifo_sequence ASC within each stop
+<span class="fc" id="L228">        List&lt;ManifestLine&gt; lines = manifestLineRepo</span>
+<span class="fc" id="L229">                .findByManifestManifestIdOrderByStopSequenceNoAscLifoSequenceAsc(manifest.getManifestId());</span>
+
+        // Group by stopSequenceNo while preserving insertion order
+<span class="fc" id="L232">        Map&lt;Integer, List&lt;ManifestLine&gt;&gt; groupedByStop = lines.stream()</span>
+<span class="fc" id="L233">                .collect(Collectors.groupingBy(ManifestLine::getStopSequenceNo, LinkedHashMap::new, Collectors.toList()));</span>
+
+        // Find min/max stop_sequence_no for LIFO loading notes
+<span class="fc" id="L236">        int maxSeqNo = groupedByStop.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);</span>
+<span class="fc" id="L237">        int minSeqNo = groupedByStop.keySet().stream().mapToInt(Integer::intValue).min().orElse(0);</span>
+
+<span class="fc" id="L239">        List&lt;ManifestByStopResponse.ManifestStopGroup&gt; stopGroups = new ArrayList&lt;&gt;();</span>
+
+        // Iterate in LIFO loading order (reverse of delivery order = descending sequence_no)
+        // — Nhóm 1 = stop xếp vào đầu tiên (sequence_no lớn nhất)
+<span class="fc" id="L243">        List&lt;Integer&gt; sortedSeqNos = new ArrayList&lt;&gt;(groupedByStop.keySet());</span>
+<span class="fc" id="L244">        Collections.sort(sortedSeqNos, Collections.reverseOrder());</span>
+
+<span class="fc" id="L246">        int groupIndex = 1;</span>
+<span class="fc" id="L247">        int totalGroups = sortedSeqNos.size();</span>
+
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        for (Integer seqNo : sortedSeqNos) {</span>
+<span class="fc" id="L250">            List&lt;ManifestLine&gt; stopLines = groupedByStop.get(seqNo);</span>
+<span class="fc" id="L251">            ManifestLine firstLine = stopLines.get(0);</span>
+
+            String loadingNote;
+<span class="fc bfc" id="L254" title="All 2 branches covered.">            if (groupIndex == 1) {</span>
+<span class="fc" id="L255">                loadingNote = &quot;Nhóm này xếp VÀO xe ĐẦU TIÊN&quot;;</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">            } else if (groupIndex == totalGroups) {</span>
+<span class="fc" id="L257">                loadingNote = &quot;Nhóm này xếp VÀO xe CUỐI CÙNG — gần cửa&quot;;</span>
+            } else {
+<span class="nc" id="L259">                loadingNote = null;</span>
+            }
+
+<span class="fc" id="L262">            BigDecimal stopWeight = stopLines.stream()</span>
+<span class="fc" id="L263">                    .map(ManifestLine::getLineWeightKg)</span>
+<span class="fc" id="L264">                    .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L265">            BigDecimal stopVolume = stopLines.stream()</span>
+<span class="fc" id="L266">                    .map(ManifestLine::getLineVolumeM3)</span>
+<span class="fc" id="L267">                    .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+
+<span class="fc" id="L269">            List&lt;ManifestLineDto&gt; itemDtos = stopLines.stream()</span>
+<span class="fc" id="L270">                    .map(l -&gt; ManifestLineDto.builder()</span>
+<span class="fc" id="L271">                            .lifoSequence(l.getLifoSequence())</span>
+<span class="fc" id="L272">                            .productCode(l.getProductCode())</span>
+<span class="fc" id="L273">                            .productName(l.getProductName())</span>
+<span class="fc" id="L274">                            .quantity(l.getQuantity())</span>
+<span class="fc" id="L275">                            .unitWeightKg(l.getUnitWeightKg())</span>
+<span class="fc" id="L276">                            .unitVolumeM3(l.getUnitVolumeM3())</span>
+<span class="fc" id="L277">                            .lineWeightKg(l.getLineWeightKg())</span>
+<span class="fc" id="L278">                            .lineVolumeM3(l.getLineVolumeM3())</span>
+<span class="fc" id="L279">                            .build())</span>
+<span class="fc" id="L280">                    .collect(Collectors.toList());</span>
+
+<span class="fc" id="L282">            stopGroups.add(ManifestByStopResponse.ManifestStopGroup.builder()</span>
+<span class="fc" id="L283">                    .stopSequenceNo(seqNo)</span>
+<span class="fc" id="L284">                    .storeCode(firstLine.getStoreCode())</span>
+<span class="fc" id="L285">                    .storeName(firstLine.getStoreName())</span>
+<span class="fc" id="L286">                    .loadingNote(loadingNote)</span>
+<span class="fc" id="L287">                    .items(itemDtos)</span>
+<span class="fc" id="L288">                    .stopWeightKg(stopWeight)</span>
+<span class="fc" id="L289">                    .stopVolumeM3(stopVolume)</span>
+<span class="fc" id="L290">                    .build());</span>
+
+<span class="fc" id="L292">            groupIndex++;</span>
+<span class="fc" id="L293">        }</span>
+
+<span class="fc" id="L295">        TripDraft draft = manifest.getTripDraft();</span>
+
+<span class="fc" id="L297">        return ManifestByStopResponse.builder()</span>
+<span class="fc" id="L298">                .manifestId(manifest.getManifestId())</span>
+<span class="fc" id="L299">                .tripDraftId(draft.getId())</span>
+<span class="fc" id="L300">                .fixedRouteCode(draft.getRoute().getCode())</span>
+<span class="fc" id="L301">                .deliveryDate(draft.getDeliveryDate().toString())</span>
+<span class="fc" id="L302">                .stops(stopGroups)</span>
+<span class="fc" id="L303">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

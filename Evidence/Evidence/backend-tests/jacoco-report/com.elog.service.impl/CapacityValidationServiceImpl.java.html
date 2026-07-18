@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CapacityValidationServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.service.impl</a> &gt; <span class="el_source">CapacityValidationServiceImpl.java</span></div><h1>CapacityValidationServiceImpl.java</h1><pre class="source lang-java linenums">package com.elog.service.impl;
+
+import com.elog.dto.response.*;
+import com.elog.entity.*;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.TripDraftRepository;
+import com.elog.repository.UserRepository;
+import com.elog.repository.VehicleRepository;
+import com.elog.service.CapacityValidationService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L25">@Slf4j</span>
+public class CapacityValidationServiceImpl implements CapacityValidationService {
+
+    private final TripDraftRepository tripDraftRepo;
+    private final VehicleRepository vehicleRepo;
+    private final UserRepository userRepo;
+
+    @Override
+    @Transactional
+    public CapacityValidationResultResponse validate(Long tripDraftId, String currentUsername) {
+<span class="fc" id="L35">        TripDraft draft = tripDraftRepo.findById(tripDraftId)</span>
+<span class="fc" id="L36">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.TRIP_DRAFT_NOT_FOUND,
+                        &quot;Trip Draft not found with id: &quot; + tripDraftId,
+                        HttpStatus.NOT_FOUND));
+
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        if (!&quot;PLANNED&quot;.equals(draft.getStatus())) {</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">            if (&quot;VALIDATED&quot;.equals(draft.getStatus())) {</span>
+<span class="fc" id="L43">                throw new BusinessException(</span>
+                        ErrorCode.ALREADY_VALIDATED,
+                        &quot;Trip Draft &quot; + tripDraftId + &quot; has already been validated (status=VALIDATED). View result via GET /validation-result.&quot;,
+                        HttpStatus.CONFLICT);
+            }
+<span class="fc" id="L48">            throw new BusinessException(</span>
+                    ErrorCode.TRIP_DRAFT_NOT_CONFIRMED,
+<span class="fc" id="L50">                    &quot;Trip Draft &quot; + tripDraftId + &quot; must be confirmed by Dispatcher (status=PLANNED) before capacity validation. Current status: &quot; + draft.getStatus() + &quot;.&quot;,</span>
+                    HttpStatus.BAD_REQUEST);
+        }
+
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (draft.getTotalVolumeM3().compareTo(BigDecimal.ZERO) == 0</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                &amp;&amp; draft.getTotalWeightKg().compareTo(BigDecimal.ZERO) == 0) {</span>
+<span class="fc" id="L56">            throw new BusinessException(</span>
+                    ErrorCode.NO_ITEMS_TO_VALIDATE,
+                    &quot;Trip Draft has zero total volume and weight — nothing to validate.&quot;,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+<span class="fc" id="L62">        List&lt;Vehicle&gt; activeVehicles = vehicleRepo.findByIsActiveTrue();</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (activeVehicles.isEmpty()) {</span>
+<span class="fc" id="L64">            throw new BusinessException(</span>
+                    ErrorCode.NO_ACTIVE_VEHICLE,
+                    &quot;No active vehicles found in fleet. Please contact Admin to configure vehicle master data.&quot;,
+                    HttpStatus.SERVICE_UNAVAILABLE);
+        }
+
+<span class="fc" id="L70">        User validator = userRepo.findByUsername(currentUsername)</span>
+<span class="fc" id="L71">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        &quot;User not found: &quot; + currentUsername,
+                        HttpStatus.NOT_FOUND));
+
+<span class="fc" id="L76">        List&lt;EligibleVehicleDto&gt; eligibleVehicles = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L77">        List&lt;IneligibleVehicleDto&gt; ineligibleVehicles = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (Vehicle v : activeVehicles) {</span>
+<span class="pc bpc" id="L80" title="2 of 4 branches missed.">            if (v.getMaxVolumeM3() == null || v.getMaxWeightKg() == null) {</span>
+<span class="nc" id="L81">                log.warn(&quot;Vehicle {} missing capacity data — skipped in validation&quot;, v.getId());</span>
+<span class="nc" id="L82">                continue;</span>
+            }
+
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            boolean volumeOk = draft.getTotalVolumeM3().compareTo(v.getMaxVolumeM3()) &lt;= 0;</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">            boolean weightOk = draft.getTotalWeightKg().compareTo(v.getMaxWeightKg()) &lt;= 0;</span>
+
+<span class="fc bfc" id="L88" title="All 4 branches covered.">            if (volumeOk &amp;&amp; weightOk) {</span>
+<span class="fc" id="L89">                eligibleVehicles.add(EligibleVehicleDto.builder()</span>
+<span class="fc" id="L90">                        .vehicleId(v.getId())</span>
+<span class="fc" id="L91">                        .plateNumber(v.getPlateNumber())</span>
+<span class="fc" id="L92">                        .vehicleType(v.getVehicleType())</span>
+<span class="fc" id="L93">                        .maxVolumeM3(v.getMaxVolumeM3())</span>
+<span class="fc" id="L94">                        .maxWeightKg(v.getMaxWeightKg())</span>
+<span class="fc" id="L95">                        .remainingVolumeM3(v.getMaxVolumeM3().subtract(draft.getTotalVolumeM3()))</span>
+<span class="fc" id="L96">                        .remainingWeightKg(v.getMaxWeightKg().subtract(draft.getTotalWeightKg()))</span>
+<span class="fc" id="L97">                        .build());</span>
+            } else {
+<span class="fc" id="L99">                StringBuilder reason = new StringBuilder();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                if (!volumeOk) {</span>
+<span class="fc" id="L101">                    reason.append(&quot;Volume exceeds capacity (&quot;)</span>
+<span class="fc" id="L102">                          .append(draft.getTotalVolumeM3()).append(&quot; m³ &gt; &quot;).append(v.getMaxVolumeM3()).append(&quot; m³)&quot;);</span>
+                }
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                if (!weightOk) {</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">                    if (reason.length() &gt; 0) reason.append(&quot; and &quot;);</span>
+<span class="fc" id="L106">                    reason.append(&quot;Weight exceeds capacity (&quot;)</span>
+<span class="fc" id="L107">                          .append(draft.getTotalWeightKg()).append(&quot; kg &gt; &quot;).append(v.getMaxWeightKg()).append(&quot; kg)&quot;);</span>
+                }
+
+<span class="fc" id="L110">                ineligibleVehicles.add(IneligibleVehicleDto.builder()</span>
+<span class="fc" id="L111">                        .vehicleId(v.getId())</span>
+<span class="fc" id="L112">                        .plateNumber(v.getPlateNumber())</span>
+<span class="fc" id="L113">                        .vehicleType(v.getVehicleType())</span>
+<span class="fc" id="L114">                        .maxVolumeM3(v.getMaxVolumeM3())</span>
+<span class="fc" id="L115">                        .maxWeightKg(v.getMaxWeightKg())</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">                        .volumeCheckResult(volumeOk ? ConstraintResult.PASS : ConstraintResult.FAIL)</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">                        .weightCheckResult(weightOk ? ConstraintResult.PASS : ConstraintResult.FAIL)</span>
+<span class="fc" id="L118">                        .failureReason(reason.toString())</span>
+<span class="fc" id="L119">                        .build());</span>
+            }
+<span class="fc" id="L121">        }</span>
+
+        ConstraintResult overallVolume;
+        ConstraintResult overallWeight;
+        String newStatus;
+<span class="fc" id="L126">        String bindingConstraint = null;</span>
+<span class="fc" id="L127">        String suggestion = null;</span>
+
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (!eligibleVehicles.isEmpty()) {</span>
+<span class="fc" id="L130">            overallVolume = ConstraintResult.PASS;</span>
+<span class="fc" id="L131">            overallWeight = ConstraintResult.PASS;</span>
+<span class="fc" id="L132">            newStatus = &quot;VALIDATED&quot;;</span>
+
+            // Sắp xếp các xe đủ tải theo maxVolumeM3 tăng dần
+<span class="fc" id="L135">            eligibleVehicles.sort(Comparator.comparing(EligibleVehicleDto::getMaxVolumeM3));</span>
+        } else {
+<span class="fc" id="L137">            boolean anyVolumeOk = activeVehicles.stream()</span>
+<span class="pc bpc" id="L138" title="1 of 4 branches missed.">                    .anyMatch(v -&gt; v.getMaxVolumeM3() != null &amp;&amp; draft.getTotalVolumeM3().compareTo(v.getMaxVolumeM3()) &lt;= 0);</span>
+<span class="fc" id="L139">            boolean anyWeightOk = activeVehicles.stream()</span>
+<span class="pc bpc" id="L140" title="1 of 4 branches missed.">                    .anyMatch(v -&gt; v.getMaxWeightKg() != null &amp;&amp; draft.getTotalWeightKg().compareTo(v.getMaxWeightKg()) &lt;= 0);</span>
+
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            overallVolume = anyVolumeOk ? ConstraintResult.PASS : ConstraintResult.FAIL;</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            overallWeight = anyWeightOk ? ConstraintResult.PASS : ConstraintResult.FAIL;</span>
+<span class="fc" id="L144">            newStatus = &quot;PLANNED&quot;;</span>
+
+<span class="fc bfc" id="L146" title="All 4 branches covered.">            if (overallVolume == ConstraintResult.FAIL &amp;&amp; overallWeight == ConstraintResult.PASS) {</span>
+<span class="fc" id="L147">                bindingConstraint = &quot;VOLUME&quot;;</span>
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">            } else if (overallVolume == ConstraintResult.PASS &amp;&amp; overallWeight == ConstraintResult.FAIL) {</span>
+<span class="fc" id="L149">                bindingConstraint = &quot;WEIGHT&quot;;</span>
+            } else {
+<span class="fc" id="L151">                bindingConstraint = &quot;BOTH&quot;;</span>
+            }
+
+<span class="fc" id="L154">            suggestion = &quot;No single vehicle can accommodate this load. Consider trip splitting in Vehicle Assignment (BR-07).&quot;;</span>
+        }
+
+<span class="fc" id="L157">        draft.setVolumeCheckResult(overallVolume);</span>
+<span class="fc" id="L158">        draft.setWeightCheckResult(overallWeight);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (&quot;VALIDATED&quot;.equals(newStatus)) {</span>
+<span class="fc" id="L160">            draft.setStatus(&quot;VALIDATED&quot;);</span>
+<span class="fc" id="L161">            draft.setValidatedAt(LocalDateTime.now());</span>
+<span class="fc" id="L162">            draft.setValidatedBy(validator);</span>
+        }
+<span class="fc" id="L164">        tripDraftRepo.save(draft);</span>
+
+<span class="fc" id="L166">        ConfirmedByDto validatorDto = ConfirmedByDto.builder()</span>
+<span class="fc" id="L167">                .userId(validator.getId())</span>
+<span class="fc" id="L168">                .fullName(validator.getFullName())</span>
+<span class="fc" id="L169">                .build();</span>
+
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        String message = &quot;VALIDATED&quot;.equals(newStatus)</span>
+<span class="fc" id="L172">                ? &quot;Capacity validation passed. &quot; + eligibleVehicles.size() + &quot; eligible vehicles available. Proceed to Vehicle Assignment.&quot;</span>
+<span class="fc" id="L173">                : &quot;Capacity validation failed. Total volume &quot; + draft.getTotalVolumeM3() + &quot; m³ exceeds all available vehicle capacities.&quot;;</span>
+
+<span class="fc" id="L175">        return CapacityValidationResultResponse.builder()</span>
+<span class="fc" id="L176">                .tripDraftId(draft.getId())</span>
+<span class="fc" id="L177">                .fixedRouteCode(draft.getRoute().getCode())</span>
+<span class="fc" id="L178">                .deliveryDate(draft.getDeliveryDate().toString())</span>
+<span class="fc" id="L179">                .newStatus(newStatus)</span>
+<span class="fc" id="L180">                .totalVolumeM3(draft.getTotalVolumeM3())</span>
+<span class="fc" id="L181">                .totalWeightKg(draft.getTotalWeightKg())</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">                .validationPassed(!eligibleVehicles.isEmpty())</span>
+<span class="fc" id="L183">                .volumeCheckResult(overallVolume)</span>
+<span class="fc" id="L184">                .weightCheckResult(overallWeight)</span>
+<span class="fc" id="L185">                .eligibleVehicles(eligibleVehicles)</span>
+<span class="fc" id="L186">                .ineligibleVehicles(ineligibleVehicles)</span>
+<span class="fc" id="L187">                .bindingConstraint(bindingConstraint)</span>
+<span class="fc" id="L188">                .suggestion(suggestion)</span>
+<span class="fc" id="L189">                .validatedAt(draft.getValidatedAt())</span>
+<span class="fc" id="L190">                .validatedBy(validatorDto)</span>
+<span class="fc" id="L191">                .message(message)</span>
+<span class="fc" id="L192">                .build();</span>
+      }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CapacityValidationResultResponse getValidationResult(Long tripDraftId) {
+<span class="fc" id="L198">        TripDraft draft = tripDraftRepo.findById(tripDraftId)</span>
+<span class="fc" id="L199">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.TRIP_DRAFT_NOT_FOUND,
+                        &quot;Trip Draft not found with id: &quot; + tripDraftId,
+                        HttpStatus.NOT_FOUND));
+
+<span class="fc" id="L204">        List&lt;Vehicle&gt; activeVehicles = vehicleRepo.findByIsActiveTrue();</span>
+<span class="fc" id="L205">        List&lt;EligibleVehicleDto&gt; eligibleVehicles = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L206">        List&lt;IneligibleVehicleDto&gt; ineligibleVehicles = new ArrayList&lt;&gt;();</span>
+
+<span class="fc" id="L208">        boolean validationPassed = &quot;VALIDATED&quot;.equals(draft.getStatus());</span>
+
+<span class="pc bpc" id="L210" title="1 of 4 branches missed.">        if (draft.getVolumeCheckResult() != ConstraintResult.NOT_CHECKED &amp;&amp; !activeVehicles.isEmpty()) {</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            for (Vehicle v : activeVehicles) {</span>
+<span class="pc bpc" id="L212" title="2 of 4 branches missed.">                if (v.getMaxVolumeM3() == null || v.getMaxWeightKg() == null) {</span>
+<span class="nc" id="L213">                    continue;</span>
+                }
+
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                boolean volumeOk = draft.getTotalVolumeM3().compareTo(v.getMaxVolumeM3()) &lt;= 0;</span>
+<span class="fc bfc" id="L217" title="All 2 branches covered.">                boolean weightOk = draft.getTotalWeightKg().compareTo(v.getMaxWeightKg()) &lt;= 0;</span>
+
+<span class="pc bpc" id="L219" title="1 of 4 branches missed.">                if (volumeOk &amp;&amp; weightOk) {</span>
+<span class="fc" id="L220">                    eligibleVehicles.add(EligibleVehicleDto.builder()</span>
+<span class="fc" id="L221">                            .vehicleId(v.getId())</span>
+<span class="fc" id="L222">                            .plateNumber(v.getPlateNumber())</span>
+<span class="fc" id="L223">                            .vehicleType(v.getVehicleType())</span>
+<span class="fc" id="L224">                            .maxVolumeM3(v.getMaxVolumeM3())</span>
+<span class="fc" id="L225">                            .maxWeightKg(v.getMaxWeightKg())</span>
+<span class="fc" id="L226">                            .remainingVolumeM3(v.getMaxVolumeM3().subtract(draft.getTotalVolumeM3()))</span>
+<span class="fc" id="L227">                            .remainingWeightKg(v.getMaxWeightKg().subtract(draft.getTotalWeightKg()))</span>
+<span class="fc" id="L228">                            .build());</span>
+                } else {
+<span class="fc" id="L230">                    StringBuilder reason = new StringBuilder();</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                    if (!volumeOk) {</span>
+<span class="fc" id="L232">                        reason.append(&quot;Volume exceeds capacity (&quot;)</span>
+<span class="fc" id="L233">                              .append(draft.getTotalVolumeM3()).append(&quot; m³ &gt; &quot;).append(v.getMaxVolumeM3()).append(&quot; m³)&quot;);</span>
+                    }
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">                    if (!weightOk) {</span>
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">                        if (reason.length() &gt; 0) reason.append(&quot; and &quot;);</span>
+<span class="fc" id="L237">                        reason.append(&quot;Weight exceeds capacity (&quot;)</span>
+<span class="fc" id="L238">                              .append(draft.getTotalWeightKg()).append(&quot; kg &gt; &quot;).append(v.getMaxWeightKg()).append(&quot; kg)&quot;);</span>
+                      }
+
+<span class="fc" id="L241">                    ineligibleVehicles.add(IneligibleVehicleDto.builder()</span>
+<span class="fc" id="L242">                            .vehicleId(v.getId())</span>
+<span class="fc" id="L243">                            .plateNumber(v.getPlateNumber())</span>
+<span class="fc" id="L244">                            .vehicleType(v.getVehicleType())</span>
+<span class="fc" id="L245">                            .maxVolumeM3(v.getMaxVolumeM3())</span>
+<span class="fc" id="L246">                            .maxWeightKg(v.getMaxWeightKg())</span>
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">                            .volumeCheckResult(volumeOk ? ConstraintResult.PASS : ConstraintResult.FAIL)</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">                            .weightCheckResult(weightOk ? ConstraintResult.PASS : ConstraintResult.FAIL)</span>
+<span class="fc" id="L249">                            .failureReason(reason.toString())</span>
+<span class="fc" id="L250">                            .build());</span>
+                }
+<span class="fc" id="L252">            }</span>
+
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">            if (!eligibleVehicles.isEmpty()) {</span>
+<span class="fc" id="L255">                eligibleVehicles.sort(Comparator.comparing(EligibleVehicleDto::getMaxVolumeM3));</span>
+            }
+        }
+
+<span class="fc" id="L259">        String bindingConstraint = null;</span>
+<span class="fc" id="L260">        String suggestion = null;</span>
+<span class="pc bpc" id="L261" title="1 of 4 branches missed.">        if (draft.getVolumeCheckResult() != ConstraintResult.NOT_CHECKED &amp;&amp; eligibleVehicles.isEmpty()) {</span>
+<span class="nc bnc" id="L262" title="All 4 branches missed.">            if (draft.getVolumeCheckResult() == ConstraintResult.FAIL &amp;&amp; draft.getWeightCheckResult() == ConstraintResult.PASS) {</span>
+<span class="nc" id="L263">                bindingConstraint = &quot;VOLUME&quot;;</span>
+<span class="nc bnc" id="L264" title="All 4 branches missed.">            } else if (draft.getVolumeCheckResult() == ConstraintResult.PASS &amp;&amp; draft.getWeightCheckResult() == ConstraintResult.FAIL) {</span>
+<span class="nc" id="L265">                bindingConstraint = &quot;WEIGHT&quot;;</span>
+            } else {
+<span class="nc" id="L267">                bindingConstraint = &quot;BOTH&quot;;</span>
+            }
+<span class="nc" id="L269">            suggestion = &quot;No single vehicle can accommodate this load. Consider trip splitting in Vehicle Assignment (BR-07).&quot;;</span>
+        }
+
+<span class="fc" id="L272">        ConfirmedByDto validatorDto = null;</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">        if (draft.getValidatedBy() != null) {</span>
+<span class="fc" id="L274">            validatorDto = ConfirmedByDto.builder()</span>
+<span class="fc" id="L275">                    .userId(draft.getValidatedBy().getId())</span>
+<span class="fc" id="L276">                    .fullName(draft.getValidatedBy().getFullName())</span>
+<span class="fc" id="L277">                    .build();</span>
+        }
+
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        String message = validationPassed</span>
+<span class="fc" id="L281">                ? &quot;Capacity validation passed. &quot; + eligibleVehicles.size() + &quot; eligible vehicles available. Proceed to Vehicle Assignment.&quot;</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">                : (draft.getVolumeCheckResult() == ConstraintResult.NOT_CHECKED</span>
+<span class="fc" id="L283">                    ? &quot;Chưa có kết quả kiểm tra. Bấm Kiểm tra để bắt đầu.&quot;</span>
+<span class="pc" id="L284">                    : &quot;Capacity validation failed. Total volume &quot; + draft.getTotalVolumeM3() + &quot; m³ exceeds all available vehicle capacities.&quot;);</span>
+
+<span class="fc" id="L286">        return CapacityValidationResultResponse.builder()</span>
+<span class="fc" id="L287">                .tripDraftId(draft.getId())</span>
+<span class="fc" id="L288">                .fixedRouteCode(draft.getRoute().getCode())</span>
+<span class="fc" id="L289">                .deliveryDate(draft.getDeliveryDate().toString())</span>
+<span class="fc" id="L290">                .newStatus(draft.getStatus())</span>
+<span class="fc" id="L291">                .totalVolumeM3(draft.getTotalVolumeM3())</span>
+<span class="fc" id="L292">                .totalWeightKg(draft.getTotalWeightKg())</span>
+<span class="fc" id="L293">                .validationPassed(validationPassed)</span>
+<span class="fc" id="L294">                .volumeCheckResult(draft.getVolumeCheckResult())</span>
+<span class="fc" id="L295">                .weightCheckResult(draft.getWeightCheckResult())</span>
+<span class="fc" id="L296">                .eligibleVehicles(eligibleVehicles)</span>
+<span class="fc" id="L297">                .ineligibleVehicles(ineligibleVehicles)</span>
+<span class="fc" id="L298">                .bindingConstraint(bindingConstraint)</span>
+<span class="fc" id="L299">                .suggestion(suggestion)</span>
+<span class="fc" id="L300">                .validatedAt(draft.getValidatedAt())</span>
+<span class="fc" id="L301">                .validatedBy(validatorDto)</span>
+<span class="fc" id="L302">                .message(message)</span>
+<span class="fc" id="L303">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

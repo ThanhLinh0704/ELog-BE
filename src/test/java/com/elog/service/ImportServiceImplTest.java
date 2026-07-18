@@ -166,6 +166,10 @@ class ImportServiceImplTest {
         ImportBatch existing = ImportBatch.builder().id(8L).deliveryDate(date).isActive(true).build();
 
         when(batchRepository.findActiveByDate(date)).thenReturn(Optional.of(existing));
+        when(batchRepository.saveAndFlush(any(ImportBatch.class))).thenAnswer(invocation -> {
+            ImportBatch b = invocation.getArgument(0);
+            return b;
+        });
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             if (b.getId() == null) b.setId(9L);
@@ -177,7 +181,7 @@ class ImportServiceImplTest {
         assertThat(response).isNotNull();
         assertThat(response.getBatchId()).isEqualTo(9L);
         assertThat(existing.getIsActive()).isFalse(); // verify old deactivated
-        verify(batchRepository).save(existing);
+        verify(batchRepository).saveAndFlush(existing);
     }
 
     // ── L1-EIS-01 ──────────────────────────────────────────

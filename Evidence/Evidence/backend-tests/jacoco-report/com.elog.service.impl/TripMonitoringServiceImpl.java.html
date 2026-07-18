@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TripMonitoringServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.service.impl</a> &gt; <span class="el_source">TripMonitoringServiceImpl.java</span></div><h1>TripMonitoringServiceImpl.java</h1><pre class="source lang-java linenums">package com.elog.service.impl;
+
+import com.elog.dto.response.*;
+import com.elog.entity.*;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.*;
+import com.elog.service.TripMonitoringService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L25">@Slf4j</span>
+@Transactional
+public class TripMonitoringServiceImpl implements TripMonitoringService {
+
+    private static final String GPS_NOTE = &quot;GPS tracking not available in this phase&quot;;
+<span class="fc" id="L30">    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;</span>
+<span class="fc" id="L31">    private static final Long SYSTEM_USER_ID = 1L;</span>
+
+    private final TripRepository tripRepo;
+    private final TripStopRepository tripStopRepo;
+    private final UserRepository userRepo;
+    private final SystemConfigRepository systemConfigRepo;
+    private final DeliveryExceptionRepository deliveryExceptionRepo;
+
+    @Override
+    public TripStartResponse startTrip(Long tripId, String currentUsername) {
+<span class="fc" id="L41">        Trip trip = tripRepo.findById(tripId)</span>
+<span class="pc" id="L42">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_NOT_FOUND,</span>
+                        &quot;Trip &quot; + tripId + &quot; not found&quot;, HttpStatus.NOT_FOUND));
+
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (!trip.getDriver().getUsername().equals(currentUsername)) {</span>
+<span class="fc" id="L46">            throw new BusinessException(ErrorCode.NOT_YOUR_TRIP,</span>
+                    &quot;You are not assigned to Trip &quot; + tripId, HttpStatus.FORBIDDEN);
+        }
+
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (trip.getStatus() != TripStatus.DISPATCHED) {</span>
+<span class="fc" id="L51">            throw new BusinessException(ErrorCode.INVALID_TRIP_TRANSITION,</span>
+<span class="fc" id="L52">                    &quot;Trip &quot; + tripId + &quot; is not DISPATCHED. Current status: &quot; + trip.getStatus(),</span>
+                    HttpStatus.CONFLICT);
+        }
+
+<span class="fc" id="L56">        trip.setStatus(TripStatus.IN_PROGRESS);</span>
+<span class="fc" id="L57">        trip.setActualDepartureTime(LocalDateTime.now());</span>
+<span class="fc" id="L58">        tripRepo.save(trip);</span>
+<span class="fc" id="L59">        log.info(&quot;Trip {} started by driver {}&quot;, tripId, currentUsername);</span>
+
+<span class="fc" id="L61">        List&lt;TripStop&gt; stops = tripStopRepo.findByTripTripIdOrderBySequenceOrderAsc(tripId);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        TripStop firstStop = stops.isEmpty() ? null : stops.get(0);</span>
+
+<span class="fc" id="L64">        return TripStartResponse.builder()</span>
+<span class="fc" id="L65">                .tripId(trip.getTripId())</span>
+<span class="fc" id="L66">                .status(&quot;IN_PROGRESS&quot;)</span>
+<span class="fc" id="L67">                .actualDepartureTime(trip.getActualDepartureTime().format(DT_FMT))</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">                .firstStopCode(firstStop != null ? getStoreCode(firstStop) : null)</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">                .firstStopEta(firstStop != null &amp;&amp; firstStop.getPlannedEta() != null</span>
+<span class="pc" id="L70">                        ? firstStop.getPlannedEta().format(DT_FMT) : null)</span>
+<span class="fc" id="L71">                .message(buildStartMessage(firstStop))</span>
+<span class="fc" id="L72">                .build();</span>
+    }
+
+    @Override
+    public StopArriveResponse arriveAtStop(Long tripStopId, String currentUsername) {
+<span class="fc" id="L77">        TripStop stop = tripStopRepo.findById(tripStopId)</span>
+<span class="pc" id="L78">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_STOP_NOT_FOUND,</span>
+                        &quot;TripStop &quot; + tripStopId + &quot; not found&quot;, HttpStatus.NOT_FOUND));
+
+<span class="fc" id="L81">        Trip trip = stop.getTrip();</span>
+
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (!trip.getDriver().getUsername().equals(currentUsername)) {</span>
+<span class="fc" id="L84">            throw new BusinessException(ErrorCode.NOT_YOUR_TRIP,</span>
+                    &quot;TripStop &quot; + tripStopId + &quot; does not belong to your trip&quot;, HttpStatus.FORBIDDEN);
+        }
+
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">        if (trip.getStatus() == TripStatus.COMPLETED) {</span>
+<span class="nc" id="L89">            throw new BusinessException(ErrorCode.TRIP_COMPLETED,</span>
+<span class="nc" id="L90">                    &quot;Trip &quot; + trip.getTripId() + &quot; is already COMPLETED&quot;, HttpStatus.CONFLICT);</span>
+        }
+
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (stop.getStatus() != TripStopStatus.PENDING) {</span>
+<span class="nc bnc" id="L94" title="All 4 branches missed.">            if (stop.getStatus() == TripStopStatus.COMPLETED || stop.getStatus() == TripStopStatus.EXCEPTION) {</span>
+<span class="nc" id="L95">                throw new BusinessException(ErrorCode.STOP_ALREADY_DONE,</span>
+<span class="nc" id="L96">                        &quot;Stop &quot; + tripStopId + &quot; is already &quot; + stop.getStatus(), HttpStatus.CONFLICT);</span>
+            }
+<span class="nc" id="L98">            throw new BusinessException(ErrorCode.STOP_NOT_PENDING,</span>
+<span class="nc" id="L99">                    &quot;Stop &quot; + tripStopId + &quot; is not PENDING. Current: &quot; + stop.getStatus(), HttpStatus.CONFLICT);</span>
+        }
+
+<span class="fc" id="L102">        List&lt;TripStop&gt; remainingStops = tripStopRepo.findRemainingStopsOrdered(trip.getTripId());</span>
+<span class="pc bpc" id="L103" title="1 of 4 branches missed.">        if (!remainingStops.isEmpty() &amp;&amp; !remainingStops.get(0).getTripStopId().equals(tripStopId)) {</span>
+<span class="fc" id="L104">            TripStop expectedNext = remainingStops.get(0);</span>
+<span class="fc" id="L105">            throw new BusinessException(ErrorCode.PREVIOUS_STOP_NOT_DONE,</span>
+<span class="fc" id="L106">                    &quot;Must complete stop &quot; + getStoreCode(expectedNext) +</span>
+<span class="fc" id="L107">                    &quot; (seq &quot; + expectedNext.getSequenceOrder() + &quot;) first&quot;, HttpStatus.CONFLICT);</span>
+        }
+
+<span class="fc" id="L110">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L111">        stop.setStatus(TripStopStatus.IN_PROGRESS);</span>
+<span class="fc" id="L112">        stop.setActualArrivalTime(now);</span>
+<span class="fc" id="L113">        tripStopRepo.save(stop);</span>
+
+<span class="fc" id="L115">        long delayMinutes = 0;</span>
+<span class="fc" id="L116">        boolean exceptionFlagged = false;</span>
+<span class="fc" id="L117">        Long exceptionId = null;</span>
+
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (stop.getPlannedEta() != null) {</span>
+<span class="fc" id="L120">            delayMinutes = ChronoUnit.MINUTES.between(stop.getPlannedEta(), now);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            if (delayMinutes &lt; 0) delayMinutes = 0;</span>
+
+<span class="fc" id="L123">            int threshold = getEtaThresholdMinutes();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (delayMinutes &gt; threshold) {</span>
+<span class="fc" id="L125">                exceptionId = createTimeException(stop, delayMinutes, threshold, now);</span>
+<span class="fc" id="L126">                exceptionFlagged = true;</span>
+<span class="fc" id="L127">                log.info(&quot;TIME_EXCEPTION flagged for TripStop {} — delay {} min&quot;, tripStopId, delayMinutes);</span>
+            }
+        }
+
+<span class="fc" id="L131">        String message = buildArriveMessage(stop, delayMinutes, exceptionFlagged, getEtaThresholdMinutes());</span>
+<span class="fc" id="L132">        return StopArriveResponse.builder()</span>
+<span class="fc" id="L133">                .tripStopId(stop.getTripStopId())</span>
+<span class="fc" id="L134">                .storeCode(getStoreCode(stop))</span>
+<span class="fc" id="L135">                .status(stop.getStatus().name())</span>
+<span class="fc" id="L136">                .actualArrivalTime(now.format(DT_FMT))</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">                .plannedEta(stop.getPlannedEta() != null ? stop.getPlannedEta().format(DT_FMT) : null)</span>
+<span class="fc" id="L138">                .delayMinutes(delayMinutes)</span>
+<span class="fc" id="L139">                .timeExceptionFlagged(exceptionFlagged)</span>
+<span class="fc" id="L140">                .exceptionId(exceptionId)</span>
+<span class="fc" id="L141">                .message(message)</span>
+<span class="fc" id="L142">                .build();</span>
+    }
+
+    @Override
+    public StopCompleteResponse completeStop(Long tripStopId, String currentUsername) {
+<span class="fc" id="L147">        TripStop stop = tripStopRepo.findById(tripStopId)</span>
+<span class="pc" id="L148">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_STOP_NOT_FOUND,</span>
+                        &quot;TripStop &quot; + tripStopId + &quot; not found&quot;, HttpStatus.NOT_FOUND));
+
+<span class="fc" id="L151">        Trip trip = stop.getTrip();</span>
+
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (!trip.getDriver().getUsername().equals(currentUsername)) {</span>
+<span class="nc" id="L154">            throw new BusinessException(ErrorCode.NOT_YOUR_TRIP,</span>
+                    &quot;TripStop &quot; + tripStopId + &quot; does not belong to your trip&quot;, HttpStatus.FORBIDDEN);
+        }
+
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (stop.getStatus() != TripStopStatus.IN_PROGRESS) {</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            if (stop.getStatus() == TripStopStatus.COMPLETED) {</span>
+<span class="nc" id="L160">                throw new BusinessException(ErrorCode.STOP_ALREADY_DONE,</span>
+                        &quot;Stop &quot; + tripStopId + &quot; is already COMPLETED&quot;, HttpStatus.CONFLICT);
+            }
+<span class="nc" id="L163">            throw new BusinessException(ErrorCode.STOP_NOT_IN_PROGRESS,</span>
+<span class="nc" id="L164">                    &quot;Stop &quot; + tripStopId + &quot; is not IN_PROGRESS. Current: &quot; + stop.getStatus(), HttpStatus.CONFLICT);</span>
+        }
+
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">        if (trip.getStatus() == TripStatus.COMPLETED) {</span>
+<span class="nc" id="L168">            throw new BusinessException(ErrorCode.TRIP_COMPLETED,</span>
+<span class="nc" id="L169">                    &quot;Trip &quot; + trip.getTripId() + &quot; is already COMPLETED&quot;, HttpStatus.CONFLICT);</span>
+        }
+
+<span class="fc" id="L172">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="fc" id="L173">        stop.setStatus(TripStopStatus.COMPLETED);</span>
+<span class="fc" id="L174">        stop.setActualDepartureTime(now);</span>
+<span class="fc" id="L175">        tripStopRepo.save(stop);</span>
+
+<span class="fc" id="L177">        boolean tripCompleted = false;</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (allStopsDone(trip)) {</span>
+<span class="fc" id="L179">            trip.setStatus(TripStatus.COMPLETED);</span>
+<span class="fc" id="L180">            trip.setCompletedAt(now);</span>
+<span class="fc" id="L181">            tripRepo.save(trip);</span>
+<span class="fc" id="L182">            tripCompleted = true;</span>
+<span class="fc" id="L183">            log.info(&quot;Trip {} auto-completed — all stops done&quot;, trip.getTripId());</span>
+        }
+
+<span class="fc" id="L186">        StopCompleteResponse.NextStopInfo nextStop = null;</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (!tripCompleted) {</span>
+<span class="fc" id="L188">            List&lt;TripStop&gt; remaining = tripStopRepo.findRemainingStopsOrdered(trip.getTripId());</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            if (!remaining.isEmpty()) {</span>
+<span class="fc" id="L190">                TripStop next = remaining.get(0);</span>
+<span class="fc" id="L191">                nextStop = StopCompleteResponse.NextStopInfo.builder()</span>
+<span class="fc" id="L192">                        .tripStopId(next.getTripStopId())</span>
+<span class="fc" id="L193">                        .storeCode(getStoreCode(next))</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                        .plannedEta(next.getPlannedEta() != null ? next.getPlannedEta().format(DT_FMT) : null)</span>
+<span class="fc" id="L195">                        .sequenceOrder(next.getSequenceOrder())</span>
+<span class="fc" id="L196">                        .build();</span>
+            }
+        }
+
+<span class="fc" id="L200">        return StopCompleteResponse.builder()</span>
+<span class="fc" id="L201">                .tripStopId(stop.getTripStopId())</span>
+<span class="fc" id="L202">                .storeCode(getStoreCode(stop))</span>
+<span class="fc" id="L203">                .status(&quot;COMPLETED&quot;)</span>
+<span class="fc" id="L204">                .actualDepartureTime(now.format(DT_FMT))</span>
+<span class="fc" id="L205">                .tripCompleted(tripCompleted)</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                .tripStatus(tripCompleted ? &quot;COMPLETED&quot; : trip.getStatus().name())</span>
+<span class="fc" id="L207">                .nextStop(nextStop)</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                .message(tripCompleted</span>
+<span class="fc" id="L209">                        ? &quot;All stops completed. Trip &quot; + trip.getTripId() + &quot; is now COMPLETED.&quot;</span>
+<span class="fc" id="L210">                        : &quot;Stop completed. Proceed to next stop.&quot;)</span>
+<span class="fc" id="L211">                .build();</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ActiveTripsResponse getActiveTripsDashboard(LocalDate date) {
+<span class="nc" id="L217">        List&lt;TripStatus&gt; activeStatuses = List.of(</span>
+                TripStatus.DISPATCHED, TripStatus.IN_PROGRESS, TripStatus.COMPLETED);
+
+<span class="nc" id="L220">        List&lt;Trip&gt; trips = tripRepo.findActiveTripsByDate(date, activeStatuses);</span>
+
+<span class="nc" id="L222">        List&lt;Long&gt; allStopIds = trips.stream()</span>
+<span class="nc" id="L223">                .flatMap(t -&gt; t.getStops().stream())</span>
+<span class="nc" id="L224">                .map(TripStop::getTripStopId)</span>
+<span class="nc" id="L225">                .toList();</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        Map&lt;Long, List&lt;DeliveryException&gt;&gt; exByStop = allStopIds.isEmpty() ? Map.of()</span>
+<span class="nc" id="L227">                : deliveryExceptionRepo.findByTripStopIdInOrderByCreatedAtDesc(allStopIds)</span>
+<span class="nc" id="L228">                        .stream().collect(Collectors.groupingBy(DeliveryException::getTripStopId));</span>
+
+<span class="nc" id="L230">        List&lt;ActiveTripsResponse.TripSummary&gt; summaries = trips.stream()</span>
+<span class="nc" id="L231">                .map(trip -&gt; buildTripSummary(trip, exByStop))</span>
+<span class="nc" id="L232">                .toList();</span>
+
+<span class="nc" id="L234">        return ActiveTripsResponse.builder()</span>
+<span class="nc" id="L235">                .date(date.toString())</span>
+<span class="nc" id="L236">                .totalActiveTrips((int) trips.stream()</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">                        .filter(t -&gt; t.getStatus() != TripStatus.COMPLETED)</span>
+<span class="nc" id="L238">                        .count())</span>
+<span class="nc" id="L239">                .trips(summaries)</span>
+<span class="nc" id="L240">                .build();</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TripProgressResponse getTripProgress(Long tripId) {
+<span class="nc" id="L246">        Trip trip = tripRepo.findById(tripId)</span>
+<span class="nc" id="L247">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_NOT_FOUND,</span>
+                        &quot;Trip &quot; + tripId + &quot; not found&quot;, HttpStatus.NOT_FOUND));
+
+<span class="nc" id="L250">        List&lt;TripStop&gt; stops = tripStopRepo.findByTripTripIdOrderBySequenceOrderAsc(tripId);</span>
+
+<span class="nc" id="L252">        List&lt;Long&gt; stopIds = stops.stream().map(TripStop::getTripStopId).toList();</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        Map&lt;Long, List&lt;DeliveryException&gt;&gt; exByStop = stopIds.isEmpty() ? Map.of()</span>
+<span class="nc" id="L254">                : deliveryExceptionRepo.findByTripStopIdInOrderByCreatedAtDesc(stopIds)</span>
+<span class="nc" id="L255">                        .stream().collect(Collectors.groupingBy(DeliveryException::getTripStopId));</span>
+
+<span class="nc" id="L257">        List&lt;TripProgressResponse.StopProgress&gt; stopProgresses = stops.stream()</span>
+<span class="nc" id="L258">                .map(stop -&gt; buildStopProgress(stop, exByStop))</span>
+<span class="nc" id="L259">                .toList();</span>
+
+<span class="nc" id="L261">        Vehicle v = trip.getVehicle();</span>
+<span class="nc" id="L262">        User d = trip.getDriver();</span>
+
+<span class="nc" id="L264">        return TripProgressResponse.builder()</span>
+<span class="nc" id="L265">                .tripId(trip.getTripId())</span>
+<span class="nc" id="L266">                .fixedRouteCode(trip.getRoute().getCode())</span>
+<span class="nc" id="L267">                .deliveryDate(trip.getDeliveryDate().toString())</span>
+<span class="nc" id="L268">                .status(trip.getStatus().name())</span>
+<span class="nc" id="L269">                .vehicle(TripProgressResponse.VehicleInfo.builder()</span>
+<span class="nc" id="L270">                        .vehicleCode(v.getPlateNumber())</span>
+<span class="nc" id="L271">                        .plateNumber(v.getPlateNumber())</span>
+<span class="nc" id="L272">                        .build())</span>
+<span class="nc" id="L273">                .driver(TripProgressResponse.DriverInfo.builder()</span>
+<span class="nc" id="L274">                        .userId(d.getId())</span>
+<span class="nc" id="L275">                        .fullName(d.getFullName())</span>
+<span class="nc" id="L276">                        .phone(null)</span>
+<span class="nc" id="L277">                        .build())</span>
+<span class="nc" id="L278">                .stops(stopProgresses)</span>
+<span class="nc" id="L279">                .gpsLocation(null)</span>
+<span class="nc" id="L280">                .gpsNote(GPS_NOTE)</span>
+<span class="nc" id="L281">                .build();</span>
+    }
+
+    private String getStoreCode(TripStop stop) {
+<span class="pc bpc" id="L285" title="2 of 4 branches missed.">        return stop.getRouteStop() != null &amp;&amp; stop.getRouteStop().getStore() != null</span>
+<span class="fc" id="L286">                ? stop.getRouteStop().getStore().getCode()</span>
+<span class="nc" id="L287">                : &quot;STOP-&quot; + stop.getTripStopId();</span>
+    }
+
+    private String getStoreName(TripStop stop) {
+<span class="nc bnc" id="L291" title="All 4 branches missed.">        return stop.getRouteStop() != null &amp;&amp; stop.getRouteStop().getStore() != null</span>
+<span class="nc" id="L292">                ? stop.getRouteStop().getStore().getName()</span>
+<span class="nc" id="L293">                : null;</span>
+    }
+
+    private int getEtaThresholdMinutes() {
+<span class="fc" id="L297">        return systemConfigRepo.findByConfigKey(&quot;ETA_THRESHOLD_MINUTES&quot;)</span>
+<span class="pc" id="L298">                .map(c -&gt; Integer.parseInt(c.getConfigValue()))</span>
+<span class="fc" id="L299">                .orElse(15);</span>
+    }
+
+    /** Idempotent — bỏ qua nếu TIME_EXCEPTION đã tồn tại cho stop này */
+    private Long createTimeException(TripStop stop, long delayMinutes, int threshold, LocalDateTime now) {
+<span class="pc bpc" id="L304" title="1 of 2 branches missed.">        if (deliveryExceptionRepo.existsByTripStopIdAndExceptionType(</span>
+<span class="fc" id="L305">                stop.getTripStopId(), ExceptionType.TIME_EXCEPTION)) {</span>
+<span class="nc" id="L306">            log.debug(&quot;TIME_EXCEPTION already exists for TripStop {} — skip&quot;, stop.getTripStopId());</span>
+<span class="nc" id="L307">            return null;</span>
+        }
+
+<span class="fc" id="L310">        DeliveryException ex = DeliveryException.builder()</span>
+<span class="fc" id="L311">                .tripStopId(stop.getTripStopId())</span>
+<span class="fc" id="L312">                .exceptionType(ExceptionType.TIME_EXCEPTION)</span>
+<span class="fc" id="L313">                .reportedBy(SYSTEM_USER_ID)</span>
+<span class="fc" id="L314">                .description(String.format(</span>
+                        &quot;Stop %s is %d minutes past planned ETA (%s). Threshold: %d min.&quot;,
+<span class="fc" id="L316">                        getStoreCode(stop), delayMinutes, stop.getPlannedEta(), threshold))</span>
+<span class="fc" id="L317">                .build();</span>
+<span class="fc" id="L318">        DeliveryException saved = deliveryExceptionRepo.save(ex);</span>
+
+<span class="fc" id="L320">        stop.setStatus(TripStopStatus.EXCEPTION);</span>
+<span class="fc" id="L321">        tripStopRepo.save(stop);</span>
+
+<span class="fc" id="L323">        log.info(&quot;TIME_EXCEPTION created (id={}) for TripStop {} — {} min late&quot;,</span>
+<span class="fc" id="L324">                saved.getExceptionId(), stop.getTripStopId(), delayMinutes);</span>
+<span class="fc" id="L325">        return saved.getExceptionId();</span>
+    }
+
+    private boolean allStopsDone(Trip trip) {
+<span class="fc" id="L329">        return trip.getStops().stream()</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">                .allMatch(s -&gt; s.getStatus() == TripStopStatus.COMPLETED</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">                            || s.getStatus() == TripStopStatus.EXCEPTION);</span>
+    }
+
+    private ActiveTripsResponse.TripSummary buildTripSummary(
+            Trip trip, Map&lt;Long, List&lt;DeliveryException&gt;&gt; exByStop) {
+<span class="nc" id="L336">        List&lt;TripStop&gt; stops = trip.getStops();</span>
+<span class="nc" id="L337">        int total     = stops.size();</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        int completed = (int) stops.stream().filter(s -&gt; s.getStatus() == TripStopStatus.COMPLETED).count();</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">        int pending   = (int) stops.stream().filter(s -&gt; s.getStatus() == TripStopStatus.PENDING).count();</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        int exception = (int) stops.stream().filter(s -&gt; s.getStatus() == TripStopStatus.EXCEPTION).count();</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">        int progress  = total == 0 ? 0 : (completed * 100 / total);</span>
+
+<span class="nc" id="L343">        List&lt;ActiveTripsResponse.ExceptionSummary&gt; exSummaries = stops.stream()</span>
+<span class="nc" id="L344">                .flatMap(stop -&gt; exByStop.getOrDefault(stop.getTripStopId(), List.of()).stream()</span>
+<span class="nc" id="L345">                        .map(ex -&gt; ActiveTripsResponse.ExceptionSummary.builder()</span>
+<span class="nc" id="L346">                                .exceptionId(ex.getExceptionId())</span>
+<span class="nc" id="L347">                                .type(ex.getExceptionType().name())</span>
+<span class="nc" id="L348">                                .storeCode(getStoreCode(stop))</span>
+<span class="nc" id="L349">                                .description(ex.getDescription())</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">                                .resolvedAt(ex.getResolvedAt() != null ? ex.getResolvedAt().format(DT_FMT) : null)</span>
+<span class="nc" id="L351">                                .build()))</span>
+<span class="nc" id="L352">                .toList();</span>
+
+<span class="nc" id="L354">        return ActiveTripsResponse.TripSummary.builder()</span>
+<span class="nc" id="L355">                .tripId(trip.getTripId())</span>
+<span class="nc" id="L356">                .fixedRouteCode(trip.getRoute().getCode())</span>
+<span class="nc" id="L357">                .vehicleCode(trip.getVehicle().getPlateNumber())</span>
+<span class="nc" id="L358">                .driverName(trip.getDriver().getFullName())</span>
+<span class="nc" id="L359">                .status(trip.getStatus().name())</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">                .plannedDepartureTime(trip.getPlannedDepartureTime() != null</span>
+<span class="nc" id="L361">                        ? trip.getPlannedDepartureTime().toString() : null)</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">                .actualDepartureTime(trip.getActualDepartureTime() != null</span>
+<span class="nc" id="L363">                        ? trip.getActualDepartureTime().format(DT_FMT) : null)</span>
+<span class="nc" id="L364">                .totalStops(total)</span>
+<span class="nc" id="L365">                .completedStops(completed)</span>
+<span class="nc" id="L366">                .pendingStops(pending)</span>
+<span class="nc" id="L367">                .exceptionStops(exception)</span>
+<span class="nc" id="L368">                .progressPercent(progress)</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                .hasUnresolvedExceptions(exSummaries.stream().anyMatch(e -&gt; e.getResolvedAt() == null))</span>
+<span class="nc" id="L370">                .exceptions(exSummaries)</span>
+<span class="nc" id="L371">                .gpsLocation(null)</span>
+<span class="nc" id="L372">                .gpsNote(GPS_NOTE)</span>
+<span class="nc" id="L373">                .build();</span>
+    }
+
+    private TripProgressResponse.StopProgress buildStopProgress(
+            TripStop stop, Map&lt;Long, List&lt;DeliveryException&gt;&gt; exByStop) {
+<span class="nc" id="L378">        long delayMin = 0;</span>
+<span class="nc bnc" id="L379" title="All 4 branches missed.">        if (stop.getActualArrivalTime() != null &amp;&amp; stop.getPlannedEta() != null) {</span>
+<span class="nc" id="L380">            delayMin = ChronoUnit.MINUTES.between(stop.getPlannedEta(), stop.getActualArrivalTime());</span>
+<span class="nc bnc" id="L381" title="All 2 branches missed.">            if (delayMin &lt; 0) delayMin = 0;</span>
+        }
+
+<span class="nc" id="L384">        List&lt;TripProgressResponse.ExceptionDetail&gt; exDetails =</span>
+<span class="nc" id="L385">                exByStop.getOrDefault(stop.getTripStopId(), List.of()).stream()</span>
+<span class="nc" id="L386">                        .map(ex -&gt; TripProgressResponse.ExceptionDetail.builder()</span>
+<span class="nc" id="L387">                                .exceptionId(ex.getExceptionId())</span>
+<span class="nc" id="L388">                                .type(ex.getExceptionType().name())</span>
+<span class="nc" id="L389">                                .description(ex.getDescription())</span>
+<span class="nc" id="L390">                                .createdAt(ex.getCreatedAt().format(DT_FMT))</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">                                .resolvedAt(ex.getResolvedAt() != null ? ex.getResolvedAt().format(DT_FMT) : null)</span>
+<span class="nc" id="L392">                                .build())</span>
+<span class="nc" id="L393">                        .toList();</span>
+
+<span class="nc" id="L395">        return TripProgressResponse.StopProgress.builder()</span>
+<span class="nc" id="L396">                .tripStopId(stop.getTripStopId())</span>
+<span class="nc" id="L397">                .sequenceOrder(stop.getSequenceOrder())</span>
+<span class="nc" id="L398">                .storeCode(getStoreCode(stop))</span>
+<span class="nc" id="L399">                .storeName(getStoreName(stop))</span>
+<span class="nc" id="L400">                .status(stop.getStatus().name())</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">                .plannedEta(stop.getPlannedEta() != null ? stop.getPlannedEta().format(DT_FMT) : null)</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">                .actualArrivalTime(stop.getActualArrivalTime() != null</span>
+<span class="nc" id="L403">                        ? stop.getActualArrivalTime().format(DT_FMT) : null)</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">                .actualDepartureTime(stop.getActualDepartureTime() != null</span>
+<span class="nc" id="L405">                        ? stop.getActualDepartureTime().format(DT_FMT) : null)</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">                .delayMinutes(stop.getActualArrivalTime() != null ? delayMin : null)</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">                .hasException(stop.getStatus() == TripStopStatus.EXCEPTION)</span>
+<span class="nc" id="L408">                .exceptions(exDetails)</span>
+<span class="nc" id="L409">                .build();</span>
+    }
+
+    private String buildStartMessage(TripStop firstStop) {
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">        if (firstStop == null) return &quot;Trip started.&quot;;</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">        String eta = firstStop.getPlannedEta() != null</span>
+<span class="pc" id="L415">                ? &quot; (ETA &quot; + firstStop.getPlannedEta().toLocalTime() + &quot;)&quot; : &quot;&quot;;</span>
+<span class="fc" id="L416">        return &quot;Trip started. Proceed to first stop: &quot; + getStoreCode(firstStop) + eta + &quot;.&quot;;</span>
+    }
+
+    private String buildArriveMessage(TripStop stop, long delayMin, boolean excepted, int threshold) {
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">        if (stop.getPlannedEta() == null) return &quot;Arrived at &quot; + getStoreCode(stop) + &quot;.&quot;;</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        if (excepted) {</span>
+<span class="fc" id="L422">            return String.format(&quot;⚠️ TIME EXCEPTION flagged: %d minutes behind ETA.&quot;, delayMin);</span>
+        }
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">        if (delayMin &gt; 0) {</span>
+<span class="nc" id="L425">            return String.format(&quot;Arrived at %s. %d minutes behind ETA (threshold: %d min).&quot;,</span>
+<span class="nc" id="L426">                    getStoreCode(stop), delayMin, threshold);</span>
+        }
+<span class="fc" id="L428">        return &quot;Arrived at &quot; + getStoreCode(stop) + &quot; on time.&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

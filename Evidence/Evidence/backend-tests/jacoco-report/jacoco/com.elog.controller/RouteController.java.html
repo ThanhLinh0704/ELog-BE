@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RouteController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.controller</a> &gt; <span class="el_source">RouteController.java</span></div><h1>RouteController.java</h1><pre class="source lang-java linenums">package com.elog.controller;
+
+import com.elog.dto.request.*;
+import com.elog.dto.response.*;
+import com.elog.service.RouteService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping(&quot;/api/routes&quot;)
+@RequiredArgsConstructor
+@Tag(name = &quot;Routes&quot;, description = &quot;Route management APIs&quot;)
+public class RouteController {
+
+    private final RouteService routeService;
+
+    // ── Route Header ────────────────────────────────────────────
+
+    @PostMapping
+    @Operation(summary = &quot;Create a new route&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;RouteResponse&gt;&gt; createRoute(
+            @Valid @RequestBody RouteCreateRequest request) {
+<span class="nc" id="L34">        RouteResponse response = routeService.createRoute(request);</span>
+<span class="nc" id="L35">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="nc" id="L36">                .body(ApiResponse.success(response, &quot;Route created successfully&quot;));</span>
+    }
+
+    @GetMapping
+    @Operation(summary = &quot;Get paginated and filtered list of routes&quot;)
+    @PreAuthorize(&quot;hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;RouteResponse&gt;&gt;&gt; getAllRoutes(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Boolean isActive,
+            @PageableDefault(size = 20) Pageable pageable) {
+<span class="nc" id="L46">        ApiResponse&lt;List&lt;RouteResponse&gt;&gt; response =</span>
+<span class="nc" id="L47">                routeService.getAllRoutes(keyword, isActive, pageable);</span>
+<span class="nc" id="L48">        return ResponseEntity.ok(response);</span>
+    }
+
+    @GetMapping(&quot;/{id}&quot;)
+    @Operation(summary = &quot;Get route detail with stops&quot;)
+    @PreAuthorize(&quot;hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;RouteDetailResponse&gt;&gt; getRouteById(@PathVariable Long id) {
+<span class="nc" id="L55">        RouteDetailResponse response = routeService.getRouteById(id);</span>
+<span class="nc" id="L56">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    @PutMapping(&quot;/{id}&quot;)
+    @Operation(summary = &quot;Update route name and description&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;RouteResponse&gt;&gt; updateRoute(
+            @PathVariable Long id,
+            @Valid @RequestBody RouteUpdateRequest request) {
+<span class="nc" id="L65">        RouteResponse response = routeService.updateRoute(id, request);</span>
+<span class="nc" id="L66">        return ResponseEntity.ok(ApiResponse.success(response, &quot;Route updated successfully&quot;));</span>
+    }
+
+    @PatchMapping(&quot;/{id}/status&quot;)
+    @Operation(summary = &quot;Activate or deactivate a route&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;RouteResponse&gt;&gt; updateRouteStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody RouteStatusUpdateRequest request) {
+<span class="nc" id="L75">        RouteResponse response = routeService.updateRouteStatus(id, request);</span>
+<span class="nc" id="L76">        return ResponseEntity.ok(ApiResponse.success(response, &quot;Route status updated&quot;));</span>
+    }
+
+    // ── Route Stops ─────────────────────────────────────────────
+
+    @PostMapping(&quot;/{id}/stops&quot;)
+    @Operation(summary = &quot;Add a stop to the route&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;RouteStopResponse&gt;&gt; addStop(
+            @PathVariable Long id,
+            @RequestBody RouteStopAddRequest request) {
+<span class="nc" id="L87">        RouteStopResponse response = routeService.addStop(id, request);</span>
+<span class="nc" id="L88">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="nc" id="L89">                .body(ApiResponse.success(response, &quot;Stop added successfully&quot;));</span>
+    }
+
+    @PutMapping(&quot;/{id}/stops/reorder&quot;)
+    @Operation(summary = &quot;Reorder all stops in the route&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;RouteStopResponse&gt;&gt;&gt; reorderStops(
+            @PathVariable Long id,
+            @Valid @RequestBody RouteStopReorderRequest request) {
+<span class="nc" id="L98">        List&lt;RouteStopResponse&gt; response = routeService.reorderStops(id, request);</span>
+<span class="nc" id="L99">        return ResponseEntity.ok(ApiResponse.success(response, &quot;Stops reordered successfully&quot;));</span>
+    }
+
+    @DeleteMapping(&quot;/{id}/stops/{stopId}&quot;)
+    @Operation(summary = &quot;Remove a stop from the route&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; removeStop(
+            @PathVariable Long id,
+            @PathVariable Long stopId) {
+<span class="nc" id="L108">        routeService.removeStop(id, stopId);</span>
+<span class="nc" id="L109">        return ResponseEntity.ok(ApiResponse.success(null, &quot;Stop removed successfully&quot;));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

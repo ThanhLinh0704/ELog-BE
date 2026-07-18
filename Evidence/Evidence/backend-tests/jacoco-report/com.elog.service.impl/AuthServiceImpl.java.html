@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.service.impl</a> &gt; <span class="el_source">AuthServiceImpl.java</span></div><h1>AuthServiceImpl.java</h1><pre class="source lang-java linenums">package com.elog.service.impl;
+
+import com.elog.dto.request.LoginRequest;
+import com.elog.dto.request.TokenRefreshRequest;
+import com.elog.dto.response.TokenResponse;
+import com.elog.dto.response.TokenRefreshResponse;
+import com.elog.entity.RefreshToken;
+import com.elog.entity.User;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.RefreshTokenRepository;
+import com.elog.repository.UserRepository;
+import com.elog.security.JwtUtils;
+import com.elog.service.AuthService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class AuthServiceImpl implements AuthService {
+
+    private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final JwtUtils jwtUtils;
+    private final PasswordEncoder passwordEncoder;
+
+    @Value(&quot;${elog.jwt.refresh-expiration-ms:604800000}&quot;) // Default 7 ngày
+    private long refreshExpirationMs;
+
+    @Override
+    @Transactional
+    public TokenResponse login(LoginRequest request) {
+        // 1. Kiểm tra tài khoản tồn tại
+<span class="fc" id="L45">        User user = userRepository.findByUsername(request.getUsername())</span>
+<span class="fc" id="L46">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.INVALID_CREDENTIALS, &quot;Invalid username or password&quot;, HttpStatus.UNAUTHORIZED));</span>
+
+        // 2. Kiểm tra mật khẩu trước (đảm bảo nếu nhập sai mật khẩu của tài khoản bị khóa vẫn báo sai tài khoản/mật khẩu)
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {</span>
+<span class="fc" id="L50">            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, &quot;Invalid username or password&quot;, HttpStatus.UNAUTHORIZED);</span>
+        }
+
+        // 3. Kiểm tra tài khoản có hoạt động không
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (Boolean.FALSE.equals(user.getIsActive())) {</span>
+<span class="fc" id="L55">            throw new BusinessException(ErrorCode.ACCOUNT_DISABLED, &quot;Account has been disabled&quot;, HttpStatus.FORBIDDEN);</span>
+        }
+
+        // 4. Thực hiện authenticate qua Spring Security AuthenticationManager
+        try {
+<span class="fc" id="L60">            authenticationManager.authenticate(</span>
+<span class="fc" id="L61">                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));</span>
+<span class="fc" id="L62">        } catch (Exception e) {</span>
+<span class="fc" id="L63">            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, &quot;Invalid username or password&quot;, HttpStatus.UNAUTHORIZED);</span>
+<span class="fc" id="L64">        }</span>
+
+        // 3. Xóa các Refresh Token cũ của user này trước khi tạo mới (tránh rác DB)
+<span class="fc" id="L67">        refreshTokenRepository.deleteByUser(user);</span>
+
+        // 4. Tạo Access Token
+<span class="fc" id="L70">        String accessToken = jwtUtils.generateAccessToken(user);</span>
+
+        // 5. Tạo Refresh Token mới
+<span class="fc" id="L73">        RefreshToken refreshToken = createRefreshToken(user);</span>
+
+<span class="fc" id="L75">        return TokenResponse.builder()</span>
+<span class="fc" id="L76">                .accessToken(accessToken)</span>
+<span class="fc" id="L77">                .refreshToken(refreshToken.getToken())</span>
+<span class="fc" id="L78">                .tokenType(&quot;Bearer&quot;)</span>
+<span class="fc" id="L79">                .expiresIn(900L) // Hoặc tính toán động nếu cần</span>
+<span class="fc" id="L80">                .userId(user.getId())</span>
+<span class="fc" id="L81">                .username(user.getUsername())</span>
+<span class="fc" id="L82">                .roles(user.getRoles().stream().map(role -&gt; role.getName()).collect(Collectors.toList()))</span>
+<span class="fc" id="L83">                .build();</span>
+    }
+
+    @Override
+    @Transactional
+    public TokenRefreshResponse refresh(TokenRefreshRequest request) {
+<span class="fc" id="L89">        String requestRefreshToken = request.getRefreshToken();</span>
+
+        // Tìm Refresh Token trong DB
+<span class="fc" id="L92">        RefreshToken refreshToken = refreshTokenRepository.findByToken(requestRefreshToken)</span>
+<span class="fc" id="L93">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TOKEN_INVALID, &quot;Refresh token is not in database!&quot;, HttpStatus.UNAUTHORIZED));</span>
+
+        // Kiểm tra xem Refresh Token đã hết hạn chưa
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (refreshToken.getExpiryDate().isBefore(Instant.now())) {</span>
+<span class="fc" id="L97">            refreshTokenRepository.delete(refreshToken);</span>
+<span class="fc" id="L98">            throw new BusinessException(ErrorCode.TOKEN_EXPIRED, &quot;Refresh token was expired. Please make a new signin request&quot;,</span>
+                    HttpStatus.UNAUTHORIZED);
+        }
+
+<span class="fc" id="L102">        User user = refreshToken.getUser();</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!user.getIsActive()) {</span>
+<span class="fc" id="L104">            throw new BusinessException(ErrorCode.ACCESS_DENIED, &quot;User account is locked&quot;, HttpStatus.FORBIDDEN);</span>
+        }
+
+        // Tạo Access Token mới
+<span class="fc" id="L108">        String newAccessToken = jwtUtils.generateAccessToken(user);</span>
+
+<span class="fc" id="L110">        return TokenRefreshResponse.builder()</span>
+<span class="fc" id="L111">                .accessToken(newAccessToken)</span>
+<span class="fc" id="L112">                .expiresIn(900L)</span>
+<span class="fc" id="L113">                .build();</span>
+    }
+
+    @Override
+    @Transactional
+    public void logout(String refreshToken) {
+        // Chỉ xóa token nếu tồn tại
+<span class="fc" id="L120">        refreshTokenRepository.findByToken(refreshToken)</span>
+<span class="fc" id="L121">                .ifPresent(refreshTokenRepository::delete);</span>
+<span class="fc" id="L122">    }</span>
+
+    // Tạo bản ghi Refresh Token lưu vào database
+    private RefreshToken createRefreshToken(User user) {
+<span class="fc" id="L126">        RefreshToken refreshToken = RefreshToken.builder()</span>
+<span class="fc" id="L127">                .user(user)</span>
+<span class="fc" id="L128">                .token(UUID.randomUUID().toString())</span>
+<span class="fc" id="L129">                .expiryDate(Instant.now().plusMillis(refreshExpirationMs))</span>
+<span class="fc" id="L130">                .build();</span>
+
+<span class="fc" id="L132">        return refreshTokenRepository.save(refreshToken);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

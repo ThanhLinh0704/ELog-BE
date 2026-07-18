@@ -1,0 +1,693 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TripServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.service.impl</a> &gt; <span class="el_source">TripServiceImpl.java</span></div><h1>TripServiceImpl.java</h1><pre class="source lang-java linenums">package com.elog.service.impl;
+
+import com.elog.dto.request.TripAssignRequest;
+import com.elog.dto.request.TripSplitAssignRequest;
+import com.elog.dto.request.TripAssignmentPatchRequest;
+import com.elog.dto.response.*;
+import com.elog.entity.*;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.*;
+import com.elog.service.TripService;
+import com.elog.service.TripStateMachine;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L28">@Slf4j</span>
+public class TripServiceImpl implements TripService {
+
+    private final TripRepository tripRepository;
+    private final TripStopRepository tripStopRepository;
+    private final TripDraftRepository tripDraftRepository;
+    private final TripDraftStopRepository tripDraftStopRepository;
+    private final VehicleRepository vehicleRepository;
+    private final UserRepository userRepository;
+    private final ManifestRepository manifestRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final TripStateMachine tripStateMachine;
+
+    // ── US-15 TASK-02 ──────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public EligibleVehiclesResponse getEligibleVehicles(Long tripDraftId) {
+<span class="fc" id="L46">        TripDraft td = findTripDraftOrThrow(tripDraftId);</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (!&quot;VALIDATED&quot;.equals(td.getStatus())) {</span>
+<span class="fc" id="L48">            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,</span>
+                    &quot;Trip Draft must be VALIDATED before assignment.&quot;, HttpStatus.BAD_REQUEST);
+        }
+
+<span class="fc" id="L52">        List&lt;Vehicle&gt; activeVehicles = vehicleRepository.findByIsActiveTrue();</span>
+<span class="fc" id="L53">        List&lt;EligibleVehicleDto&gt; eligibleVehicles = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L54">        List&lt;IneligibleVehicleDto&gt; ineligibleVehicles = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L56" title="All 2 branches covered.">        for (Vehicle v : activeVehicles) {</span>
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">            if (v.getMaxVolumeM3() == null || v.getMaxWeightKg() == null) {</span>
+<span class="nc" id="L58">                continue;</span>
+            }
+
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">            boolean volumeOk = v.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) &gt;= 0;</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">            boolean weightOk = v.getMaxWeightKg().compareTo(td.getTotalWeightKg()) &gt;= 0;</span>
+
+<span class="pc bpc" id="L64" title="2 of 4 branches missed.">            if (volumeOk &amp;&amp; weightOk) {</span>
+<span class="fc" id="L65">                eligibleVehicles.add(EligibleVehicleDto.builder()</span>
+<span class="fc" id="L66">                        .vehicleId(v.getId())</span>
+<span class="fc" id="L67">                        .plateNumber(v.getPlateNumber())</span>
+<span class="fc" id="L68">                        .vehicleType(v.getVehicleType())</span>
+<span class="fc" id="L69">                        .maxVolumeM3(v.getMaxVolumeM3())</span>
+<span class="fc" id="L70">                        .maxWeightKg(v.getMaxWeightKg())</span>
+<span class="fc" id="L71">                        .remainingVolumeM3(v.getMaxVolumeM3().subtract(td.getTotalVolumeM3()))</span>
+<span class="fc" id="L72">                        .remainingWeightKg(v.getMaxWeightKg().subtract(td.getTotalWeightKg()))</span>
+<span class="fc" id="L73">                        .build());</span>
+            } else {
+<span class="nc" id="L75">                StringBuilder reason = new StringBuilder();</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                if (!volumeOk) {</span>
+<span class="nc" id="L77">                    reason.append(&quot;Volume exceeds capacity (&quot;)</span>
+<span class="nc" id="L78">                          .append(td.getTotalVolumeM3()).append(&quot; m³ &gt; &quot;).append(v.getMaxVolumeM3()).append(&quot; m³)&quot;);</span>
+                }
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                if (!weightOk) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                    if (reason.length() &gt; 0) reason.append(&quot; and &quot;);</span>
+<span class="nc" id="L82">                    reason.append(&quot;Weight exceeds capacity (&quot;)</span>
+<span class="nc" id="L83">                          .append(td.getTotalWeightKg()).append(&quot; kg &gt; &quot;).append(v.getMaxWeightKg()).append(&quot; kg)&quot;);</span>
+                }
+
+<span class="nc" id="L86">                ineligibleVehicles.add(IneligibleVehicleDto.builder()</span>
+<span class="nc" id="L87">                        .vehicleId(v.getId())</span>
+<span class="nc" id="L88">                        .plateNumber(v.getPlateNumber())</span>
+<span class="nc" id="L89">                        .vehicleType(v.getVehicleType())</span>
+<span class="nc" id="L90">                        .maxVolumeM3(v.getMaxVolumeM3())</span>
+<span class="nc" id="L91">                        .maxWeightKg(v.getMaxWeightKg())</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                        .volumeCheckResult(volumeOk ? ConstraintResult.PASS : ConstraintResult.FAIL)</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">                        .weightCheckResult(weightOk ? ConstraintResult.PASS : ConstraintResult.FAIL)</span>
+<span class="nc" id="L94">                        .failureReason(reason.toString())</span>
+<span class="nc" id="L95">                        .build());</span>
+            }
+<span class="fc" id="L97">        }</span>
+
+<span class="fc" id="L99">        eligibleVehicles.sort(Comparator.comparing(EligibleVehicleDto::getMaxVolumeM3));</span>
+
+<span class="fc" id="L101">        return EligibleVehiclesResponse.builder()</span>
+<span class="fc" id="L102">                .eligibleVehicles(eligibleVehicles)</span>
+<span class="fc" id="L103">                .ineligibleVehicles(ineligibleVehicles)</span>
+<span class="fc" id="L104">                .build();</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List&lt;AvailableDriverResponse&gt; getAvailableDrivers(LocalDate date) {
+<span class="nc" id="L110">        List&lt;User&gt; drivers = userRepository.findAll().stream()</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                .filter(u -&gt; u.getIsActive() &amp;&amp; u.getRoles().stream()</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                        .anyMatch(r -&gt; &quot;DRIVER&quot;.equals(r.getName())))</span>
+<span class="nc" id="L113">                .toList();</span>
+
+<span class="nc" id="L115">        List&lt;TripStatus&gt; busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);</span>
+
+<span class="nc" id="L117">        return drivers.stream().map(d -&gt; {</span>
+<span class="nc" id="L118">            boolean busy = tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(</span>
+<span class="nc" id="L119">                    d.getId(), date, busyStatuses);</span>
+<span class="nc" id="L120">            return AvailableDriverResponse.builder()</span>
+<span class="nc" id="L121">                    .userId(d.getId())</span>
+<span class="nc" id="L122">                    .fullName(d.getFullName())</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                    .email(d.getEmail())</span>
+<span class="nc" id="L124">                    .available(!busy)</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                    .busyReason(busy ? &quot;Already assigned to an active trip on &quot; + date : null)</span>
+<span class="nc" id="L126">                    .build();</span>
+<span class="nc" id="L127">        }).toList();</span>
+    }
+
+    @Override
+    @Transactional
+    public TripResponse assignVehicleAndDriver(Long tripDraftId, TripAssignRequest request,
+                                                String currentUsername) {
+<span class="fc" id="L134">        TripDraft td = findTripDraftOrThrow(tripDraftId);</span>
+
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (tripRepository.existsByTripDraftId(tripDraftId)) {</span>
+<span class="fc" id="L137">            throw new BusinessException(ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED,</span>
+                    &quot;Trip Draft has already been assigned.&quot;, HttpStatus.CONFLICT);
+        }
+
+        // Guard 1: TripDraft must be VALIDATED
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (!&quot;VALIDATED&quot;.equals(td.getStatus())) {</span>
+<span class="nc" id="L143">            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,</span>
+                    &quot;Trip Draft must be VALIDATED before assignment.&quot;, HttpStatus.BAD_REQUEST);
+        }
+
+<span class="fc" id="L147">        Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())</span>
+<span class="pc" id="L148">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.VEHICLE_NOT_FOUND,</span>
+                        &quot;Vehicle not found.&quot;, HttpStatus.NOT_FOUND));
+
+<span class="fc" id="L151">        User driver = findDriverOrThrow(request.getDriverId());</span>
+<span class="fc" id="L152">        User dispatcher = findUserByUsernameOrThrow(currentUsername);</span>
+
+        // Guard 2: Vehicle must be eligible (dual-constraint)
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (vehicle.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) &lt; 0</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">                || vehicle.getMaxWeightKg().compareTo(td.getTotalWeightKg()) &lt; 0) {</span>
+<span class="fc" id="L157">            throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,</span>
+<span class="fc" id="L158">                    &quot;Vehicle &quot; + vehicle.getPlateNumber()</span>
+                            + &quot; does not meet dual-constraint requirements for this trip.&quot;,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // Guard 3: Vehicle not busy on same day (NAC-04e)
+<span class="fc" id="L164">        List&lt;TripStatus&gt; busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);</span>
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (tripRepository.existsByVehicleIdAndDeliveryDateAndStatusIn(</span>
+<span class="fc" id="L166">                vehicle.getId(), td.getDeliveryDate(), busyStatuses)) {</span>
+<span class="nc" id="L167">            throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,</span>
+<span class="nc" id="L168">                    &quot;Vehicle &quot; + vehicle.getPlateNumber()</span>
+<span class="nc" id="L169">                            + &quot; already has an active trip on &quot; + td.getDeliveryDate() + &quot;.&quot;,</span>
+                    HttpStatus.CONFLICT);
+        }
+
+        // Guard 4: Driver not busy on same day (NAC-15a)
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(</span>
+<span class="fc" id="L175">                driver.getId(), td.getDeliveryDate(), busyStatuses)) {</span>
+<span class="nc" id="L176">            throw new BusinessException(ErrorCode.DRIVER_CONFLICT,</span>
+<span class="nc" id="L177">                    &quot;Driver &quot; + driver.getFullName()</span>
+<span class="nc" id="L178">                            + &quot; already assigned to another trip on &quot; + td.getDeliveryDate() + &quot;.&quot;,</span>
+                    HttpStatus.CONFLICT);
+        }
+
+        // Create Trip
+<span class="fc" id="L183">        Trip trip = buildTrip(td, vehicle, driver, dispatcher,</span>
+<span class="fc" id="L184">                td.getTotalWeightKg(), td.getTotalVolumeM3());</span>
+<span class="fc" id="L185">        trip = tripRepository.save(trip);</span>
+
+        // Create TripStops from active TripDraftStops
+<span class="fc" id="L188">        List&lt;TripDraftStop&gt; activeStops =</span>
+<span class="fc" id="L189">                tripDraftStopRepository.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);</span>
+<span class="fc" id="L190">        createTripStops(trip, activeStops);</span>
+
+        // Link manifest
+<span class="fc" id="L193">        linkManifest(tripDraftId, trip.getTripId());</span>
+
+<span class="fc" id="L195">        log.info(&quot;Trip {} created from TripDraft {} with vehicle {} and driver {}&quot;,</span>
+<span class="fc" id="L196">                trip.getTripId(), tripDraftId, vehicle.getPlateNumber(), driver.getFullName());</span>
+
+<span class="fc" id="L198">        return buildTripResponse(trip, &quot;Trip created successfully. Proceed to Dispatch (US-16).&quot;);</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List&lt;TripResponse&gt; getTripsByTripDraftId(Long tripDraftId) {
+<span class="nc" id="L204">        List&lt;Trip&gt; trips = tripRepository.findByTripDraftIdWithDetails(tripDraftId);</span>
+<span class="nc" id="L205">        return trips.stream()</span>
+<span class="nc" id="L206">                .map(t -&gt; buildTripResponse(t, null))</span>
+<span class="nc" id="L207">                .toList();</span>
+    }
+
+    // ── US-15 TASK-03 — Split ──────────────────────────────────────
+
+    @Override
+    @Transactional
+    public TripSplitResponse assignSplit(Long tripDraftId, TripSplitAssignRequest request,
+                                          String currentUsername) {
+<span class="fc" id="L216">        TripDraft td = findTripDraftOrThrow(tripDraftId);</span>
+
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (tripRepository.existsByTripDraftId(tripDraftId)) {</span>
+<span class="nc" id="L219">            throw new BusinessException(ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED,</span>
+                    &quot;Trip Draft has already been assigned.&quot;, HttpStatus.CONFLICT);
+        }
+
+<span class="pc bpc" id="L223" title="1 of 2 branches missed.">        if (!&quot;VALIDATED&quot;.equals(td.getStatus())) {</span>
+<span class="nc" id="L224">            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,</span>
+                    &quot;Trip Draft must be VALIDATED before assignment.&quot;, HttpStatus.BAD_REQUEST);
+        }
+
+<span class="fc" id="L228">        User dispatcher = findUserByUsernameOrThrow(currentUsername);</span>
+<span class="fc" id="L229">        List&lt;TripSplitResponse.TripSummary&gt; summaries = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L230">        List&lt;TripStatus&gt; busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);</span>
+
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        for (TripSplitAssignRequest.SplitAssignment assignment : request.getAssignments()) {</span>
+<span class="fc" id="L233">            Vehicle vehicle = vehicleRepository.findById(assignment.getVehicleId())</span>
+<span class="pc" id="L234">                    .orElseThrow(() -&gt; new BusinessException(ErrorCode.VEHICLE_NOT_FOUND,</span>
+                            &quot;Vehicle not found.&quot;, HttpStatus.NOT_FOUND));
+<span class="fc" id="L236">            User driver = findDriverOrThrow(assignment.getDriverId());</span>
+
+            // Vehicle conflict check
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">            if (tripRepository.existsByVehicleIdAndDeliveryDateAndStatusIn(</span>
+<span class="fc" id="L240">                    vehicle.getId(), td.getDeliveryDate(), busyStatuses)) {</span>
+<span class="nc" id="L241">                throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,</span>
+<span class="nc" id="L242">                        &quot;Vehicle &quot; + vehicle.getPlateNumber()</span>
+<span class="nc" id="L243">                                + &quot; already has an active trip on &quot; + td.getDeliveryDate() + &quot;.&quot;,</span>
+                        HttpStatus.CONFLICT);
+            }
+
+            // Driver conflict check
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">            if (tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(</span>
+<span class="fc" id="L249">                    driver.getId(), td.getDeliveryDate(), busyStatuses)) {</span>
+<span class="nc" id="L250">                throw new BusinessException(ErrorCode.DRIVER_CONFLICT,</span>
+<span class="nc" id="L251">                        &quot;Driver &quot; + driver.getFullName()</span>
+<span class="nc" id="L252">                                + &quot; already assigned to another trip on &quot; + td.getDeliveryDate() + &quot;.&quot;,</span>
+                        HttpStatus.CONFLICT);
+            }
+
+            // Get the specific stops for this split group
+<span class="fc" id="L257">            List&lt;TripDraftStop&gt; groupStops = assignment.getStopIds().stream()</span>
+<span class="fc" id="L258">                    .map(stopId -&gt; tripDraftStopRepository.findById(stopId)</span>
+<span class="pc" id="L259">                            .orElseThrow(() -&gt; new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,</span>
+                                    &quot;TripDraftStop &quot; + stopId + &quot; not found.&quot;, HttpStatus.NOT_FOUND)))
+<span class="fc" id="L261">                    .sorted(Comparator.comparing(TripDraftStop::getSequenceNo))</span>
+<span class="fc" id="L262">                    .toList();</span>
+
+            // Calculate group totals
+<span class="fc" id="L265">            BigDecimal groupWeight = BigDecimal.ZERO;</span>
+<span class="fc" id="L266">            BigDecimal groupVolume = BigDecimal.ZERO;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">            for (TripDraftStop stop : groupStops) {</span>
+<span class="fc" id="L268">                List&lt;OrderItem&gt; items = orderItemRepository.findByStopForManifest(</span>
+<span class="fc" id="L269">                        stop.getStore().getId(), tripDraftId);</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">                for (OrderItem item : items) {</span>
+<span class="fc" id="L271">                    groupWeight = groupWeight.add(item.getLineWeightKg());</span>
+<span class="fc" id="L272">                    groupVolume = groupVolume.add(item.getLineVolumeM3());</span>
+<span class="fc" id="L273">                }</span>
+<span class="fc" id="L274">            }</span>
+
+            // Validate vehicle capacity for this group
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">            if (vehicle.getMaxVolumeM3().compareTo(groupVolume) &lt; 0</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">                    || vehicle.getMaxWeightKg().compareTo(groupWeight) &lt; 0) {</span>
+<span class="nc" id="L279">                throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,</span>
+<span class="nc" id="L280">                        &quot;Vehicle &quot; + vehicle.getPlateNumber()</span>
+                                + &quot; cannot carry the assigned stops (volume: &quot; + groupVolume
+                                + &quot; m³, weight: &quot; + groupWeight + &quot; kg).&quot;,
+                        HttpStatus.BAD_REQUEST);
+            }
+
+<span class="fc" id="L286">            Trip trip = buildTrip(td, vehicle, driver, dispatcher, groupWeight, groupVolume);</span>
+<span class="fc" id="L287">            trip = tripRepository.save(trip);</span>
+<span class="fc" id="L288">            createTripStops(trip, groupStops);</span>
+
+<span class="fc" id="L290">            summaries.add(TripSplitResponse.TripSummary.builder()</span>
+<span class="fc" id="L291">                    .tripId(trip.getTripId())</span>
+<span class="fc" id="L292">                    .plateNumber(vehicle.getPlateNumber())</span>
+<span class="fc" id="L293">                    .vehicleType(vehicle.getVehicleType())</span>
+<span class="fc" id="L294">                    .stopCount(groupStops.size())</span>
+<span class="fc" id="L295">                    .totalVolumeM3(groupVolume)</span>
+<span class="fc" id="L296">                    .totalWeightKg(groupWeight)</span>
+<span class="fc" id="L297">                    .build());</span>
+<span class="fc" id="L298">        }</span>
+
+<span class="fc" id="L300">        return TripSplitResponse.builder()</span>
+<span class="fc" id="L301">                .tripDraftId(tripDraftId)</span>
+<span class="fc" id="L302">                .tripsCreated(summaries.size())</span>
+<span class="fc" id="L303">                .trips(summaries)</span>
+<span class="fc" id="L304">                .message(&quot;Load split into &quot; + summaries.size() + &quot; trips per BR-07.&quot;)</span>
+<span class="fc" id="L305">                .build();</span>
+    }
+
+    // ── US-15 TASK-03 — Fleet Shortfall Check (BR-08) ──────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public FleetCapacityCheckResponse checkFleetCapacity(LocalDate date) {
+<span class="fc" id="L313">        BigDecimal fleetVolume = vehicleRepository.sumActiveMaxVolumeM3();</span>
+<span class="fc" id="L314">        BigDecimal fleetWeight = vehicleRepository.sumActiveMaxWeightKg();</span>
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">        if (fleetVolume == null) fleetVolume = BigDecimal.ZERO;</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">        if (fleetWeight == null) fleetWeight = BigDecimal.ZERO;</span>
+
+        // Sum all VALIDATED trip drafts for the day
+<span class="fc" id="L319">        List&lt;TripDraft&gt; dayDrafts = tripDraftRepository.findByDeliveryDate(date,</span>
+<span class="fc" id="L320">                org.springframework.data.domain.Pageable.unpaged()).getContent().stream()</span>
+<span class="fc" id="L321">                .filter(td -&gt; &quot;VALIDATED&quot;.equals(td.getStatus()))</span>
+<span class="fc" id="L322">                .toList();</span>
+
+<span class="fc" id="L324">        BigDecimal dayVolume = dayDrafts.stream()</span>
+<span class="fc" id="L325">                .map(TripDraft::getTotalVolumeM3)</span>
+<span class="fc" id="L326">                .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L327">        BigDecimal dayWeight = dayDrafts.stream()</span>
+<span class="fc" id="L328">                .map(TripDraft::getTotalWeightKg)</span>
+<span class="fc" id="L329">                .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        String volResult = dayVolume.compareTo(fleetVolume) &lt;= 0 ? &quot;PASS&quot; : &quot;FAIL&quot;;</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">        String wgtResult = dayWeight.compareTo(fleetWeight) &lt;= 0 ? &quot;PASS&quot; : &quot;FAIL&quot;;</span>
+<span class="pc bpc" id="L333" title="2 of 4 branches missed.">        boolean canDispatch = &quot;PASS&quot;.equals(volResult) &amp;&amp; &quot;PASS&quot;.equals(wgtResult);</span>
+
+<span class="fc" id="L335">        return FleetCapacityCheckResponse.builder()</span>
+<span class="fc" id="L336">                .deliveryDate(date)</span>
+<span class="fc" id="L337">                .fleetTotalVolumeM3(fleetVolume)</span>
+<span class="fc" id="L338">                .fleetTotalWeightKg(fleetWeight)</span>
+<span class="fc" id="L339">                .dayTotalVolumeM3(dayVolume)</span>
+<span class="fc" id="L340">                .dayTotalWeightKg(dayWeight)</span>
+<span class="fc" id="L341">                .volumeCheckResult(volResult)</span>
+<span class="fc" id="L342">                .weightCheckResult(wgtResult)</span>
+<span class="fc" id="L343">                .canDispatch(canDispatch)</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                .message(canDispatch</span>
+<span class="fc" id="L345">                        ? &quot;Fleet capacity sufficient for &quot; + date + &quot;.&quot;</span>
+<span class="nc" id="L346">                        : &quot;Fleet capacity insufficient for &quot; + date + &quot;. Cannot dispatch.&quot;)</span>
+<span class="fc" id="L347">                .build();</span>
+    }
+
+    // ── US-16 TASK-02 — Dispatch ───────────────────────────────────
+
+    @Override
+    @Transactional
+    public TripResponse dispatchTrip(Long tripId, String currentUsername) {
+<span class="fc" id="L355">        Trip trip = tripRepository.findById(tripId)</span>
+<span class="pc" id="L356">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_NOT_FOUND,</span>
+                        &quot;Trip not found.&quot;, HttpStatus.NOT_FOUND));
+
+        // Guard: already locked?
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">        if (trip.getLockedAt() != null) {</span>
+<span class="nc" id="L361">            throw new BusinessException(ErrorCode.TRIP_LOCKED,</span>
+<span class="nc" id="L362">                    &quot;Trip &quot; + tripId + &quot; is already dispatched (locked at &quot; + trip.getLockedAt() + &quot;).&quot;,</span>
+                    HttpStatus.CONFLICT);
+        }
+
+        // Guard: BR-08 fleet shortfall (last check before lock)
+<span class="fc" id="L367">        FleetCapacityCheckResponse fleetCheck = checkFleetCapacity(trip.getDeliveryDate());</span>
+<span class="pc bpc" id="L368" title="1 of 2 branches missed.">        if (!fleetCheck.isCanDispatch()) {</span>
+<span class="nc" id="L369">            throw new BusinessException(ErrorCode.FLEET_CAPACITY_SHORTFALL,</span>
+<span class="nc" id="L370">                    fleetCheck.getMessage(), HttpStatus.SERVICE_UNAVAILABLE);</span>
+        }
+
+<span class="fc" id="L373">        User dispatcher = findUserByUsernameOrThrow(currentUsername);</span>
+
+        // State machine transition: VALIDATED → DISPATCHED
+<span class="fc" id="L376">        tripStateMachine.transition(trip, TripStatus.DISPATCHED, dispatcher.getId());</span>
+<span class="fc" id="L377">        trip.setLockedBy(dispatcher);</span>
+<span class="fc" id="L378">        tripRepository.save(trip);</span>
+
+<span class="fc" id="L380">        log.info(&quot;Trip {} dispatched by {}&quot;, tripId, currentUsername);</span>
+
+<span class="fc" id="L382">        TripResponse response = buildTripResponse(trip,</span>
+                &quot;Trip dispatched and locked. Handover slip ready.&quot;);
+<span class="fc" id="L384">        response.setHandoverSlipUrl(&quot;/api/trips/&quot; + tripId + &quot;/handover-slip&quot;);</span>
+<span class="fc" id="L385">        return response;</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String getHandoverSlipHtml(Long tripId) {
+<span class="nc" id="L391">        Trip trip = tripRepository.findById(tripId)</span>
+<span class="nc" id="L392">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_NOT_FOUND,</span>
+                        &quot;Trip not found.&quot;, HttpStatus.NOT_FOUND));
+
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        if (trip.getStatus() == TripStatus.VALIDATED) {</span>
+<span class="nc" id="L396">            throw new BusinessException(ErrorCode.HANDOVER_SLIP_NOT_AVAILABLE,</span>
+                    &quot;Trip must be dispatched before generating handover slip.&quot;,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+<span class="nc" id="L401">        List&lt;TripStop&gt; stops = tripStopRepository.findByTripTripIdOrderBySequenceOrderAsc(tripId);</span>
+<span class="nc" id="L402">        DateTimeFormatter dtf = DateTimeFormatter.ofPattern(&quot;dd/MM/yyyy&quot;);</span>
+<span class="nc" id="L403">        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern(&quot;HH:mm&quot;);</span>
+<span class="nc" id="L404">        DateTimeFormatter dtTimeFmt = DateTimeFormatter.ofPattern(&quot;HH:mm:ss&quot;);</span>
+
+<span class="nc" id="L406">        StringBuilder html = new StringBuilder();</span>
+<span class="nc" id="L407">        html.append(&quot;&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;meta charset='UTF-8'&gt;&quot;);</span>
+<span class="nc" id="L408">        html.append(&quot;&lt;title&gt;Handover Slip - Trip #&quot;).append(tripId).append(&quot;&lt;/title&gt;&quot;);</span>
+<span class="nc" id="L409">        html.append(&quot;&lt;style&gt;&quot;);</span>
+<span class="nc" id="L410">        html.append(&quot;body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:20px}&quot;);</span>
+<span class="nc" id="L411">        html.append(&quot;table{width:100%;border-collapse:collapse;margin:10px 0}&quot;);</span>
+<span class="nc" id="L412">        html.append(&quot;th,td{border:1px solid #333;padding:8px;text-align:left}&quot;);</span>
+<span class="nc" id="L413">        html.append(&quot;th{background:#f0f0f0}h1{text-align:center;font-size:18px}&quot;);</span>
+<span class="nc" id="L414">        html.append(&quot;.header{text-align:center;margin-bottom:20px}&quot;);</span>
+<span class="nc" id="L415">        html.append(&quot;.sig{margin-top:40px}.sig-line{border-bottom:1px solid #333;width:250px;display:inline-block;margin-right:40px}&quot;);</span>
+<span class="nc" id="L416">        html.append(&quot;@media print{body{margin:0}@page{margin:1cm}}&quot;);</span>
+<span class="nc" id="L417">        html.append(&quot;&lt;/style&gt;&lt;/head&gt;&lt;body&gt;&quot;);</span>
+<span class="nc" id="L418">        html.append(&quot;&lt;div class='header'&gt;&lt;h1&gt;PHIẾU GIAO HÀNG (HANDOVER SLIP)&lt;/h1&gt;&quot;);</span>
+<span class="nc" id="L419">        html.append(&quot;&lt;p&gt;ELog Delivery System — SEP490_G104&lt;/p&gt;&lt;/div&gt;&quot;);</span>
+
+<span class="nc" id="L421">        html.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;td&gt;&lt;b&gt;Ngày giao:&lt;/b&gt; &quot;)</span>
+<span class="nc" id="L422">                .append(trip.getDeliveryDate().format(dtf)).append(&quot;&lt;/td&gt;&quot;);</span>
+<span class="nc" id="L423">        html.append(&quot;&lt;td&gt;&lt;b&gt;Tuyến:&lt;/b&gt; &quot;).append(trip.getRoute().getCode()).append(&quot;&lt;/td&gt;&lt;/tr&gt;&quot;);</span>
+<span class="nc" id="L424">        html.append(&quot;&lt;tr&gt;&lt;td&gt;&lt;b&gt;Xe:&lt;/b&gt; &quot;).append(trip.getVehicle().getPlateNumber())</span>
+<span class="nc" id="L425">                .append(&quot; (&quot;).append(trip.getVehicle().getVehicleType()).append(&quot;)&lt;/td&gt;&quot;);</span>
+<span class="nc" id="L426">        html.append(&quot;&lt;td&gt;&lt;b&gt;Tài xế:&lt;/b&gt; &quot;).append(trip.getDriver().getFullName()).append(&quot;&lt;/td&gt;&lt;/tr&gt;&quot;);</span>
+<span class="nc" id="L427">        html.append(&quot;&lt;tr&gt;&lt;td&gt;&lt;b&gt;Xuất phát:&lt;/b&gt; &quot;)</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                .append(trip.getPlannedDepartureTime() != null</span>
+<span class="nc" id="L429">                        ? trip.getPlannedDepartureTime().format(timeFmt) : &quot;N/A&quot;)</span>
+<span class="nc" id="L430">                .append(&quot;&lt;/td&gt;&quot;);</span>
+<span class="nc" id="L431">        html.append(&quot;&lt;td&gt;&lt;b&gt;Dispatch lúc:&lt;/b&gt; &quot;)</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">                .append(trip.getLockedAt() != null ? trip.getLockedAt().format(dtTimeFmt) : &quot;N/A&quot;)</span>
+<span class="nc" id="L433">                .append(&quot;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&quot;);</span>
+
+<span class="nc" id="L435">        html.append(&quot;&lt;h3&gt;DANH SÁCH ĐIỂM GIAO (theo thứ tự tuyến)&lt;/h3&gt;&quot;);</span>
+<span class="nc" id="L436">        html.append(&quot;&lt;table&gt;&lt;tr&gt;&lt;th&gt;#&lt;/th&gt;&lt;th&gt;Điểm giao&lt;/th&gt;&lt;th&gt;ETA&lt;/th&gt;&lt;th&gt;Trạng thái&lt;/th&gt;&lt;/tr&gt;&quot;);</span>
+<span class="nc bnc" id="L437" title="All 2 branches missed.">        for (TripStop stop : stops) {</span>
+<span class="nc" id="L438">            html.append(&quot;&lt;tr&gt;&lt;td&gt;&quot;).append(stop.getSequenceOrder()).append(&quot;&lt;/td&gt;&quot;);</span>
+<span class="nc" id="L439">            html.append(&quot;&lt;td&gt;&quot;).append(stop.getRouteStop().getStore().getName()).append(&quot;&lt;/td&gt;&quot;);</span>
+<span class="nc bnc" id="L440" title="All 2 branches missed.">            html.append(&quot;&lt;td&gt;&quot;).append(stop.getPlannedEta() != null</span>
+<span class="nc" id="L441">                    ? stop.getPlannedEta().format(timeFmt) : &quot;N/A&quot;).append(&quot;&lt;/td&gt;&quot;);</span>
+<span class="nc" id="L442">            html.append(&quot;&lt;td&gt;&quot;).append(stop.getStatus()).append(&quot;&lt;/td&gt;&lt;/tr&gt;&quot;);</span>
+<span class="nc" id="L443">        }</span>
+<span class="nc" id="L444">        html.append(&quot;&lt;/table&gt;&quot;);</span>
+
+<span class="nc" id="L446">        html.append(&quot;&lt;p&gt;&lt;b&gt;Tổng tải:&lt;/b&gt; &quot;)</span>
+<span class="nc" id="L447">                .append(trip.getTotalWeightKg()).append(&quot; kg / &quot;)</span>
+<span class="nc" id="L448">                .append(trip.getTotalVolumeM3()).append(&quot; m³&lt;/p&gt;&quot;);</span>
+
+<span class="nc bnc" id="L450" title="All 2 branches missed.">        if (trip.getLockedBy() != null) {</span>
+<span class="nc" id="L451">            html.append(&quot;&lt;p&gt;&lt;b&gt;Dispatcher:&lt;/b&gt; &quot;).append(trip.getLockedBy().getFullName()).append(&quot;&lt;/p&gt;&quot;);</span>
+        }
+
+<span class="nc" id="L454">        html.append(&quot;&lt;div class='sig'&gt;&quot;);</span>
+<span class="nc" id="L455">        html.append(&quot;&lt;p&gt;Chữ ký xác nhận: &lt;span class='sig-line'&gt;&amp;nbsp;&lt;/span&gt; Ngày: ___/___/______&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L456">        html.append(&quot;&lt;p&gt;Tài xế nhận slip: &lt;span class='sig-line'&gt;&amp;nbsp;&lt;/span&gt; Ngày: ___/___/______&lt;/p&gt;&quot;);</span>
+<span class="nc" id="L457">        html.append(&quot;&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;&quot;);</span>
+
+<span class="nc" id="L459">        return html.toString();</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List&lt;TripResponse&gt; getDriverTrips(String username, LocalDate date, String status) {
+<span class="nc" id="L465">        User driver = findUserByUsernameOrThrow(username);</span>
+        List&lt;Trip&gt; trips;
+<span class="nc bnc" id="L467" title="All 4 branches missed.">        if (status != null &amp;&amp; !status.isBlank()) {</span>
+<span class="nc" id="L468">            TripStatus tripStatus = TripStatus.valueOf(status.toUpperCase());</span>
+<span class="nc" id="L469">            trips = tripRepository.findByDriverIdAndDeliveryDateAndStatus(driver.getId(), date, tripStatus);</span>
+<span class="nc" id="L470">        } else {</span>
+<span class="nc" id="L471">            trips = tripRepository.findAll().stream()</span>
+<span class="nc bnc" id="L472" title="All 2 branches missed.">                    .filter(t -&gt; t.getDriver().getId().equals(driver.getId())</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">                              &amp;&amp; t.getDeliveryDate().equals(date))</span>
+<span class="nc" id="L474">                    .toList();</span>
+        }
+<span class="nc" id="L476">        return trips.stream().map(t -&gt; buildTripResponse(t, null)).toList();</span>
+    }
+
+
+    // ── Private helpers ────────────────────────────────────────────
+
+    private TripDraft findTripDraftOrThrow(Long id) {
+<span class="fc" id="L483">        return tripDraftRepository.findById(id)</span>
+<span class="pc" id="L484">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_DRAFT_NOT_FOUND,</span>
+                        &quot;Trip Draft not found.&quot;, HttpStatus.NOT_FOUND));
+    }
+
+    private User findDriverOrThrow(Long driverId) {
+<span class="fc" id="L489">        User driver = userRepository.findById(driverId)</span>
+<span class="pc" id="L490">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.DRIVER_NOT_FOUND,</span>
+                        &quot;Driver not found.&quot;, HttpStatus.NOT_FOUND));
+<span class="fc" id="L492">        boolean isDriver = driver.getRoles().stream()</span>
+<span class="fc" id="L493">                .anyMatch(r -&gt; &quot;DRIVER&quot;.equals(r.getName()));</span>
+<span class="pc bpc" id="L494" title="1 of 2 branches missed.">        if (!isDriver) {</span>
+<span class="nc" id="L495">            throw new BusinessException(ErrorCode.DRIVER_NOT_FOUND,</span>
+                    &quot;User &quot; + driverId + &quot; is not a driver.&quot;, HttpStatus.BAD_REQUEST);
+        }
+<span class="fc" id="L498">        return driver;</span>
+    }
+
+    private User findUserByUsernameOrThrow(String username) {
+<span class="fc" id="L502">        return userRepository.findByUsername(username)</span>
+<span class="pc" id="L503">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,</span>
+                        &quot;User not found: &quot; + username, HttpStatus.NOT_FOUND));
+    }
+
+    private Trip buildTrip(TripDraft td, Vehicle vehicle, User driver, User dispatcher,
+                           BigDecimal totalWeight, BigDecimal totalVolume) {
+<span class="fc" id="L509">        return Trip.builder()</span>
+<span class="fc" id="L510">                .tripDraft(td)</span>
+<span class="fc" id="L511">                .route(td.getRoute())</span>
+<span class="fc" id="L512">                .vehicle(vehicle)</span>
+<span class="fc" id="L513">                .driver(driver)</span>
+<span class="fc" id="L514">                .deliveryDate(td.getDeliveryDate())</span>
+<span class="fc" id="L515">                .status(TripStatus.VALIDATED)</span>
+<span class="fc" id="L516">                .totalWeightKg(totalWeight)</span>
+<span class="fc" id="L517">                .totalVolumeM3(totalVolume)</span>
+<span class="fc" id="L518">                .plannedDepartureTime(td.getPlannedDepartureTime())</span>
+<span class="fc" id="L519">                .createdBy(dispatcher)</span>
+<span class="fc" id="L520">                .createdAt(LocalDateTime.now())</span>
+<span class="fc" id="L521">                .build();</span>
+    }
+
+    private void createTripStops(Trip trip, List&lt;TripDraftStop&gt; draftStops) {
+<span class="fc" id="L525">        List&lt;TripStop&gt; tripStops = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L526" title="All 2 branches covered.">        for (TripDraftStop ds : draftStops) {</span>
+            // Calculate stop weight/volume from order items
+<span class="fc" id="L528">            List&lt;OrderItem&gt; items = orderItemRepository.findByStopForManifest(</span>
+<span class="fc" id="L529">                    ds.getStore().getId(), ds.getTripDraft().getId());</span>
+<span class="fc" id="L530">            BigDecimal stopWeight = items.stream()</span>
+<span class="fc" id="L531">                    .map(OrderItem::getLineWeightKg)</span>
+<span class="fc" id="L532">                    .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="fc" id="L533">            BigDecimal stopVolume = items.stream()</span>
+<span class="fc" id="L534">                    .map(OrderItem::getLineVolumeM3)</span>
+<span class="fc" id="L535">                    .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+
+<span class="fc" id="L537">            TripStop ts = TripStop.builder()</span>
+<span class="fc" id="L538">                    .trip(trip)</span>
+<span class="fc" id="L539">                    .routeStop(ds.getRouteStop())</span>
+<span class="fc" id="L540">                    .tripDraftStop(ds)</span>
+<span class="fc" id="L541">                    .sequenceOrder(ds.getSequenceNo())</span>
+<span class="fc" id="L542">                    .plannedEta(ds.getPlannedEta())</span>
+<span class="fc" id="L543">                    .stopWeightKg(stopWeight)</span>
+<span class="fc" id="L544">                    .stopVolumeM3(stopVolume)</span>
+<span class="fc" id="L545">                    .status(TripStopStatus.PENDING)</span>
+<span class="fc" id="L546">                    .build();</span>
+<span class="fc" id="L547">            tripStops.add(ts);</span>
+<span class="fc" id="L548">        }</span>
+<span class="fc" id="L549">        tripStopRepository.saveAll(tripStops);</span>
+<span class="fc" id="L550">    }</span>
+
+    private void linkManifest(Long tripDraftId, Long tripId) {
+<span class="fc" id="L553">        manifestRepository.findByTripDraftIdWithDetails(tripDraftId)</span>
+<span class="fc" id="L554">                .ifPresent(manifest -&gt; {</span>
+<span class="nc" id="L555">                    manifest.setTripId(tripId);</span>
+<span class="nc" id="L556">                    manifestRepository.save(manifest);</span>
+<span class="nc" id="L557">                });</span>
+<span class="fc" id="L558">    }</span>
+
+    private TripResponse buildTripResponse(Trip trip, String message) {
+<span class="fc" id="L561">        List&lt;TripStop&gt; stops = tripStopRepository.findByTripTripIdOrderBySequenceOrderAsc(trip.getTripId());</span>
+<span class="fc" id="L562">        Long manifestId = manifestRepository.findByTripDraftIdWithDetails(trip.getTripDraft().getId())</span>
+<span class="fc" id="L563">                .map(Manifest::getManifestId)</span>
+<span class="fc" id="L564">                .orElse(null);</span>
+
+<span class="fc" id="L566">        return TripResponse.builder()</span>
+<span class="fc" id="L567">                .tripId(trip.getTripId())</span>
+<span class="fc" id="L568">                .tripDraftId(trip.getTripDraft().getId())</span>
+<span class="fc" id="L569">                .fixedRouteCode(trip.getRoute().getCode())</span>
+<span class="fc" id="L570">                .deliveryDate(trip.getDeliveryDate())</span>
+<span class="fc" id="L571">                .status(trip.getStatus().name())</span>
+<span class="fc" id="L572">                .vehicle(TripResponse.VehicleInfo.builder()</span>
+<span class="fc" id="L573">                        .vehicleId(trip.getVehicle().getId())</span>
+<span class="fc" id="L574">                        .plateNumber(trip.getVehicle().getPlateNumber())</span>
+<span class="fc" id="L575">                        .vehicleType(trip.getVehicle().getVehicleType())</span>
+<span class="fc" id="L576">                        .build())</span>
+<span class="fc" id="L577">                .driver(TripResponse.DriverInfo.builder()</span>
+<span class="fc" id="L578">                        .userId(trip.getDriver().getId())</span>
+<span class="fc" id="L579">                        .fullName(trip.getDriver().getFullName())</span>
+<span class="fc" id="L580">                        .build())</span>
+<span class="fc" id="L581">                .totalWeightKg(trip.getTotalWeightKg())</span>
+<span class="fc" id="L582">                .totalVolumeM3(trip.getTotalVolumeM3())</span>
+<span class="fc" id="L583">                .plannedDepartureTime(trip.getPlannedDepartureTime())</span>
+<span class="fc" id="L584">                .lockedAt(trip.getLockedAt())</span>
+<span class="fc bfc" id="L585" title="All 2 branches covered.">                .lockedBy(trip.getLockedBy() != null</span>
+<span class="fc" id="L586">                        ? TripResponse.DriverInfo.builder()</span>
+<span class="fc" id="L587">                        .userId(trip.getLockedBy().getId())</span>
+<span class="fc" id="L588">                        .fullName(trip.getLockedBy().getFullName())</span>
+<span class="fc" id="L589">                        .build() : null)</span>
+<span class="fc" id="L590">                .completedAt(trip.getCompletedAt())</span>
+<span class="fc" id="L591">                .tripStopCount(stops.size())</span>
+<span class="fc" id="L592">                .manifestId(manifestId)</span>
+<span class="fc" id="L593">                .tripStops(stops.stream().map(this::buildTripStopResponse).toList())</span>
+<span class="fc" id="L594">                .message(message)</span>
+<span class="fc" id="L595">                .build();</span>
+    }
+
+    private TripStopResponse buildTripStopResponse(TripStop ts) {
+<span class="nc" id="L599">        return TripStopResponse.builder()</span>
+<span class="nc" id="L600">                .tripStopId(ts.getTripStopId())</span>
+<span class="nc" id="L601">                .routeStopId(ts.getRouteStop().getId())</span>
+<span class="nc" id="L602">                .tripDraftStopId(ts.getTripDraftStop().getId())</span>
+<span class="nc" id="L603">                .sequenceOrder(ts.getSequenceOrder())</span>
+<span class="nc bnc" id="L604" title="All 2 branches missed.">                .storeCode(ts.getRouteStop().getStore() != null</span>
+<span class="nc" id="L605">                        ? ts.getRouteStop().getStore().getCode() : null)</span>
+<span class="nc bnc" id="L606" title="All 2 branches missed.">                .storeName(ts.getRouteStop().getStore() != null</span>
+<span class="nc" id="L607">                        ? ts.getRouteStop().getStore().getName() : null)</span>
+<span class="nc" id="L608">                .plannedEta(ts.getPlannedEta())</span>
+<span class="nc" id="L609">                .status(ts.getStatus().name())</span>
+<span class="nc" id="L610">                .stopWeightKg(ts.getStopWeightKg())</span>
+<span class="nc" id="L611">                .stopVolumeM3(ts.getStopVolumeM3())</span>
+<span class="nc" id="L612">                .notes(ts.getNotes())</span>
+<span class="nc" id="L613">                .build();</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TripResponse getTripById(Long tripId) {
+<span class="nc" id="L619">        Trip trip = tripRepository.findById(tripId)</span>
+<span class="nc" id="L620">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_NOT_FOUND,</span>
+                        &quot;Trip not found with id: &quot; + tripId, HttpStatus.NOT_FOUND));
+<span class="nc" id="L622">        return buildTripResponse(trip, null);</span>
+    }
+
+    @Override
+    @Transactional
+    public TripResponse updateAssignment(Long tripId, TripAssignmentPatchRequest request, String currentUsername) {
+<span class="fc" id="L628">        Trip trip = tripRepository.findById(tripId)</span>
+<span class="pc" id="L629">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_NOT_FOUND,</span>
+                        &quot;Trip not found with id: &quot; + tripId, HttpStatus.NOT_FOUND));
+
+        // Guard 1: Status must be VALIDATED
+<span class="pc bpc" id="L633" title="1 of 2 branches missed.">        if (trip.getStatus() != TripStatus.VALIDATED) {</span>
+<span class="nc" id="L634">            throw new BusinessException(ErrorCode.TRIP_LOCKED,</span>
+                    &quot;Trip &quot; + tripId + &quot; is already dispatched or completed and cannot be modified.&quot;,
+                    HttpStatus.CONFLICT);
+        }
+
+        // Fetch new vehicle and driver
+<span class="fc" id="L640">        Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())</span>
+<span class="pc" id="L641">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.VEHICLE_NOT_FOUND,</span>
+<span class="nc" id="L642">                        &quot;Vehicle not found with id: &quot; + request.getVehicleId(), HttpStatus.NOT_FOUND));</span>
+
+<span class="fc" id="L644">        User driver = userRepository.findById(request.getDriverId())</span>
+<span class="pc" id="L645">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.DRIVER_NOT_FOUND,</span>
+<span class="nc" id="L646">                        &quot;Driver not found with id: &quot; + request.getDriverId(), HttpStatus.NOT_FOUND));</span>
+
+        // Check if driver has role DRIVER
+<span class="fc" id="L649">        boolean isDriver = driver.getRoles().stream()</span>
+<span class="pc bpc" id="L650" title="2 of 4 branches missed.">                .anyMatch(r -&gt; &quot;ROLE_DRIVER&quot;.equals(r.getName()) || &quot;DRIVER&quot;.equals(r.getName()));</span>
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">        if (!isDriver) {</span>
+<span class="nc" id="L652">            throw new BusinessException(ErrorCode.DRIVER_NOT_FOUND,</span>
+<span class="nc" id="L653">                    &quot;User &quot; + driver.getFullName() + &quot; is not a driver.&quot;, HttpStatus.BAD_REQUEST);</span>
+        }
+
+        // Guard 2: Capacity check (trip total load vs vehicle max capacity)
+<span class="pc bpc" id="L657" title="1 of 2 branches missed.">        if (vehicle.getMaxVolumeM3().compareTo(trip.getTotalVolumeM3()) &lt; 0</span>
+<span class="pc bpc" id="L658" title="1 of 2 branches missed.">                || vehicle.getMaxWeightKg().compareTo(trip.getTotalWeightKg()) &lt; 0) {</span>
+<span class="nc" id="L659">            throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,</span>
+<span class="nc" id="L660">                    &quot;Vehicle &quot; + vehicle.getPlateNumber() + &quot; capacity is insufficient for the trip load.&quot;,</span>
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // Guard 3: Vehicle busy check on the same day (excluding current trip)
+<span class="fc" id="L665">        List&lt;TripStatus&gt; busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);</span>
+<span class="pc bpc" id="L666" title="1 of 2 branches missed.">        if (tripRepository.existsByVehicleIdAndDeliveryDateAndStatusInAndTripIdNot(</span>
+<span class="fc" id="L667">                vehicle.getId(), trip.getDeliveryDate(), busyStatuses, tripId)) {</span>
+<span class="nc" id="L668">            throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,</span>
+<span class="nc" id="L669">                    &quot;Vehicle &quot; + vehicle.getPlateNumber() + &quot; is already assigned to another active trip on &quot; + trip.getDeliveryDate(),</span>
+                    HttpStatus.CONFLICT);
+        }
+
+        // Guard 4: Driver busy check on the same day (excluding current trip)
+<span class="pc bpc" id="L674" title="1 of 2 branches missed.">        if (tripRepository.existsByDriverIdAndDeliveryDateAndStatusInAndTripIdNot(</span>
+<span class="fc" id="L675">                driver.getId(), trip.getDeliveryDate(), busyStatuses, tripId)) {</span>
+<span class="nc" id="L676">            throw new BusinessException(ErrorCode.DRIVER_CONFLICT,</span>
+<span class="nc" id="L677">                    &quot;Driver &quot; + driver.getFullName() + &quot; is already assigned to another active trip on &quot; + trip.getDeliveryDate(),</span>
+                    HttpStatus.CONFLICT);
+        }
+
+        // Update and save
+<span class="fc" id="L682">        trip.setVehicle(vehicle);</span>
+<span class="fc" id="L683">        trip.setDriver(driver);</span>
+<span class="fc" id="L684">        tripRepository.save(trip);</span>
+
+<span class="fc" id="L686">        log.info(&quot;Trip {} assignment updated by {}: Vehicle={}, Driver={}&quot;,</span>
+<span class="fc" id="L687">                tripId, currentUsername, vehicle.getPlateNumber(), driver.getFullName());</span>
+
+<span class="fc" id="L689">        return buildTripResponse(trip, null);</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

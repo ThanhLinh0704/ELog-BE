@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StoreServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.service.impl</a> &gt; <span class="el_source">StoreServiceImpl.java</span></div><h1>StoreServiceImpl.java</h1><pre class="source lang-java linenums">package com.elog.service.impl;
+
+import com.elog.dto.request.*;
+import com.elog.dto.response.*;
+import com.elog.entity.Store;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.mapper.StoreMapper;
+import com.elog.repository.RouteStopRepository;
+import com.elog.repository.StoreRepository;
+import com.elog.repository.specification.StoreSpecification;
+import com.elog.service.StoreService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class StoreServiceImpl implements StoreService {
+
+    private final StoreRepository storeRepository;
+    private final RouteStopRepository routeStopRepository;
+    private final StoreMapper storeMapper;
+
+    @Override
+    @Transactional
+    public StoreResponse createStore(StoreCreateRequest request) {
+<span class="fc bfc" id="L34" title="All 2 branches covered.">        if (storeRepository.existsByCode(request.getStoreCode())) {</span>
+<span class="fc" id="L35">            throw new BusinessException(ErrorCode.STORE_CODE_DUPLICATE,</span>
+<span class="fc" id="L36">                    &quot;Store code already exists: &quot; + request.getStoreCode(), HttpStatus.CONFLICT);</span>
+        }
+<span class="fc" id="L38">        validateCoordinates(request.getLatitude(), request.getLongitude());</span>
+
+<span class="fc" id="L40">        Store store = storeMapper.toEntity(request);</span>
+<span class="fc" id="L41">        Store saved = storeRepository.save(store);</span>
+<span class="fc" id="L42">        return buildStoreResponse(saved);</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StoreResponse getStoreById(Long id) {
+<span class="fc" id="L48">        Store store = findStoreOrThrow(id);</span>
+<span class="fc" id="L49">        return buildStoreResponse(store);</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse&lt;List&lt;StoreListItemResponse&gt;&gt; getAllStores(
+            String keyword, Boolean isActive, Boolean hasRoute, Pageable pageable) {
+
+<span class="fc" id="L57">        Specification&lt;Store&gt; spec = Specification.where(StoreSpecification.hasKeyword(keyword))</span>
+<span class="fc" id="L58">                .and(StoreSpecification.hasActiveStatus(isActive))</span>
+<span class="fc" id="L59">                .and(StoreSpecification.hasRoute(hasRoute));</span>
+
+<span class="fc" id="L61">        Page&lt;Store&gt; page = storeRepository.findAll(spec, pageable);</span>
+<span class="fc" id="L62">        List&lt;StoreListItemResponse&gt; content = page.getContent().stream()</span>
+<span class="fc" id="L63">                .map(s -&gt; storeMapper.toListItem(s, resolveAssignedRoute(s.getId())))</span>
+<span class="fc" id="L64">                .toList();</span>
+
+<span class="fc" id="L66">        ApiResponse.PaginationInfo pagination = ApiResponse.PaginationInfo.builder()</span>
+<span class="fc" id="L67">                .page(page.getNumber())</span>
+<span class="fc" id="L68">                .size(page.getSize())</span>
+<span class="fc" id="L69">                .totalElements(page.getTotalElements())</span>
+<span class="fc" id="L70">                .totalPages(page.getTotalPages())</span>
+<span class="fc" id="L71">                .build();</span>
+
+<span class="fc" id="L73">        return ApiResponse.&lt;List&lt;StoreListItemResponse&gt;&gt;builder()</span>
+<span class="fc" id="L74">                .success(true)</span>
+<span class="fc" id="L75">                .data(content)</span>
+<span class="fc" id="L76">                .pagination(pagination)</span>
+<span class="fc" id="L77">                .build();</span>
+    }
+
+    @Override
+    @Transactional
+    public StoreResponse updateStore(Long id, StoreUpdateRequest request) {
+<span class="fc" id="L83">        Store store = findStoreOrThrow(id);</span>
+<span class="fc" id="L84">        validateCoordinates(request.getLatitude(), request.getLongitude());</span>
+
+<span class="fc" id="L86">        store.setName(request.getStoreName());</span>
+<span class="fc" id="L87">        store.setAddress(request.getAddress());</span>
+<span class="fc" id="L88">        store.setContactName(request.getContactName());</span>
+<span class="fc" id="L89">        store.setContactPhone(request.getContactPhone());</span>
+<span class="fc" id="L90">        store.setLatitude(request.getLatitude());</span>
+<span class="fc" id="L91">        store.setLongitude(request.getLongitude());</span>
+
+<span class="fc" id="L93">        return buildStoreResponse(storeRepository.save(store));</span>
+    }
+
+    @Override
+    @Transactional
+    public StoreResponse updateStoreStatus(Long id, StoreStatusUpdateRequest request) {
+<span class="fc" id="L99">        Store store = findStoreOrThrow(id);</span>
+
+<span class="fc bfc" id="L101" title="All 4 branches covered.">        if (!request.getIsActive() &amp;&amp; routeStopRepository.existsByStoreIdAndRouteIsActiveTrue(id)) {</span>
+<span class="fc" id="L102">            String routeCode = routeStopRepository.findFirstByStoreId(id)</span>
+<span class="fc" id="L103">                    .map(rs -&gt; rs.getRoute().getCode())</span>
+<span class="fc" id="L104">                    .orElse(&quot;unknown&quot;);</span>
+<span class="fc" id="L105">            throw new BusinessException(ErrorCode.STORE_ACTIVE_ROUTE,</span>
+                    &quot;Store dang thuoc tuyen &quot; + routeCode + &quot;. Hay xoa store khoi tuyen truoc.&quot;,
+                    HttpStatus.CONFLICT);
+        }
+
+<span class="fc" id="L110">        store.setIsActive(request.getIsActive());</span>
+<span class="fc" id="L111">        return buildStoreResponse(storeRepository.save(store));</span>
+    }
+
+    // ── helpers ──────────────────────────────────────────────
+
+    private Store findStoreOrThrow(Long id) {
+<span class="fc" id="L117">        return storeRepository.findById(id)</span>
+<span class="fc" id="L118">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.STORE_NOT_FOUND, &quot;Store not found: &quot; + id, HttpStatus.NOT_FOUND));
+    }
+
+    private AssignedRouteDto resolveAssignedRoute(Long storeId) {
+<span class="fc" id="L123">        return routeStopRepository.findFirstByStoreId(storeId)</span>
+<span class="fc" id="L124">                .map(rs -&gt; AssignedRouteDto.builder()</span>
+<span class="fc" id="L125">                        .id(rs.getRoute().getId())</span>
+<span class="fc" id="L126">                        .code(rs.getRoute().getCode())</span>
+<span class="fc" id="L127">                        .name(rs.getRoute().getName())</span>
+<span class="fc" id="L128">                        .build())</span>
+<span class="fc" id="L129">                .orElse(null);</span>
+    }
+
+    private void validateCoordinates(Double latitude, Double longitude) {
+<span class="fc bfc" id="L133" title="All 6 branches covered.">        if ((latitude == null) != (longitude == null)) {</span>
+<span class="fc" id="L134">            throw new BusinessException(ErrorCode.INVALID_COORDINATES,</span>
+                    &quot;latitude va longitude phai duoc nhap ca hai hoac de trong ca hai&quot;,
+                    HttpStatus.BAD_REQUEST);
+        }
+<span class="fc" id="L138">    }</span>
+
+    private StoreResponse buildStoreResponse(Store store) {
+<span class="fc" id="L141">        return storeMapper.toResponse(store, resolveAssignedRoute(store.getId()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

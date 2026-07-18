@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DataInitializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.config</a> &gt; <span class="el_source">DataInitializer.java</span></div><h1>DataInitializer.java</h1><pre class="source lang-java linenums">package com.elog.config;
+
+import com.elog.entity.Role;
+import com.elog.entity.User;
+import com.elog.repository.RoleRepository;
+import com.elog.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
+import java.util.HashSet;
+
+/**
+ * Initializes default system data (e.g., SYSTEM_ADMIN role and admin user)
+ * if they are missing from the database when the application starts up.
+ */
+@Component
+@RequiredArgsConstructor
+<span class="fc" id="L23">@Slf4j</span>
+public class DataInitializer implements CommandLineRunner {
+
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @Override
+    @Transactional
+    public void run(String... args) throws Exception {
+        // 1. Ensure the SYSTEM_ADMIN role exists
+<span class="fc" id="L34">        Role adminRole = roleRepository.findByName(&quot;SYSTEM_ADMIN&quot;)</span>
+<span class="fc" id="L35">                .orElseGet(() -&gt; {</span>
+<span class="nc" id="L36">                    log.info(&quot;Role SYSTEM_ADMIN not found, creating a new one...&quot;);</span>
+<span class="nc" id="L37">                    Role newRole = Role.builder()</span>
+<span class="nc" id="L38">                            .name(&quot;SYSTEM_ADMIN&quot;)</span>
+<span class="nc" id="L39">                            .build();</span>
+<span class="nc" id="L40">                    return roleRepository.save(newRole);</span>
+                });
+
+        // 2. Check if the default 'admin' user exists
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        if (!userRepository.existsByUsername(&quot;admin&quot;)) {</span>
+<span class="nc" id="L45">            log.info(&quot;Default admin account 'admin' not found. Initializing default admin...&quot;);</span>
+
+            // Check if email is already taken to avoid unique constraint violations
+<span class="nc" id="L48">            String email = &quot;admin@elog.vn&quot;;</span>
+<span class="nc bnc" id="L49" title="All 2 branches missed.">            if (userRepository.existsByEmail(email)) {</span>
+<span class="nc" id="L50">                email = &quot;system.admin@elog.vn&quot;;</span>
+            }
+
+<span class="nc" id="L53">            User adminUser = User.builder()</span>
+<span class="nc" id="L54">                    .username(&quot;admin&quot;)</span>
+<span class="nc" id="L55">                    .passwordHash(passwordEncoder.encode(&quot;Admin@2025&quot;))</span>
+<span class="nc" id="L56">                    .fullName(&quot;System Administrator&quot;)</span>
+<span class="nc" id="L57">                    .email(email)</span>
+<span class="nc" id="L58">                    .isActive(true)</span>
+<span class="nc" id="L59">                    .roles(new HashSet&lt;&gt;(Collections.singletonList(adminRole)))</span>
+<span class="nc" id="L60">                    .build();</span>
+
+<span class="nc" id="L62">            userRepository.save(adminUser);</span>
+<span class="nc" id="L63">            log.info(&quot;Successfully seeded default admin account 'admin' with password 'Admin@2025'&quot;);</span>
+<span class="nc" id="L64">        } else {</span>
+<span class="fc" id="L65">            log.debug(&quot;Default admin account already exists. Skipping database seeding.&quot;);</span>
+        }
+<span class="fc" id="L67">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RouteMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.mapper</a> &gt; <span class="el_source">RouteMapper.java</span></div><h1>RouteMapper.java</h1><pre class="source lang-java linenums">package com.elog.mapper;
+
+import com.elog.dto.response.*;
+import com.elog.entity.Route;
+import com.elog.entity.RouteStop;
+import com.elog.entity.Store;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+<span class="fc" id="L12">public class RouteMapper {</span>
+
+    public RouteResponse toResponse(Route route, int stopCount) {
+<span class="nc" id="L15">        return RouteResponse.builder()</span>
+<span class="nc" id="L16">                .id(route.getId())</span>
+<span class="nc" id="L17">                .code(route.getCode())</span>
+<span class="nc" id="L18">                .name(route.getName())</span>
+<span class="nc" id="L19">                .description(route.getDescription())</span>
+<span class="nc" id="L20">                .isActive(route.getIsActive())</span>
+<span class="nc" id="L21">                .stopCount(stopCount)</span>
+<span class="nc" id="L22">                .createdAt(route.getCreatedAt())</span>
+<span class="nc" id="L23">                .build();</span>
+    }
+
+    public RouteDetailResponse toDetailResponse(Route route, List&lt;RouteStop&gt; stops) {
+<span class="nc" id="L27">        int warningCount = 0;</span>
+<span class="nc" id="L28">        List&lt;RouteStopResponse&gt; stopResponses = new java.util.ArrayList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L30" title="All 2 branches missed.">        for (RouteStop rs : stops) {</span>
+<span class="nc bnc" id="L31" title="All 2 branches missed.">            boolean hasCoords = rs.getStore().getLatitude() != null</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">                    &amp;&amp; rs.getStore().getLongitude() != null;</span>
+<span class="nc bnc" id="L33" title="All 2 branches missed.">            if (!hasCoords) warningCount++;</span>
+
+<span class="nc bnc" id="L35" title="All 2 branches missed.">            stopResponses.add(toStopResponse(rs, !hasCoords));</span>
+<span class="nc" id="L36">        }</span>
+
+<span class="nc" id="L38">        return RouteDetailResponse.builder()</span>
+<span class="nc" id="L39">                .id(route.getId())</span>
+<span class="nc" id="L40">                .code(route.getCode())</span>
+<span class="nc" id="L41">                .name(route.getName())</span>
+<span class="nc" id="L42">                .description(route.getDescription())</span>
+<span class="nc" id="L43">                .isActive(route.getIsActive())</span>
+<span class="nc" id="L44">                .stopCount(stops.size())</span>
+<span class="nc" id="L45">                .coordinatesWarningCount(warningCount)</span>
+<span class="nc" id="L46">                .stops(stopResponses)</span>
+<span class="nc" id="L47">                .createdAt(route.getCreatedAt())</span>
+<span class="nc" id="L48">                .build();</span>
+    }
+
+    public RouteStopResponse toStopResponse(RouteStop rs, boolean coordinatesWarning) {
+<span class="nc" id="L52">        Store store = rs.getStore();</span>
+<span class="nc bnc" id="L53" title="All 4 branches missed.">        boolean hasCoords = store.getLatitude() != null &amp;&amp; store.getLongitude() != null;</span>
+
+<span class="nc" id="L55">        return RouteStopResponse.builder()</span>
+<span class="nc" id="L56">                .id(rs.getId())</span>
+<span class="nc" id="L57">                .routeId(rs.getRoute().getId())</span>
+<span class="nc" id="L58">                .sequenceOrder(rs.getSequenceOrder())</span>
+<span class="nc" id="L59">                .store(RouteStopStoreDto.builder()</span>
+<span class="nc" id="L60">                        .id(store.getId())</span>
+<span class="nc" id="L61">                        .storeCode(store.getCode())</span>
+<span class="nc" id="L62">                        .storeName(store.getName())</span>
+<span class="nc" id="L63">                        .address(store.getAddress())</span>
+<span class="nc" id="L64">                        .contactName(store.getContactName())</span>
+<span class="nc" id="L65">                        .contactPhone(store.getContactPhone())</span>
+<span class="nc" id="L66">                        .hasCoordinates(hasCoords)</span>
+<span class="nc" id="L67">                        .build())</span>
+<span class="nc" id="L68">                .coordinatesWarning(coordinatesWarning)</span>
+<span class="nc" id="L69">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

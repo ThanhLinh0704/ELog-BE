@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TripController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.controller</a> &gt; <span class="el_source">TripController.java</span></div><h1>TripController.java</h1><pre class="source lang-java linenums">package com.elog.controller;
+
+import com.elog.dto.request.TripAssignRequest;
+import com.elog.dto.request.TripSplitAssignRequest;
+import com.elog.dto.request.TripAssignmentPatchRequest;
+import com.elog.dto.response.*;
+import com.elog.service.TripService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@RestController
+@RequiredArgsConstructor
+@Tag(name = &quot;Trips&quot;, description = &quot;US-15 Vehicle Assignment &amp; US-16 Dispatch APIs&quot;)
+public class TripController {
+
+    private final TripService tripService;
+
+    // ── US-15 TASK-02 — Vehicle Assignment ─────────────────────────
+
+    @GetMapping(&quot;/api/trip-drafts/{id}/eligible-vehicles&quot;)
+    @Operation(summary = &quot;Get eligible and ineligible vehicles for a validated trip draft&quot;)
+    @PreAuthorize(&quot;hasRole('DISPATCHER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;EligibleVehiclesResponse&gt;&gt; getEligibleVehicles(
+            @PathVariable Long id) {
+<span class="nc" id="L37">        EligibleVehiclesResponse response = tripService.getEligibleVehicles(id);</span>
+<span class="nc" id="L38">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    @GetMapping(&quot;/api/drivers/available&quot;)
+    @Operation(summary = &quot;Get available drivers for a date&quot;)
+    @PreAuthorize(&quot;hasRole('DISPATCHER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;AvailableDriverResponse&gt;&gt;&gt; getAvailableDrivers(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+<span class="nc" id="L46">        List&lt;AvailableDriverResponse&gt; drivers = tripService.getAvailableDrivers(date);</span>
+<span class="nc" id="L47">        return ResponseEntity.ok(ApiResponse.success(drivers));</span>
+    }
+
+    @PostMapping(&quot;/api/trip-drafts/{id}/assign&quot;)
+    @Operation(summary = &quot;Assign vehicle + driver to trip draft → create Trip&quot;)
+    @PreAuthorize(&quot;hasRole('DISPATCHER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;TripResponse&gt;&gt; assignVehicleAndDriver(
+            @PathVariable Long id,
+            @Valid @RequestBody TripAssignRequest request) {
+<span class="nc" id="L56">        String username = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L57">        TripResponse response = tripService.assignVehicleAndDriver(id, request, username);</span>
+<span class="nc" id="L58">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="nc" id="L59">                .body(ApiResponse.success(response, response.getMessage()));</span>
+    }
+
+    @PostMapping(&quot;/api/trip-drafts/{id}/assign-split&quot;)
+    @Operation(summary = &quot;Split-assign trip draft into multiple trips (BR-07)&quot;)
+    @PreAuthorize(&quot;hasRole('DISPATCHER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;TripSplitResponse&gt;&gt; assignSplit(
+            @PathVariable Long id,
+            @Valid @RequestBody TripSplitAssignRequest request) {
+<span class="nc" id="L68">        String username = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L69">        TripSplitResponse response = tripService.assignSplit(id, request, username);</span>
+<span class="nc" id="L70">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="nc" id="L71">                .body(ApiResponse.success(response, response.getMessage()));</span>
+    }
+
+    @GetMapping(&quot;/api/trips&quot;)
+    @Operation(summary = &quot;Get trips by trip draft ID&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;TripResponse&gt;&gt;&gt; getTripsByTripDraftId(
+            @RequestParam Long tripDraftId) {
+<span class="nc" id="L79">        List&lt;TripResponse&gt; trips = tripService.getTripsByTripDraftId(tripDraftId);</span>
+<span class="nc" id="L80">        return ResponseEntity.ok(ApiResponse.success(trips));</span>
+    }
+
+    // ── US-15 TASK-03 — Fleet Capacity Check (BR-08) ──────────────
+
+    @GetMapping(&quot;/api/fleet/capacity-check&quot;)
+    @Operation(summary = &quot;Check fleet capacity for a delivery date (BR-08)&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;FleetCapacityCheckResponse&gt;&gt; checkFleetCapacity(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+<span class="nc" id="L90">        FleetCapacityCheckResponse response = tripService.checkFleetCapacity(date);</span>
+<span class="nc" id="L91">        return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));</span>
+    }
+
+    // ── US-16 TASK-02 — Dispatch ──────────────────────────────────
+
+    @PostMapping(&quot;/api/trips/{id}/dispatch&quot;)
+    @Operation(summary = &quot;Dispatch trip — lock and generate handover slip&quot;)
+    @PreAuthorize(&quot;hasRole('DISPATCHER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;TripResponse&gt;&gt; dispatchTrip(@PathVariable Long id) {
+<span class="nc" id="L100">        String username = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L101">        TripResponse response = tripService.dispatchTrip(id, username);</span>
+<span class="nc" id="L102">        return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));</span>
+    }
+
+    @GetMapping(value = &quot;/api/trips/{id}/handover-slip&quot;, produces = MediaType.TEXT_HTML_VALUE)
+    @Operation(summary = &quot;Get handover slip as HTML for printing&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'WAREHOUSE_STAFF')&quot;)
+    public ResponseEntity&lt;String&gt; getHandoverSlip(@PathVariable Long id) {
+<span class="nc" id="L109">        String html = tripService.getHandoverSlipHtml(id);</span>
+<span class="nc" id="L110">        return ResponseEntity.ok(html);</span>
+    }
+
+    @GetMapping(&quot;/api/trips/{tripId}&quot;)
+    @Operation(summary = &quot;Get trip detail by trip ID&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF', 'DRIVER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;TripResponse&gt;&gt; getTripById(@PathVariable Long tripId) {
+<span class="nc" id="L117">        TripResponse response = tripService.getTripById(tripId);</span>
+<span class="nc" id="L118">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    @PatchMapping(&quot;/api/trips/{id}/assignment&quot;)
+    @Operation(summary = &quot;Update vehicle and driver assignment for a validated trip before dispatch&quot;)
+    @PreAuthorize(&quot;hasRole('DISPATCHER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;TripResponse&gt;&gt; updateAssignment(
+            @PathVariable Long id,
+            @Valid @RequestBody TripAssignmentPatchRequest request) {
+<span class="nc" id="L127">        String username = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L128">        TripResponse response = tripService.updateAssignment(id, request, username);</span>
+<span class="nc" id="L129">        return ResponseEntity.ok(ApiResponse.success(response, &quot;Assignment updated successfully.&quot;));</span>
+    }
+
+    // ── US-16 — Driver view ───────────────────────────────────────
+
+    @GetMapping(&quot;/api/trips/my-trips&quot;)
+    @Operation(summary = &quot;Driver view: get trips assigned to current driver&quot;)
+    @PreAuthorize(&quot;hasRole('DRIVER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;TripResponse&gt;&gt;&gt; getMyTrips(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) String status) {
+<span class="nc" id="L140">        String username = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L141">        List&lt;TripResponse&gt; trips = tripService.getDriverTrips(username, date, status);</span>
+<span class="nc" id="L142">        return ResponseEntity.ok(ApiResponse.success(trips));</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

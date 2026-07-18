@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RouteServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.service.impl</a> &gt; <span class="el_source">RouteServiceImpl.java</span></div><h1>RouteServiceImpl.java</h1><pre class="source lang-java linenums">package com.elog.service.impl;
+
+import com.elog.dto.request.*;
+import com.elog.dto.response.*;
+import com.elog.entity.Route;
+import com.elog.entity.RouteStop;
+import com.elog.entity.Store;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.mapper.RouteMapper;
+import com.elog.repository.RouteRepository;
+import com.elog.repository.RouteStopRepository;
+import com.elog.repository.StoreRepository;
+import com.elog.repository.specification.RouteSpecification;
+import com.elog.service.RouteService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class RouteServiceImpl implements RouteService {
+
+    private final RouteRepository routeRepository;
+    private final RouteStopRepository routeStopRepository;
+    private final StoreRepository storeRepository;
+    private final RouteMapper routeMapper;
+
+    // ── Route CRUD ──────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public RouteResponse createRoute(RouteCreateRequest request) {
+<span class="fc" id="L41">        String code = request.getCode().toUpperCase();</span>
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (routeRepository.existsByCode(code)) {</span>
+<span class="fc" id="L43">            throw new BusinessException(ErrorCode.ROUTE_CODE_DUPLICATE,</span>
+                    &quot;Route code already exists: &quot; + code, HttpStatus.CONFLICT);
+        }
+
+<span class="fc" id="L47">        Route route = Route.builder()</span>
+<span class="fc" id="L48">                .code(code)</span>
+<span class="fc" id="L49">                .name(request.getName())</span>
+<span class="fc" id="L50">                .description(request.getDescription())</span>
+<span class="fc" id="L51">                .isActive(false)</span>
+<span class="fc" id="L52">                .build();</span>
+<span class="fc" id="L53">        Route saved = routeRepository.save(route);</span>
+<span class="fc" id="L54">        return routeMapper.toResponse(saved, 0);</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RouteDetailResponse getRouteById(Long id) {
+<span class="fc" id="L60">        Route route = findRouteOrThrow(id);</span>
+<span class="fc" id="L61">        List&lt;RouteStop&gt; stops = routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(id);</span>
+<span class="fc" id="L62">        return routeMapper.toDetailResponse(route, stops);</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse&lt;List&lt;RouteResponse&gt;&gt; getAllRoutes(
+            String keyword, Boolean isActive, Pageable pageable) {
+
+<span class="fc" id="L70">        Specification&lt;Route&gt; spec = Specification</span>
+<span class="fc" id="L71">                .where(RouteSpecification.hasKeyword(keyword))</span>
+<span class="fc" id="L72">                .and(RouteSpecification.hasActiveStatus(isActive));</span>
+
+<span class="fc" id="L74">        Page&lt;Route&gt; page = routeRepository.findAll(spec, pageable);</span>
+<span class="fc" id="L75">        List&lt;RouteResponse&gt; content = page.getContent().stream()</span>
+<span class="fc" id="L76">                .map(r -&gt; routeMapper.toResponse(r, routeStopRepository.countByRouteId(r.getId())))</span>
+<span class="fc" id="L77">                .toList();</span>
+
+<span class="fc" id="L79">        ApiResponse.PaginationInfo pagination = ApiResponse.PaginationInfo.builder()</span>
+<span class="fc" id="L80">                .page(page.getNumber())</span>
+<span class="fc" id="L81">                .size(page.getSize())</span>
+<span class="fc" id="L82">                .totalElements(page.getTotalElements())</span>
+<span class="fc" id="L83">                .totalPages(page.getTotalPages())</span>
+<span class="fc" id="L84">                .build();</span>
+
+<span class="fc" id="L86">        return ApiResponse.&lt;List&lt;RouteResponse&gt;&gt;builder()</span>
+<span class="fc" id="L87">                .success(true)</span>
+<span class="fc" id="L88">                .data(content)</span>
+<span class="fc" id="L89">                .pagination(pagination)</span>
+<span class="fc" id="L90">                .build();</span>
+    }
+
+    @Override
+    @Transactional
+    public RouteResponse updateRoute(Long id, RouteUpdateRequest request) {
+<span class="fc" id="L96">        Route route = findRouteOrThrow(id);</span>
+<span class="fc" id="L97">        route.setName(request.getName());</span>
+<span class="fc" id="L98">        route.setDescription(request.getDescription());</span>
+<span class="fc" id="L99">        Route saved = routeRepository.save(route);</span>
+<span class="fc" id="L100">        return routeMapper.toResponse(saved, routeStopRepository.countByRouteId(id));</span>
+    }
+
+    @Override
+    @Transactional
+    public RouteResponse updateRouteStatus(Long id, RouteStatusUpdateRequest request) {
+<span class="fc" id="L106">        Route route = findRouteOrThrow(id);</span>
+
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (Boolean.TRUE.equals(request.getIsActive())) {</span>
+<span class="fc" id="L109">            int stopCount = routeStopRepository.countByRouteId(id);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (stopCount &lt; 2) {</span>
+<span class="fc" id="L111">                throw new BusinessException(ErrorCode.ROUTE_INSUFFICIENT_STOPS,</span>
+                        &quot;Route must have at least 2 stops to activate. Current: &quot; + stopCount,
+                        HttpStatus.BAD_REQUEST);
+            }
+        }
+
+<span class="fc" id="L117">        route.setIsActive(request.getIsActive());</span>
+<span class="fc" id="L118">        Route saved = routeRepository.save(route);</span>
+<span class="fc" id="L119">        return routeMapper.toResponse(saved, routeStopRepository.countByRouteId(id));</span>
+    }
+
+    // ── Stop Management ─────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public RouteStopResponse addStop(Long routeId, RouteStopAddRequest request) {
+<span class="fc" id="L127">        Route route = findRouteOrThrow(routeId);</span>
+
+        // Validate store exists
+<span class="fc" id="L130">        Store store = storeRepository.findById(request.getStoreId())</span>
+<span class="fc" id="L131">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.STORE_NOT_FOUND,</span>
+<span class="fc" id="L132">                        &quot;Store not found: &quot; + request.getStoreId(), HttpStatus.NOT_FOUND));</span>
+
+        // BR-02: store must be active
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (!Boolean.TRUE.equals(store.getIsActive())) {</span>
+<span class="fc" id="L136">            throw new BusinessException(ErrorCode.STORE_INACTIVE,</span>
+<span class="fc" id="L137">                    &quot;Store is inactive: &quot; + store.getCode(), HttpStatus.UNPROCESSABLE_ENTITY);</span>
+        }
+
+        // Check duplicate store in route
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (routeStopRepository.existsByRouteIdAndStoreId(routeId, request.getStoreId())) {</span>
+<span class="fc" id="L142">            throw new BusinessException(ErrorCode.ROUTE_STOP_DUPLICATE,</span>
+<span class="fc" id="L143">                    &quot;Store &quot; + store.getCode() + &quot; already exists in this route&quot;,</span>
+                    HttpStatus.CONFLICT);
+        }
+
+        // Auto-append to end
+<span class="fc" id="L148">        int nextSeq = routeStopRepository.findMaxSequenceOrderByRouteId(routeId) + 1;</span>
+
+<span class="fc" id="L150">        RouteStop routeStop = RouteStop.builder()</span>
+<span class="fc" id="L151">                .route(route)</span>
+<span class="fc" id="L152">                .store(store)</span>
+<span class="fc" id="L153">                .sequenceOrder(nextSeq)</span>
+<span class="fc" id="L154">                .build();</span>
+<span class="fc" id="L155">        RouteStop saved = routeStopRepository.save(routeStop);</span>
+
+<span class="pc bpc" id="L157" title="1 of 4 branches missed.">        boolean hasCoords = store.getLatitude() != null &amp;&amp; store.getLongitude() != null;</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        return routeMapper.toStopResponse(saved, !hasCoords);</span>
+    }
+
+    @Override
+    @Transactional
+    public List&lt;RouteStopResponse&gt; reorderStops(Long routeId, RouteStopReorderRequest request) {
+<span class="fc" id="L164">        findRouteOrThrow(routeId);</span>
+
+<span class="fc" id="L166">        List&lt;RouteStop&gt; existingStops = routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(routeId);</span>
+<span class="fc" id="L167">        Set&lt;Long&gt; existingIds = existingStops.stream()</span>
+<span class="fc" id="L168">                .map(RouteStop::getId)</span>
+<span class="fc" id="L169">                .collect(Collectors.toSet());</span>
+<span class="fc" id="L170">        Set&lt;Long&gt; requestedIds = new LinkedHashSet&lt;&gt;(request.getOrderedStopIds());</span>
+
+        // Validate: must contain exactly the same stop IDs
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (!existingIds.equals(requestedIds)) {</span>
+<span class="fc" id="L174">            throw new BusinessException(ErrorCode.ROUTE_STOP_REORDER_INVALID,</span>
+                    &quot;orderedStopIds must contain exactly all stop IDs of this route&quot;,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // Build lookup map
+<span class="fc" id="L180">        Map&lt;Long, RouteStop&gt; stopMap = existingStops.stream()</span>
+<span class="fc" id="L181">                .collect(Collectors.toMap(RouteStop::getId, s -&gt; s));</span>
+
+        // Step 1: Move existing stops to a temporary sequence range to avoid unique constraint violations
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        for (RouteStop rs : existingStops) {</span>
+<span class="fc" id="L185">            rs.setSequenceOrder(rs.getSequenceOrder() + 10000);</span>
+<span class="fc" id="L186">            routeStopRepository.save(rs);</span>
+<span class="fc" id="L187">        }</span>
+<span class="fc" id="L188">        routeStopRepository.flush(); // Force update in DB before reassigning</span>
+
+        // Step 2: Reassign sequence numbers in the requested order
+<span class="fc" id="L191">        int seq = 1;</span>
+<span class="fc" id="L192">        List&lt;RouteStopResponse&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        for (Long stopId : request.getOrderedStopIds()) {</span>
+<span class="fc" id="L194">            RouteStop rs = stopMap.get(stopId);</span>
+<span class="fc" id="L195">            rs.setSequenceOrder(seq++);</span>
+<span class="fc" id="L196">            routeStopRepository.save(rs);</span>
+
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            boolean hasCoords = rs.getStore().getLatitude() != null</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                    &amp;&amp; rs.getStore().getLongitude() != null;</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            result.add(routeMapper.toStopResponse(rs, !hasCoords));</span>
+<span class="fc" id="L201">        }</span>
+
+<span class="fc" id="L203">        return result;</span>
+    }
+
+    @Override
+    @Transactional
+    public void removeStop(Long routeId, Long stopId) {
+<span class="fc" id="L209">        findRouteOrThrow(routeId);</span>
+
+<span class="fc" id="L211">        RouteStop stop = routeStopRepository.findById(stopId)</span>
+<span class="fc" id="L212">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.ROUTE_STOP_NOT_FOUND,</span>
+                        &quot;Route stop not found: &quot; + stopId, HttpStatus.NOT_FOUND));
+
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        if (!stop.getRoute().getId().equals(routeId)) {</span>
+<span class="fc" id="L216">            throw new BusinessException(ErrorCode.ROUTE_STOP_NOT_FOUND,</span>
+                    &quot;Stop &quot; + stopId + &quot; does not belong to route &quot; + routeId,
+                    HttpStatus.NOT_FOUND);
+        }
+
+<span class="fc" id="L221">        routeStopRepository.delete(stop);</span>
+
+        // Renumber remaining stops
+<span class="fc" id="L224">        List&lt;RouteStop&gt; remaining = routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(routeId);</span>
+<span class="fc" id="L225">        int seq = 1;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (RouteStop rs : remaining) {</span>
+<span class="fc" id="L227">            rs.setSequenceOrder(seq++);</span>
+<span class="fc" id="L228">            routeStopRepository.save(rs);</span>
+<span class="fc" id="L229">        }</span>
+<span class="fc" id="L230">    }</span>
+
+    // ── helpers ──────────────────────────────────────────────
+
+    private Route findRouteOrThrow(Long id) {
+<span class="fc" id="L235">        return routeRepository.findById(id)</span>
+<span class="fc" id="L236">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.ROUTE_NOT_FOUND, &quot;Route not found: &quot; + id, HttpStatus.NOT_FOUND));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VehicleMapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.mapper</a> &gt; <span class="el_source">VehicleMapper.java</span></div><h1>VehicleMapper.java</h1><pre class="source lang-java linenums">package com.elog.mapper;
+
+import com.elog.dto.request.VehicleCreateRequest;
+import com.elog.dto.response.VehicleListItemResponse;
+import com.elog.dto.response.VehicleResponse;
+import com.elog.entity.Vehicle;
+import org.springframework.stereotype.Component;
+
+@Component
+<span class="fc" id="L10">public class VehicleMapper {</span>
+
+    public Vehicle toEntity(VehicleCreateRequest request) {
+<span class="nc" id="L13">        return Vehicle.builder()</span>
+<span class="nc" id="L14">                .plateNumber(normalizePlate(request.getPlateNumber()))</span>
+<span class="nc" id="L15">                .vehicleType(request.getVehicleType())</span>
+<span class="nc" id="L16">                .maxWeightKg(request.getMaxWeightKg())</span>
+<span class="nc" id="L17">                .maxVolumeM3(request.getMaxVolumeM3())</span>
+<span class="nc" id="L18">                .isActive(true)</span>
+<span class="nc" id="L19">                .build();</span>
+    }
+
+    public VehicleResponse toResponse(Vehicle vehicle) {
+<span class="nc" id="L23">        return VehicleResponse.builder()</span>
+<span class="nc" id="L24">                .id(vehicle.getId())</span>
+<span class="nc" id="L25">                .plateNumber(vehicle.getPlateNumber())</span>
+<span class="nc" id="L26">                .vehicleType(vehicle.getVehicleType())</span>
+<span class="nc" id="L27">                .maxWeightKg(vehicle.getMaxWeightKg())</span>
+<span class="nc" id="L28">                .maxVolumeM3(vehicle.getMaxVolumeM3())</span>
+<span class="nc" id="L29">                .isActive(vehicle.getIsActive())</span>
+<span class="nc" id="L30">                .createdAt(vehicle.getCreatedAt())</span>
+<span class="nc" id="L31">                .updatedAt(vehicle.getUpdatedAt())</span>
+<span class="nc" id="L32">                .build();</span>
+    }
+
+    public VehicleListItemResponse toListItem(Vehicle vehicle) {
+<span class="nc" id="L36">        return VehicleListItemResponse.builder()</span>
+<span class="nc" id="L37">                .id(vehicle.getId())</span>
+<span class="nc" id="L38">                .plateNumber(vehicle.getPlateNumber())</span>
+<span class="nc" id="L39">                .vehicleType(vehicle.getVehicleType())</span>
+<span class="nc" id="L40">                .maxWeightKg(vehicle.getMaxWeightKg())</span>
+<span class="nc" id="L41">                .maxVolumeM3(vehicle.getMaxVolumeM3())</span>
+<span class="nc" id="L42">                .isActive(vehicle.getIsActive())</span>
+<span class="nc" id="L43">                .build();</span>
+    }
+
+    public String normalizePlate(String plateNumber) {
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        if (plateNumber == null) return null;</span>
+<span class="nc" id="L48">        return plateNumber.trim().toUpperCase();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

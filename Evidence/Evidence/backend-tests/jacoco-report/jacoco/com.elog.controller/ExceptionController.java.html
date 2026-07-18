@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExceptionController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.controller</a> &gt; <span class="el_source">ExceptionController.java</span></div><h1>ExceptionController.java</h1><pre class="source lang-java linenums">package com.elog.controller;
+
+import com.elog.dto.request.RejectStopRequest;
+import com.elog.dto.request.ResolveExceptionRequest;
+import com.elog.dto.response.ApiResponse;
+import com.elog.dto.response.DeliveryExceptionResponse;
+import com.elog.dto.response.ExceptionListResponse;
+import com.elog.service.ExceptionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+
+@RestController
+@RequiredArgsConstructor
+@Tag(name = &quot;Exception Management&quot;, description = &quot;US-18 — DELIVERY_REJECTION + TIME_EXCEPTION&quot;)
+public class ExceptionController {
+
+    private final ExceptionService exceptionService;
+
+    @PostMapping(&quot;/api/trip-stops/{id}/reject&quot;)
+    @Operation(summary = &quot;Driver ghi nhận cửa hàng từ chối nhận hàng — DELIVERY_REJECTION (BR-10)&quot;)
+    @PreAuthorize(&quot;hasRole('DRIVER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;DeliveryExceptionResponse&gt;&gt; rejectStop(
+            @PathVariable Long id,
+            @Valid @RequestBody RejectStopRequest request) {
+<span class="nc" id="L36">        String username = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L37">        DeliveryExceptionResponse response = exceptionService.rejectStop(id, request, username);</span>
+<span class="nc" id="L38">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="nc" id="L39">                .body(ApiResponse.success(response, response.getMessage()));</span>
+    }
+
+    @GetMapping(&quot;/api/exceptions&quot;)
+    @Operation(summary = &quot;Danh sách exception — filter theo ngày, loại, trạng thái resolve&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;ExceptionListResponse&gt;&gt; listExceptions(
+            @Parameter(description = &quot;yyyy-MM-dd, mặc định hôm nay&quot;)
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = &quot;ALL | TIME_EXCEPTION | DELIVERY_REJECTION&quot;)
+            @RequestParam(required = false, defaultValue = &quot;ALL&quot;) String type,
+            @Parameter(description = &quot;true | false | all&quot;)
+            @RequestParam(required = false, defaultValue = &quot;false&quot;) String resolved) {
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        LocalDate effectiveDate = (date != null) ? date : LocalDate.now();</span>
+<span class="nc" id="L53">        ExceptionListResponse response = exceptionService.listExceptions(effectiveDate, type, resolved);</span>
+<span class="nc" id="L54">        return ResponseEntity.ok(ApiResponse.success(response, null));</span>
+    }
+
+    @GetMapping(&quot;/api/exceptions/{id}&quot;)
+    @Operation(summary = &quot;Chi tiết 1 exception&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;DeliveryExceptionResponse&gt;&gt; getException(@PathVariable Long id) {
+<span class="nc" id="L61">        return ResponseEntity.ok(ApiResponse.success(exceptionService.getException(id), null));</span>
+    }
+
+    @PatchMapping(&quot;/api/exceptions/{id}/resolve&quot;)
+    @Operation(summary = &quot;Dispatcher/Manager đóng exception&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;DeliveryExceptionResponse&gt;&gt; resolveException(
+            @PathVariable Long id,
+            @RequestBody ResolveExceptionRequest request) {
+<span class="nc" id="L70">        String username = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L71">        DeliveryExceptionResponse response = exceptionService.resolveException(id, request, username);</span>
+<span class="nc" id="L72">        return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

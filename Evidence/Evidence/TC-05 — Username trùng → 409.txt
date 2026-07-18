@@ -1,0 +1,18 @@
+TC-05 — Username trùng → 409
+Verify: PASS
+Auth: No Auth
+URL: http://localhost:8080/api/v1/users
+Mô tả: POST với username testuserMeoMeo01 đã tồn tại trong DB → server trả 409 Conflict đúng spec. 
+Body test:
+
+{
+  "username": "testuserMeoMeo01",
+  "password": "TestPass@123",
+  "fullName": "Nguyen Van MeoMeo",
+  "email": "testuserMeoMeo01@elog.vn",
+  "roles": ["driver"]
+}
+
+Lỗi ở file: Không có.
+Đoạn code lỗi: Không có.
+Sửa: Không cần.
