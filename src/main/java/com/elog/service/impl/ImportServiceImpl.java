@@ -402,6 +402,7 @@ public class ImportServiceImpl implements ImportService {
                         .orderRef(orderRef)
                         .store(store)
                         .deliveryDate(deliveryDate)
+                        .status("ACCEPTED")
                         .build();
                 return orderRepository.save(newOrder);
             });

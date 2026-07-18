@@ -151,4 +151,14 @@ Load these files only when needed — **do NOT load all at once**:
 | Working on US-01 | `@docs/us01-checklist.md` |
 
 ---
+
+## 11. Git Workflow Policy
+
+- **NEVER run `git add .`, `git commit` or `git push` automatically.** 
+- All modified and new files must remain unstaged/uncommitted in the working directory at the end of the session.
+- Present the changes to the user and let them perform the commit and push manually.
+
+
+---
 *SEP490_G104 · Last updated: 2025 · Source of truth: ELog_Report3_SRS_v1.0.1_EN.docx*
+

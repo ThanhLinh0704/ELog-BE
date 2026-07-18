@@ -5,22 +5,21 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-@Getter
-@Setter
+@Data
 @Builder
-@AllArgsConstructor
 @NoArgsConstructor
-public class TripDraftStopResponse {
+@AllArgsConstructor
+public class TripStopResponse {
+    private Long tripStopId;
+    private Long routeStopId;
     private Long tripDraftStopId;
-    private Integer sequenceNo;
-    private Long storeId;
+    private Integer sequenceOrder;
     private String storeCode;
     private String storeName;
-    private Boolean isActive;
-    private Integer orderCount;
     private LocalDateTime plannedEta;
-    private String overrideNote;
-    private Long routeStopId;
-    private BigDecimal stopVolumeM3;
+    private String status;
     private BigDecimal stopWeightKg;
+    private BigDecimal stopVolumeM3;
+    private String notes;
 }
+
