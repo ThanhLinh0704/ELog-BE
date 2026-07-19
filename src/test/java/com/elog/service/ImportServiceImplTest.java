@@ -1150,4 +1150,61 @@ class ImportServiceImplTest {
         String valError = (String) method.invoke(importService, cellError);
         assertThat(valError).isEmpty();
     }
+
+    @Test
+    void getImportedOrders_success() {
+        ImportBatch batch = ImportBatch.builder().id(1L).build();
+        when(batchRepository.existsById(1L)).thenReturn(true);
+
+        Store store = Store.builder().id(10L).code("ST-001").name("Store 1").build();
+        Product product = Product.builder().id(20L).sku("SKU-001").productName("Prod 1").build();
+        Order order = Order.builder()
+                .id(100L)
+                .orderRef("DH-001")
+                .store(store)
+                .deliveryTimeWindow("08:00 - 12:00")
+                .recipientName("A")
+                .recipientPhone("123")
+                .notes("notes")
+                .build();
+        OrderItem item = OrderItem.builder()
+                .id(200L)
+                .order(order)
+                .product(product)
+                .sku("SKU-001")
+                .quantity(5)
+                .lineWeightKg(BigDecimal.valueOf(10.0))
+                .lineVolumeM3(BigDecimal.valueOf(0.5))
+                .build();
+        order.setItems(List.of(item));
+
+        when(orderRepository.findByImportBatchId(1L)).thenReturn(List.of(order));
+
+        List<com.elog.dto.response.ImportedOrderDetailResponse> results = importService.getImportedOrders(1L);
+
+        assertThat(results).hasSize(1);
+        com.elog.dto.response.ImportedOrderDetailResponse res = results.get(0);
+        assertThat(res.getOrderRef()).isEqualTo("DH-001");
+        assertThat(res.getStoreCode()).isEqualTo("ST-001");
+        assertThat(res.getStoreName()).isEqualTo("Store 1");
+        assertThat(res.getSku()).isEqualTo("SKU-001");
+        assertThat(res.getProductName()).isEqualTo("Prod 1");
+        assertThat(res.getQuantity()).isEqualTo(5);
+        assertThat(res.getWeightKg()).isEqualByComparingTo(BigDecimal.valueOf(10.0));
+        assertThat(res.getVolumeM3()).isEqualByComparingTo(BigDecimal.valueOf(0.5));
+        assertThat(res.getDeliveryTimeWindow()).isEqualTo("08:00 - 12:00");
+        assertThat(res.getRecipientName()).isEqualTo("A");
+        assertThat(res.getRecipientPhone()).isEqualTo("123");
+        assertThat(res.getNotes()).isEqualTo("notes");
+    }
+
+    @Test
+    void getImportedOrders_batchNotFound_throwsException() {
+        when(batchRepository.existsById(99L)).thenReturn(false);
+
+        assertThatThrownBy(() -> importService.getImportedOrders(99L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.NOT_FOUND)
+                .hasMessageContaining("Import batch not found: 99");
+    }
 }

@@ -503,4 +503,39 @@ public class TripDraftServiceImpl implements TripDraftService {
                 .stopWeightKg(stopWeight)
                 .build();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StopOrderItemResponse> getStopOrderItems(Long tripDraftId, Long stopId) {
+        TripDraftStop stop = tripDraftStopRepository.findById(stopId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "TripDraftStop not found with id: " + stopId,
+                        HttpStatus.NOT_FOUND));
+
+        if (!stop.getTripDraft().getId().equals(tripDraftId)) {
+            throw new BusinessException(
+                    ErrorCode.RESOURCE_NOT_FOUND,
+                    "Stop " + stopId + " does not belong to Trip Draft " + tripDraftId,
+                    HttpStatus.NOT_FOUND);
+        }
+
+        List<OrderItem> items = orderItemRepository.findByStopForManifest(
+                stop.getStore().getId(), tripDraftId);
+
+        if (items == null) {
+            return Collections.emptyList();
+        }
+
+        return items.stream()
+                .map(item -> StopOrderItemResponse.builder()
+                        .orderRef(item.getOrder().getOrderRef())
+                        .sku(item.getSku())
+                        .productName(item.getProduct().getProductName())
+                        .quantity(item.getQuantity())
+                        .weightKg(item.getLineWeightKg())
+                        .volumeM3(item.getLineVolumeM3())
+                        .build())
+                .toList();
+    }
 }

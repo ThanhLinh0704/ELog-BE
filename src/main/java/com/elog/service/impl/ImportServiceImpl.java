@@ -3,6 +3,7 @@ package com.elog.service.impl;
 import com.elog.dto.response.ApiResponse;
 import com.elog.dto.response.ImportBatchResponse;
 import com.elog.dto.response.ImportErrorResponse;
+import com.elog.dto.response.ImportedOrderDetailResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -517,6 +518,39 @@ public class ImportServiceImpl implements ImportService {
                 .isActive(batch.getIsActive())
                 .createdAt(batch.getCreatedAt())
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ImportedOrderDetailResponse> getImportedOrders(Long batchId) {
+        // Verify batch exists
+        if (!batchRepository.existsById(batchId)) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+                    "Import batch not found: " + batchId, HttpStatus.NOT_FOUND);
+        }
+
+        List<Order> orders = orderRepository.findByImportBatchId(batchId);
+        List<ImportedOrderDetailResponse> results = new ArrayList<>();
+
+        for (Order order : orders) {
+            for (OrderItem item : order.getItems()) {
+                results.add(ImportedOrderDetailResponse.builder()
+                        .orderRef(order.getOrderRef())
+                        .storeCode(order.getStore().getCode())
+                        .storeName(order.getStore().getName())
+                        .sku(item.getSku())
+                        .productName(item.getProduct() != null ? item.getProduct().getProductName() : null)
+                        .quantity(item.getQuantity())
+                        .weightKg(item.getLineWeightKg())
+                        .volumeM3(item.getLineVolumeM3())
+                        .deliveryTimeWindow(order.getDeliveryTimeWindow())
+                        .recipientName(order.getRecipientName())
+                        .recipientPhone(order.getRecipientPhone())
+                        .notes(order.getNotes())
+                        .build());
+            }
+        }
+        return results;
     }
 
     // ── Inner exception for per-row rejection ─────────────────────────────────

@@ -26,4 +26,6 @@ public interface TripDraftService {
     ConfirmResponse confirmTripDraft(Long tripDraftId, String currentUsername);
 
     void revertToDraft(Long tripDraftId, String currentUsername);
+
+    List<StopOrderItemResponse> getStopOrderItems(Long tripDraftId, Long stopId);
 }

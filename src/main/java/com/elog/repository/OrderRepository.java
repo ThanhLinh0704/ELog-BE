@@ -42,5 +42,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT o FROM Order o WHERE o.tripDraft.id = :tripDraftId")
     List<Order> findByTripDraftId(@Param("tripDraftId") Long tripDraftId);
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "JOIN FETCH o.store s " +
+           "LEFT JOIN FETCH o.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "WHERE o.importBatch.id = :batchId " +
+           "ORDER BY o.orderRef ASC, i.sku ASC")
+    List<Order> findByImportBatchId(@Param("batchId") Long batchId);
 }
 
