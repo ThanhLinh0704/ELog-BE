@@ -86,7 +86,7 @@ public class ImportController {
 
     @GetMapping("/{batchId}/orders")
     @Operation(summary = "Get list of successfully imported orders and products details for a batch")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('order:import', 'trip:read')")
     public ResponseEntity<ApiResponse<List<ImportedOrderDetailResponse>>> getImportedOrders(
             @PathVariable Long batchId) {
         List<ImportedOrderDetailResponse> response = importService.getImportedOrders(batchId);

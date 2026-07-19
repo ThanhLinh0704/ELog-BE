@@ -89,7 +89,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}/stops/{stopId}/order-items")
     @Operation(summary = "Get order items detail for a specific trip draft stop")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<List<StopOrderItemResponse>>> getStopOrderItems(
             @PathVariable Long id,
             @PathVariable Long stopId) {
@@ -119,7 +119,7 @@ public class TripDraftController {
 
     @PostMapping("/{id}/revert")
     @Operation(summary = "Revert trip draft — (PLANNED/VALIDATED → DRAFT)")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:confirm')")
     public ResponseEntity<ApiResponse<Void>> revertToDraft(
             @PathVariable Long id) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
