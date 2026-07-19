@@ -50,8 +50,7 @@ public class TripDraftController {
     public ResponseEntity<ApiResponse<List<TripDraftResponse>>> getTripDrafts(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
             @PageableDefault(size = 20) Pageable pageable) {
-        ApiResponse<List<TripDraftResponse>> response =
-                tripDraftService.getTripDrafts(deliveryDate, pageable);
+        ApiResponse<List<TripDraftResponse>> response = tripDraftService.getTripDrafts(deliveryDate, pageable);
         return ResponseEntity.ok(response);
     }
 

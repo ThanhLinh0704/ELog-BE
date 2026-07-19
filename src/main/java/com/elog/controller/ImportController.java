@@ -110,7 +110,8 @@ public class ImportController {
     public ResponseEntity<byte[]> exportBatchErrors(@PathVariable Long batchId) {
         byte[] content = importService.exportBatchErrors(batchId);
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-        headers.setContentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentType(org.springframework.http.MediaType
+                .parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
         headers.setContentDispositionFormData("attachment", "import-errors-batch" + batchId + ".xlsx");
         headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
         return new ResponseEntity<>(content, headers, org.springframework.http.HttpStatus.OK);
