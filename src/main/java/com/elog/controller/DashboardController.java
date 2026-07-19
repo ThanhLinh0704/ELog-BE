@@ -25,7 +25,7 @@ public class DashboardController {
      */
     @GetMapping("/api/dashboard/active-trips")
     @Operation(summary = "Get all active trips for a date (DISPATCHED/IN_PROGRESS/COMPLETED)")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<ActiveTripsResponse>> getActiveTrips(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 
@@ -36,11 +36,10 @@ public class DashboardController {
 
     /**
      * Chi tiết tiến độ từng stop của 1 trip
-     * Dùng khi Dispatcher click "Xem chi tiết" trên 1 trip card
      */
     @GetMapping("/api/trips/{id}/progress")
     @Operation(summary = "Get detailed stop-by-stop progress of a trip")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<TripProgressResponse>> getTripProgress(@PathVariable Long id) {
         TripProgressResponse response = tripMonitoringService.getTripProgress(id);
         return ResponseEntity.ok(ApiResponse.success(response));

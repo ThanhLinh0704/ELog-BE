@@ -29,7 +29,7 @@ public class ExceptionController {
 
     @PostMapping("/api/trip-stops/{id}/reject")
     @Operation(summary = "Driver ghi nhận cửa hàng từ chối nhận hàng — DELIVERY_REJECTION (BR-10)")
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<DeliveryExceptionResponse>> rejectStop(
             @PathVariable Long id,
             @Valid @RequestBody RejectStopRequest request) {
@@ -41,14 +41,11 @@ public class ExceptionController {
 
     @GetMapping("/api/exceptions")
     @Operation(summary = "Danh sách exception — filter theo ngày, loại, trạng thái resolve")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<ExceptionListResponse>> listExceptions(
-            @Parameter(description = "yyyy-MM-dd, mặc định hôm nay")
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @Parameter(description = "ALL | TIME_EXCEPTION | DELIVERY_REJECTION")
-            @RequestParam(required = false, defaultValue = "ALL") String type,
-            @Parameter(description = "true | false | all")
-            @RequestParam(required = false, defaultValue = "false") String resolved) {
+            @Parameter(description = "yyyy-MM-dd, mặc định hôm nay") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "ALL | TIME_EXCEPTION | DELIVERY_REJECTION") @RequestParam(required = false, defaultValue = "ALL") String type,
+            @Parameter(description = "true | false | all") @RequestParam(required = false, defaultValue = "false") String resolved) {
         LocalDate effectiveDate = (date != null) ? date : LocalDate.now();
         ExceptionListResponse response = exceptionService.listExceptions(effectiveDate, type, resolved);
         return ResponseEntity.ok(ApiResponse.success(response, null));
@@ -56,14 +53,14 @@ public class ExceptionController {
 
     @GetMapping("/api/exceptions/{id}")
     @Operation(summary = "Chi tiết 1 exception")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<DeliveryExceptionResponse>> getException(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(exceptionService.getException(id), null));
     }
 
     @PatchMapping("/api/exceptions/{id}/resolve")
     @Operation(summary = "Dispatcher/Manager đóng exception")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<DeliveryExceptionResponse>> resolveException(
             @PathVariable Long id,
             @RequestBody ResolveExceptionRequest request) {

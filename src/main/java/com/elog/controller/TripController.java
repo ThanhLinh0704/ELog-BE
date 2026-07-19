@@ -27,11 +27,9 @@ public class TripController {
 
     private final TripService tripService;
 
-    // ── US-15 TASK-02 — Vehicle Assignment ─────────────────────────
-
     @GetMapping("/api/trip-drafts/{id}/eligible-vehicles")
     @Operation(summary = "Get eligible and ineligible vehicles for a validated trip draft")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<EligibleVehiclesResponse>> getEligibleVehicles(
             @PathVariable Long id) {
         EligibleVehiclesResponse response = tripService.getEligibleVehicles(id);
@@ -40,7 +38,7 @@ public class TripController {
 
     @GetMapping("/api/drivers/available")
     @Operation(summary = "Get available drivers for a date")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<List<AvailableDriverResponse>>> getAvailableDrivers(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         List<AvailableDriverResponse> drivers = tripService.getAvailableDrivers(date);
@@ -49,7 +47,7 @@ public class TripController {
 
     @PostMapping("/api/trip-drafts/{id}/assign")
     @Operation(summary = "Assign vehicle + driver to trip draft → create Trip")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<TripResponse>> assignVehicleAndDriver(
             @PathVariable Long id,
             @Valid @RequestBody TripAssignRequest request) {
@@ -61,7 +59,7 @@ public class TripController {
 
     @PostMapping("/api/trip-drafts/{id}/assign-split")
     @Operation(summary = "Split-assign trip draft into multiple trips (BR-07)")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<TripSplitResponse>> assignSplit(
             @PathVariable Long id,
             @Valid @RequestBody TripSplitAssignRequest request) {
@@ -73,29 +71,25 @@ public class TripController {
 
     @GetMapping("/api/trips")
     @Operation(summary = "Get trips by trip draft ID")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<List<TripResponse>>> getTripsByTripDraftId(
             @RequestParam Long tripDraftId) {
         List<TripResponse> trips = tripService.getTripsByTripDraftId(tripDraftId);
         return ResponseEntity.ok(ApiResponse.success(trips));
     }
 
-    // ── US-15 TASK-03 — Fleet Capacity Check (BR-08) ──────────────
-
     @GetMapping("/api/fleet/capacity-check")
     @Operation(summary = "Check fleet capacity for a delivery date (BR-08)")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<FleetCapacityCheckResponse>> checkFleetCapacity(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         FleetCapacityCheckResponse response = tripService.checkFleetCapacity(date);
         return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     }
 
-    // ── US-16 TASK-02 — Dispatch ──────────────────────────────────
-
     @PostMapping("/api/trips/{id}/dispatch")
     @Operation(summary = "Dispatch trip — lock and generate handover slip")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<TripResponse>> dispatchTrip(@PathVariable Long id) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         TripResponse response = tripService.dispatchTrip(id, username);
@@ -104,7 +98,7 @@ public class TripController {
 
     @GetMapping(value = "/api/trips/{id}/handover-slip", produces = MediaType.TEXT_HTML_VALUE)
     @Operation(summary = "Get handover slip as HTML for printing")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<String> getHandoverSlip(@PathVariable Long id) {
         String html = tripService.getHandoverSlipHtml(id);
         return ResponseEntity.ok(html);
@@ -112,7 +106,7 @@ public class TripController {
 
     @GetMapping("/api/trips/{tripId}")
     @Operation(summary = "Get trip detail by trip ID")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF', 'DRIVER')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<TripResponse>> getTripById(@PathVariable Long tripId) {
         TripResponse response = tripService.getTripById(tripId);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -120,7 +114,7 @@ public class TripController {
 
     @PatchMapping("/api/trips/{id}/assignment")
     @Operation(summary = "Update vehicle and driver assignment for a validated trip before dispatch")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<TripResponse>> updateAssignment(
             @PathVariable Long id,
             @Valid @RequestBody TripAssignmentPatchRequest request) {
@@ -129,11 +123,9 @@ public class TripController {
         return ResponseEntity.ok(ApiResponse.success(response, "Assignment updated successfully."));
     }
 
-    // ── US-16 — Driver view ───────────────────────────────────────
-
     @GetMapping("/api/trips/my-trips")
     @Operation(summary = "Driver view: get trips assigned to current driver")
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<List<TripResponse>>> getMyTrips(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) String status) {
@@ -142,4 +134,3 @@ public class TripController {
         return ResponseEntity.ok(ApiResponse.success(trips));
     }
 }
-

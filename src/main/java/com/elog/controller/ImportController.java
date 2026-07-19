@@ -35,7 +35,7 @@ public class ImportController {
 
     @PostMapping(consumes = "multipart/form-data")
     @Operation(summary = "Upload Excel file to import orders for a delivery date")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('order:import')")
     public ResponseEntity<?> importOrders(
             @RequestParam("file") MultipartFile file,
             @RequestParam("deliveryDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
@@ -66,7 +66,7 @@ public class ImportController {
 
     @GetMapping
     @Operation(summary = "Get import batch history (paginated, optionally filter by date)")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('order:import', 'trip:read')")
     public ResponseEntity<ApiResponse<List<ImportBatchResponse>>> getBatches(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -77,7 +77,7 @@ public class ImportController {
 
     @GetMapping("/{batchId}")
     @Operation(summary = "Get import batch detail by ID")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('order:import', 'trip:read')")
     public ResponseEntity<ApiResponse<ImportBatchResponse>> getBatchById(@PathVariable Long batchId) {
         ImportBatchResponse response = importService.getBatchById(batchId);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -85,7 +85,7 @@ public class ImportController {
 
     @GetMapping("/{batchId}/errors")
     @Operation(summary = "Get error list for a specific import batch (paginated & filterable)")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('order:import', 'trip:read')")
     public ResponseEntity<ApiResponse<List<ImportErrorResponse>>> getBatchErrors(
             @PathVariable Long batchId,
             @RequestParam(value = "errorCode", required = false) String errorCode,
@@ -96,7 +96,7 @@ public class ImportController {
 
     @GetMapping("/{batchId}/errors/export")
     @Operation(summary = "Export error list to Excel file")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('order:import', 'trip:read')")
     public ResponseEntity<byte[]> exportBatchErrors(@PathVariable Long batchId) {
         byte[] content = importService.exportBatchErrors(batchId);
         org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
