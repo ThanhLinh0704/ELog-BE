@@ -1,12 +1,11 @@
 package com.elog.entity;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import jakarta.persistence.*;
 import lombok.*;
 
-/**
- * Role entity — values: ADMIN, DISPATCHER, WAREHOUSE_STAFF, DRIVER, LOGISTICS_MANAGER.
- * Seeded by V2__seed_reference_data.sql; do NOT add/remove at runtime.
- */
 @Entity
 @Table(name = "roles")
 @Getter
@@ -22,4 +21,9 @@ public class Role {
 
     @Column(nullable = false, unique = true, length = 50)
     private String name;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "role_permissions", joinColumns = @JoinColumn(name = "role_id"), inverseJoinColumns = @JoinColumn(name = "permission_id"))
+    @Builder.Default
+    private Set<Permission> permissions = new HashSet<>();
 }

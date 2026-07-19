@@ -32,7 +32,7 @@ public class VehicleController {
 
     @PostMapping
     @Operation(summary = "Register a new vehicle")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('vehicle:write')")
     public ResponseEntity<ApiResponse<VehicleResponse>> createVehicle(
             @Valid @RequestBody VehicleCreateRequest request) {
         VehicleResponse response = vehicleService.createVehicle(request);
@@ -42,7 +42,7 @@ public class VehicleController {
 
     @GetMapping("/fleet-capacity")
     @Operation(summary = "Get total active fleet capacity")
-    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('vehicle:read', 'vehicle:write')")
     public ResponseEntity<ApiResponse<VehicleFleetCapacityResponse>> getFleetCapacity() {
         VehicleFleetCapacityResponse response = vehicleService.getFleetCapacity();
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -50,7 +50,7 @@ public class VehicleController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get vehicle detail by ID")
-    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('vehicle:read', 'vehicle:write')")
     public ResponseEntity<ApiResponse<VehicleResponse>> getVehicleById(@PathVariable Long id) {
         VehicleResponse response = vehicleService.getVehicleById(id);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -58,7 +58,7 @@ public class VehicleController {
 
     @GetMapping
     @Operation(summary = "Get paginated and filtered vehicle list")
-    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('vehicle:read', 'vehicle:write')")
     public ResponseEntity<ApiResponse<List<VehicleListItemResponse>>> getAllVehicles(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isActive,
@@ -72,7 +72,7 @@ public class VehicleController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update vehicle information (plate number is immutable)")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('vehicle:write')")
     public ResponseEntity<ApiResponse<VehicleResponse>> updateVehicle(
             @PathVariable Long id,
             @Valid @RequestBody VehicleUpdateRequest request) {
@@ -82,7 +82,7 @@ public class VehicleController {
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Activate or deactivate a vehicle")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('vehicle:write')")
     public ResponseEntity<ApiResponse<VehicleResponse>> updateVehicleStatus(
             @PathVariable Long id,
             @Valid @RequestBody VehicleStatusUpdateRequest request) {

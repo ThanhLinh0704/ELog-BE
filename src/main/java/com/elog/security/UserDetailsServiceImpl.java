@@ -9,6 +9,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -27,10 +28,16 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                                 .orElseThrow(() -> new UsernameNotFoundException(
                                                 "User not found or inactive: " + username));
 
-                // Duyệt qua tập hợp roles và map thành danh sách GrantedAuthority
-                List<SimpleGrantedAuthority> authorities = user.getRoles().stream()
-                                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName()))
-                                .toList();
+                // Duyệt qua tập hợp roles để lấy vai trò và các quyền tương ứng
+                List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                user.getRoles().forEach(role -> {
+                        authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
+                        if (role.getPermissions() != null) {
+                                role.getPermissions().forEach(permission -> {
+                                        authorities.add(new SimpleGrantedAuthority(permission.getName()));
+                                });
+                        }
+                });
 
                 return org.springframework.security.core.userdetails.User
                                 .withUsername(user.getUsername())

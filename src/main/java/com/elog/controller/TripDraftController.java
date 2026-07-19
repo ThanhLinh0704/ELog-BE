@@ -37,7 +37,7 @@ public class TripDraftController {
 
     @PostMapping("/consolidate")
     @Operation(summary = "Trigger consolidation for all routes on a delivery date")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('trip:write')")
     public ResponseEntity<ApiResponse<ConsolidateResponse>> consolidate(
             @Valid @RequestBody ConsolidateRequest request) {
         ConsolidateResponse response = tripDraftService.consolidate(request.getDeliveryDate());
@@ -46,18 +46,17 @@ public class TripDraftController {
 
     @GetMapping
     @Operation(summary = "Get trip drafts by delivery date (paginated)")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<List<TripDraftResponse>>> getTripDrafts(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
             @PageableDefault(size = 20) Pageable pageable) {
-        ApiResponse<List<TripDraftResponse>> response =
-                tripDraftService.getTripDrafts(deliveryDate, pageable);
+        ApiResponse<List<TripDraftResponse>> response = tripDraftService.getTripDrafts(deliveryDate, pageable);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get trip draft detail with active/skipped stop list")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<TripDraftResponse>> getTripDraftById(
             @PathVariable Long id) {
         TripDraftResponse response = tripDraftService.getTripDraftById(id);
@@ -68,7 +67,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}/stops")
     @Operation(summary = "Get all stops (active + skipped) for trip draft review")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<TripDraftResponse>> getStopsForReview(
             @PathVariable Long id) {
         TripDraftResponse response = tripDraftService.getStopsForReview(id);
@@ -77,7 +76,7 @@ public class TripDraftController {
 
     @PatchMapping("/{id}/stops/{stopId}")
     @Operation(summary = "Toggle active/skipped status for a stop")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:write')")
     public ResponseEntity<ApiResponse<TripDraftStopResponse>> updateStop(
             @PathVariable Long id,
             @PathVariable Long stopId,
@@ -89,7 +88,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}/stops/{stopId}/order-items")
     @Operation(summary = "Get order items detail for a specific trip draft stop")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<List<StopOrderItemResponse>>> getStopOrderItems(
             @PathVariable Long id,
             @PathVariable Long stopId) {
@@ -99,7 +98,7 @@ public class TripDraftController {
 
     @PostMapping("/{id}/recalculate-eta")
     @Operation(summary = "Recalculate ETA for all active stops using Haversine")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:write')")
     public ResponseEntity<ApiResponse<RecalculateEtaResponse>> recalculateEta(
             @PathVariable Long id,
             @Valid @RequestBody RecalculateEtaRequest request) {
@@ -109,7 +108,7 @@ public class TripDraftController {
 
     @PostMapping("/{id}/confirm")
     @Operation(summary = "Confirm trip draft — DC-07 gate (DRAFT → PLANNED)")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:confirm')")
     public ResponseEntity<ApiResponse<ConfirmResponse>> confirmTripDraft(
             @PathVariable Long id) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -119,7 +118,7 @@ public class TripDraftController {
 
     @PostMapping("/{id}/revert")
     @Operation(summary = "Revert trip draft — (PLANNED/VALIDATED → DRAFT)")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:confirm')")
     public ResponseEntity<ApiResponse<Void>> revertToDraft(
             @PathVariable Long id) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -131,7 +130,7 @@ public class TripDraftController {
 
     @PostMapping("/{id}/validate-capacity")
     @Operation(summary = "Trigger capacity validation for a trip draft against the vehicle fleet")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('trip:confirm')")
     public ResponseEntity<ApiResponse<CapacityValidationResultResponse>> validateCapacity(
             @PathVariable Long id) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -141,7 +140,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}/validation-result")
     @Operation(summary = "Get stored capacity validation result")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF', 'SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<CapacityValidationResultResponse>> getValidationResult(
             @PathVariable Long id) {
         CapacityValidationResultResponse response = capacityValidationService.getValidationResult(id);
@@ -152,7 +151,7 @@ public class TripDraftController {
 
     @PostMapping("/{id}/generate-manifest")
     @Operation(summary = "Generate LIFO loading manifest for a validated trip draft")
-    @PreAuthorize("hasRole('DISPATCHER')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<ManifestResponse>> generateManifest(
             @PathVariable Long id) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -163,7 +162,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}/manifest")
     @Operation(summary = "Get LIFO manifest flat list for a trip draft")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<ManifestResponse>> getManifest(
             @PathVariable Long id) {
         ManifestResponse response = manifestService.getManifest(id);
@@ -172,7 +171,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}/manifest/by-stop")
     @Operation(summary = "Get LIFO manifest grouped by stop (for Warehouse Staff)")
-    @PreAuthorize("hasAnyRole('DISPATCHER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<ManifestByStopResponse>> getManifestByStop(
             @PathVariable Long id) {
         ManifestByStopResponse response = manifestService.getManifestByStop(id);

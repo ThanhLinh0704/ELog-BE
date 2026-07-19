@@ -43,11 +43,13 @@ public class AuthServiceImpl implements AuthService {
     public TokenResponse login(LoginRequest request) {
         // 1. Kiểm tra tài khoản tồn tại
         User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS, "Invalid username or password", HttpStatus.UNAUTHORIZED));
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS, "Invalid username or password",
+                        HttpStatus.UNAUTHORIZED));
 
-        // 2. Kiểm tra mật khẩu trước (đảm bảo nếu nhập sai mật khẩu của tài khoản bị khóa vẫn báo sai tài khoản/mật khẩu)
+        // 2. Kiểm tra mật khẩu
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "Invalid username or password", HttpStatus.UNAUTHORIZED);
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "Invalid username or password",
+                    HttpStatus.UNAUTHORIZED);
         }
 
         // 3. Kiểm tra tài khoản có hoạt động không
@@ -60,7 +62,8 @@ public class AuthServiceImpl implements AuthService {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
         } catch (Exception e) {
-            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "Invalid username or password", HttpStatus.UNAUTHORIZED);
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "Invalid username or password",
+                    HttpStatus.UNAUTHORIZED);
         }
 
         // 3. Xóa các Refresh Token cũ của user này trước khi tạo mới (tránh rác DB)
@@ -80,6 +83,11 @@ public class AuthServiceImpl implements AuthService {
                 .userId(user.getId())
                 .username(user.getUsername())
                 .roles(user.getRoles().stream().map(role -> role.getName()).collect(Collectors.toList()))
+                .permissions(user.getRoles().stream()
+                        .filter(role -> role.getPermissions() != null)
+                        .flatMap(role -> role.getPermissions().stream())
+                        .map(permission -> permission.getName())
+                        .collect(Collectors.toList()))
                 .build();
     }
 
@@ -90,12 +98,14 @@ public class AuthServiceImpl implements AuthService {
 
         // Tìm Refresh Token trong DB
         RefreshToken refreshToken = refreshTokenRepository.findByToken(requestRefreshToken)
-                .orElseThrow(() -> new BusinessException(ErrorCode.TOKEN_INVALID, "Refresh token is not in database!", HttpStatus.UNAUTHORIZED));
+                .orElseThrow(() -> new BusinessException(ErrorCode.TOKEN_INVALID, "Refresh token is not in database!",
+                        HttpStatus.UNAUTHORIZED));
 
         // Kiểm tra xem Refresh Token đã hết hạn chưa
         if (refreshToken.getExpiryDate().isBefore(Instant.now())) {
             refreshTokenRepository.delete(refreshToken);
-            throw new BusinessException(ErrorCode.TOKEN_EXPIRED, "Refresh token was expired. Please make a new signin request",
+            throw new BusinessException(ErrorCode.TOKEN_EXPIRED,
+                    "Refresh token was expired. Please make a new signin request",
                     HttpStatus.UNAUTHORIZED);
         }
 

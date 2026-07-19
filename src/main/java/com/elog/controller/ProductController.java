@@ -30,7 +30,7 @@ public class ProductController {
 
     @PostMapping
     @Operation(summary = "Create a new product")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('product:write')")
     public ResponseEntity<ApiResponse<ProductResponse>> createProduct(
             @Valid @RequestBody ProductCreateRequest request) {
         ProductResponse response = productService.createProduct(request);
@@ -40,7 +40,7 @@ public class ProductController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get product detail by ID")
-    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAuthority('product:read')")
     public ResponseEntity<ApiResponse<ProductResponse>> getProductById(@PathVariable Long id) {
         ProductResponse response = productService.getProductById(id);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -48,7 +48,7 @@ public class ProductController {
 
     @GetMapping("/by-sku/{sku}")
     @Operation(summary = "Look up product by SKU — returns 200 even if inactive (caller checks isActive)")
-    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAuthority('product:read')")
     public ResponseEntity<ApiResponse<ProductResponse>> getProductBySku(@PathVariable String sku) {
         ProductResponse response = productService.getProductBySku(sku);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -56,7 +56,7 @@ public class ProductController {
 
     @GetMapping
     @Operation(summary = "Get paginated and filtered product list")
-    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAuthority('product:read')")
     public ResponseEntity<ApiResponse<List<ProductListItemResponse>>> getAllProducts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isActive,
@@ -68,7 +68,7 @@ public class ProductController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update product information (SKU is immutable)")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('product:write')")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
             @PathVariable Long id,
             @Valid @RequestBody ProductUpdateRequest request) {
@@ -78,7 +78,7 @@ public class ProductController {
 
     @PatchMapping("/{id}/status")
     @Operation(summary = "Activate or deactivate a product")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAuthority('product:write')")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProductStatus(
             @PathVariable Long id,
             @Valid @RequestBody ProductStatusUpdateRequest request) {

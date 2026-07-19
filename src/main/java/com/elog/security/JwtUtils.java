@@ -36,6 +36,11 @@ public class JwtUtils {
         claims.put("roles", user.getRoles().stream()
                 .map(role -> role.getName())
                 .collect(Collectors.toList()));
+        claims.put("permissions", user.getRoles().stream()
+                .filter(role -> role.getPermissions() != null)
+                .flatMap(role -> role.getPermissions().stream())
+                .map(permission -> permission.getName())
+                .collect(Collectors.toSet()));
 
         return Jwts.builder()
                 .setClaims(claims)

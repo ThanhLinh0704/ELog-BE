@@ -23,7 +23,7 @@ public class TripMonitoringController {
      */
     @PostMapping("/api/trips/{id}/start")
     @Operation(summary = "Driver starts trip: DISPATCHED → IN_PROGRESS")
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<TripStartResponse>> startTrip(@PathVariable Long id) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         TripStartResponse response = tripMonitoringService.startTrip(id, username);
@@ -37,7 +37,7 @@ public class TripMonitoringController {
      */
     @PostMapping("/api/trip-stops/{id}/arrive")
     @Operation(summary = "Driver arrives at stop: PENDING → IN_PROGRESS. Auto-flags TIME_EXCEPTION if late (BR-09)")
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<StopArriveResponse>> arriveAtStop(@PathVariable Long id) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         StopArriveResponse response = tripMonitoringService.arriveAtStop(id, username);
@@ -51,7 +51,7 @@ public class TripMonitoringController {
      */
     @PostMapping("/api/trip-stops/{id}/complete")
     @Operation(summary = "Driver completes stop: IN_PROGRESS → COMPLETED. Trip auto-completes if last stop done")
-    @PreAuthorize("hasRole('DRIVER')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<StopCompleteResponse>> completeStop(@PathVariable Long id) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         StopCompleteResponse response = tripMonitoringService.completeStop(id, username);
