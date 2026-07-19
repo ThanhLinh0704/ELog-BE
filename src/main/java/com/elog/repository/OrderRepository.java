@@ -18,6 +18,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             @Param("orderRef") String orderRef,
             @Param("storeId") Long storeId);
 
+    @Query("SELECT o FROM Order o WHERE o.orderRef = :orderRef AND o.deliveryDate = :deliveryDate AND o.importBatch.isActive = true")
+    Optional<Order> findActiveByOrderRefAndDeliveryDate(
+            @Param("orderRef") String orderRef,
+            @Param("deliveryDate") LocalDate deliveryDate);
+
     @Query("SELECT COUNT(o) FROM Order o WHERE o.importBatch.id = :batchId")
     long countByBatchId(@Param("batchId") Long batchId);
 
@@ -34,5 +39,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("UPDATE Order o SET o.tripDraft.id = :tripDraftId WHERE o.id IN :orderIds")
     void updateTripDraftId(@Param("orderIds") List<Long> orderIds,
                            @Param("tripDraftId") Long tripDraftId);
+
+    @Query("SELECT o FROM Order o WHERE o.tripDraft.id = :tripDraftId")
+    List<Order> findByTripDraftId(@Param("tripDraftId") Long tripDraftId);
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "JOIN FETCH o.store s " +
+           "LEFT JOIN FETCH o.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "WHERE o.importBatch.id = :batchId " +
+           "ORDER BY o.orderRef ASC, i.sku ASC")
+    List<Order> findByImportBatchId(@Param("batchId") Long batchId);
 }
 

@@ -36,4 +36,13 @@ public class ProductUpdateRequest {
     @DecimalMin(value = "0.0001", inclusive = true, message = "INVALID_FORMAT")
     @Digits(integer = 4, fraction = 4, message = "INVALID_FORMAT")
     private BigDecimal heightM;
+
+    private String shape;
+
+    private Boolean isFragile;
+
+    @Size(max = 512, message = "INVALID_SIZE")
+    private String packageImageUrl;
+
+    private String description;
 }

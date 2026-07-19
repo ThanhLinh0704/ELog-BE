@@ -29,12 +29,13 @@ public class StoreSpecification {
 
     public static Specification<Store> hasRoute(Boolean hasRoute) {
         return (root, query, cb) -> {
-            if (hasRoute == null) return null;
+            // Bypass hasRoute=false filtering to allow assigning a store to multiple routes
+            if (hasRoute == null || !hasRoute) return null;
             Subquery<Long> sub = query.subquery(Long.class);
             Root<RouteStop> rs = sub.from(RouteStop.class);
             sub.select(rs.get("id"))
                .where(cb.equal(rs.get("store").get("id"), root.get("id")));
-            return hasRoute ? cb.exists(sub) : cb.not(cb.exists(sub));
+            return cb.exists(sub);
         };
     }
 }

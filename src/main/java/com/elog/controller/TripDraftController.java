@@ -87,6 +87,16 @@ public class TripDraftController {
                 "Stop updated. ETA recalculation required — call POST /recalculate-eta."));
     }
 
+    @GetMapping("/{id}/stops/{stopId}/order-items")
+    @Operation(summary = "Get order items detail for a specific trip draft stop")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')")
+    public ResponseEntity<ApiResponse<List<StopOrderItemResponse>>> getStopOrderItems(
+            @PathVariable Long id,
+            @PathVariable Long stopId) {
+        List<StopOrderItemResponse> response = tripDraftService.getStopOrderItems(id, stopId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @PostMapping("/{id}/recalculate-eta")
     @Operation(summary = "Recalculate ETA for all active stops using Haversine")
     @PreAuthorize("hasRole('DISPATCHER')")
@@ -105,6 +115,16 @@ public class TripDraftController {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         ConfirmResponse response = tripDraftService.confirmTripDraft(id, currentUsername);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/{id}/revert")
+    @Operation(summary = "Revert trip draft — (PLANNED/VALIDATED → DRAFT)")
+    @PreAuthorize("hasRole('DISPATCHER')")
+    public ResponseEntity<ApiResponse<Void>> revertToDraft(
+            @PathVariable Long id) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        tripDraftService.revertToDraft(id, currentUsername);
+        return ResponseEntity.ok(ApiResponse.success(null, "Trip draft reverted to DRAFT successfully."));
     }
 
     // ── US-12 endpoints ──────────────────────────────────────────

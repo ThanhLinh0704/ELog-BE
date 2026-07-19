@@ -46,6 +46,19 @@ public class Product {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(name = "shape", length = 100)
+    private String shape;
+
+    @Column(name = "is_fragile", nullable = false)
+    @Builder.Default
+    private Boolean isFragile = false;
+
+    @Column(name = "package_image_url", length = 512)
+    private String packageImageUrl;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

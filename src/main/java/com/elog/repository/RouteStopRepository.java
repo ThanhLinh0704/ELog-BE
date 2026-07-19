@@ -9,6 +9,7 @@ import java.util.Optional;
 
 public interface RouteStopRepository extends JpaRepository<RouteStop, Long> {
     Optional<RouteStop> findFirstByStoreId(Long storeId);
+    List<RouteStop> findAllByStoreId(Long storeId);
     boolean existsByStoreIdAndRouteIsActiveTrue(Long storeId);
 
     List<RouteStop> findByRouteIdOrderBySequenceOrderAsc(Long routeId);

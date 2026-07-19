@@ -41,6 +41,13 @@ public class VehicleServiceImpl implements VehicleService {
                     "Vehicle plate already exists: " + normalizedPlate, HttpStatus.CONFLICT);
         }
 
+        if (request.getVehicleCode() != null && vehicleRepository.existsByVehicleCode(request.getVehicleCode().trim())) {
+            throw new BusinessException(ErrorCode.VEHICLE_CODE_DUPLICATE,
+                    "Vehicle code already exists: " + request.getVehicleCode().trim(), HttpStatus.CONFLICT);
+        }
+
+        validateVehicleCapacityRatio(request.getPayloadKg(), request.getMaxVolumeM3());
+
         Vehicle vehicle = vehicleMapper.toEntity(request);
         Vehicle saved = vehicleRepository.save(vehicle);
         return vehicleMapper.toResponse(saved);
@@ -103,9 +110,25 @@ public class VehicleServiceImpl implements VehicleService {
 
         // plateNumber is intentionally immutable. If a real plate changes, deactivate
         // the old vehicle and create a new vehicle record to preserve trip history.
+        validateVehicleCapacityRatio(request.getPayloadKg(), request.getMaxVolumeM3());
+
         vehicle.setVehicleType(request.getVehicleType());
-        vehicle.setMaxWeightKg(request.getMaxWeightKg());
+        vehicle.setVehicleClass(request.getVehicleClass());
+        vehicle.setPayloadKg(request.getPayloadKg());
+        vehicle.setGrossVehicleWeightKg(request.getGrossVehicleWeightKg());
+        vehicle.setRequiredLicense(request.getRequiredLicense());
         vehicle.setMaxVolumeM3(request.getMaxVolumeM3());
+        vehicle.setCargoLengthMm(request.getCargoLengthMm());
+        vehicle.setCargoWidthMm(request.getCargoWidthMm());
+        vehicle.setCargoHeightMm(request.getCargoHeightMm());
+        vehicle.setAverageSpeedKmh(request.getAverageSpeedKmh());
+        vehicle.setCostPerKm(request.getCostPerKm());
+        if (request.getStatus() != null) {
+            vehicle.setStatus(request.getStatus());
+        }
+        vehicle.setImageUrl(request.getImageUrl());
+        vehicle.setPermitInfo(request.getPermitInfo());
+        vehicle.setDescription(request.getDescription());
 
         Vehicle saved = vehicleRepository.save(vehicle);
         return vehicleMapper.toResponse(saved);
@@ -131,5 +154,19 @@ public class VehicleServiceImpl implements VehicleService {
 
     private BigDecimal zeroIfNull(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private void validateVehicleCapacityRatio(BigDecimal maxWeightKg, BigDecimal maxVolumeM3) {
+        if (maxWeightKg != null && maxVolumeM3 != null) {
+            double volume = maxVolumeM3.doubleValue();
+            if (volume > 0) {
+                double ratio = maxWeightKg.doubleValue() / volume;
+                if (ratio < 80.0 || ratio > 1500.0) {
+                    throw new BusinessException(ErrorCode.INVALID_CAPACITY_RATIO,
+                            "Tỷ lệ tải trọng/thể tích của xe không hợp lý (80-1500 kg/m³). Khai báo hiện tại: " + Math.round(ratio) + " kg/m³.",
+                            HttpStatus.BAD_REQUEST);
+                }
+            }
+        }
     }
 }

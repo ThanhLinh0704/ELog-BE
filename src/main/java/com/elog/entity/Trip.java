@@ -70,6 +70,7 @@ public class Trip {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;

@@ -17,4 +17,8 @@ public class StoreListItemResponse {
     private Boolean isActive;
     private Boolean hasCoordinates;
     private AssignedRouteDto assignedRoute;
+    private java.util.List<AssignedRouteDto> assignedRoutes;
+    private String allowedDeliveryHours;
+    private java.math.BigDecimal maxAllowedVehicleWeight;
+    private String imageUrl;
 }

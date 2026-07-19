@@ -34,6 +34,8 @@ class TripDraftServiceImplTest {
     private TripDraftStopRepository tripDraftStopRepository;
     @Mock
     private RouteRepository routeRepository;
+    @Mock
+    private OrderItemRepository orderItemRepository;
 
     @InjectMocks
     private TripDraftServiceImpl tripDraftService;
@@ -353,5 +355,68 @@ class TripDraftServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.NOT_FOUND)
                 .hasMessageContaining("Trip Draft not found");
+    }
+
+    @Test
+    void getStopOrderItems_success() {
+        TripDraft draft = TripDraft.builder().id(50L).build();
+        Store store = Store.builder().id(1L).code("ST-001").name("Store 1").build();
+        TripDraftStop stop = TripDraftStop.builder()
+                .id(100L)
+                .tripDraft(draft)
+                .store(store)
+                .build();
+
+        Product product = Product.builder().id(10L).sku("SKU-001").productName("TV LG").build();
+        Order order = Order.builder().id(200L).orderRef("DH-001").build();
+        OrderItem item = OrderItem.builder()
+                .id(300L)
+                .order(order)
+                .product(product)
+                .sku("SKU-001")
+                .quantity(5)
+                .lineWeightKg(BigDecimal.valueOf(150.0))
+                .lineVolumeM3(BigDecimal.valueOf(1.2))
+                .build();
+
+        when(tripDraftStopRepository.findById(100L)).thenReturn(Optional.of(stop));
+        when(orderItemRepository.findByStopForManifest(1L, 50L)).thenReturn(List.of(item));
+
+        List<StopOrderItemResponse> response = tripDraftService.getStopOrderItems(50L, 100L);
+
+        assertThat(response).hasSize(1);
+        StopOrderItemResponse resItem = response.get(0);
+        assertThat(resItem.getOrderRef()).isEqualTo("DH-001");
+        assertThat(resItem.getSku()).isEqualTo("SKU-001");
+        assertThat(resItem.getProductName()).isEqualTo("TV LG");
+        assertThat(resItem.getQuantity()).isEqualTo(5);
+        assertThat(resItem.getWeightKg()).isEqualByComparingTo(BigDecimal.valueOf(150.0));
+        assertThat(resItem.getVolumeM3()).isEqualByComparingTo(BigDecimal.valueOf(1.2));
+    }
+
+    @Test
+    void getStopOrderItems_stopNotFound_throwsNotFound() {
+        when(tripDraftStopRepository.findById(100L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> tripDraftService.getStopOrderItems(50L, 100L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.NOT_FOUND)
+                .hasMessageContaining("TripDraftStop not found");
+    }
+
+    @Test
+    void getStopOrderItems_mismatchDraftId_throwsNotFound() {
+        TripDraft draft = TripDraft.builder().id(99L).build(); // different draft ID
+        TripDraftStop stop = TripDraftStop.builder()
+                .id(100L)
+                .tripDraft(draft)
+                .build();
+
+        when(tripDraftStopRepository.findById(100L)).thenReturn(Optional.of(stop));
+
+        assertThatThrownBy(() -> tripDraftService.getStopOrderItems(50L, 100L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.NOT_FOUND)
+                .hasMessageContaining("does not belong to Trip Draft");
     }
 }

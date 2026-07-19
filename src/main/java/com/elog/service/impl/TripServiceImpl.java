@@ -54,12 +54,12 @@ public class TripServiceImpl implements TripService {
         List<IneligibleVehicleDto> ineligibleVehicles = new ArrayList<>();
 
         for (Vehicle v : activeVehicles) {
-            if (v.getMaxVolumeM3() == null || v.getMaxWeightKg() == null) {
+            if (v.getMaxVolumeM3() == null || v.getPayloadKg() == null) {
                 continue;
             }
 
             boolean volumeOk = v.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) >= 0;
-            boolean weightOk = v.getMaxWeightKg().compareTo(td.getTotalWeightKg()) >= 0;
+            boolean weightOk = v.getPayloadKg().compareTo(td.getTotalWeightKg()) >= 0;
 
             if (volumeOk && weightOk) {
                 eligibleVehicles.add(EligibleVehicleDto.builder()
@@ -67,9 +67,9 @@ public class TripServiceImpl implements TripService {
                         .plateNumber(v.getPlateNumber())
                         .vehicleType(v.getVehicleType())
                         .maxVolumeM3(v.getMaxVolumeM3())
-                        .maxWeightKg(v.getMaxWeightKg())
+                        .maxWeightKg(v.getPayloadKg())
                         .remainingVolumeM3(v.getMaxVolumeM3().subtract(td.getTotalVolumeM3()))
-                        .remainingWeightKg(v.getMaxWeightKg().subtract(td.getTotalWeightKg()))
+                        .remainingWeightKg(v.getPayloadKg().subtract(td.getTotalWeightKg()))
                         .build());
             } else {
                 StringBuilder reason = new StringBuilder();
@@ -80,7 +80,7 @@ public class TripServiceImpl implements TripService {
                 if (!weightOk) {
                     if (reason.length() > 0) reason.append(" and ");
                     reason.append("Weight exceeds capacity (")
-                          .append(td.getTotalWeightKg()).append(" kg > ").append(v.getMaxWeightKg()).append(" kg)");
+                          .append(td.getTotalWeightKg()).append(" kg > ").append(v.getPayloadKg()).append(" kg)");
                 }
 
                 ineligibleVehicles.add(IneligibleVehicleDto.builder()
@@ -88,7 +88,7 @@ public class TripServiceImpl implements TripService {
                         .plateNumber(v.getPlateNumber())
                         .vehicleType(v.getVehicleType())
                         .maxVolumeM3(v.getMaxVolumeM3())
-                        .maxWeightKg(v.getMaxWeightKg())
+                        .maxWeightKg(v.getPayloadKg())
                         .volumeCheckResult(volumeOk ? ConstraintResult.PASS : ConstraintResult.FAIL)
                         .weightCheckResult(weightOk ? ConstraintResult.PASS : ConstraintResult.FAIL)
                         .failureReason(reason.toString())
@@ -153,11 +153,21 @@ public class TripServiceImpl implements TripService {
 
         // Guard 2: Vehicle must be eligible (dual-constraint)
         if (vehicle.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) < 0
-                || vehicle.getMaxWeightKg().compareTo(td.getTotalWeightKg()) < 0) {
+                || vehicle.getPayloadKg().compareTo(td.getTotalWeightKg()) < 0) {
             throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
                     "Vehicle " + vehicle.getPlateNumber()
                             + " does not meet dual-constraint requirements for this trip.",
                     HttpStatus.BAD_REQUEST);
+        }
+
+        // Guard 2.5: Driver license class must be compatible with vehicle's required license
+        if (vehicle.getRequiredLicense() != null) {
+            if (driver.getLicenseClass() == null || driver.getLicenseClass().ordinal() < vehicle.getRequiredLicense().ordinal()) {
+                throw new BusinessException(ErrorCode.DRIVER_LICENSE_INCOMPATIBLE,
+                        "Driver " + driver.getFullName() + " license class (" + (driver.getLicenseClass() != null ? driver.getLicenseClass() : "None") +
+                        ") is insufficient for vehicle required license (" + vehicle.getRequiredLicense() + ").",
+                        HttpStatus.BAD_REQUEST);
+            }
         }
 
         // Guard 3: Vehicle not busy on same day (NAC-04e)
@@ -275,12 +285,22 @@ public class TripServiceImpl implements TripService {
 
             // Validate vehicle capacity for this group
             if (vehicle.getMaxVolumeM3().compareTo(groupVolume) < 0
-                    || vehicle.getMaxWeightKg().compareTo(groupWeight) < 0) {
+                    || vehicle.getPayloadKg().compareTo(groupWeight) < 0) {
                 throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
                         "Vehicle " + vehicle.getPlateNumber()
                                 + " cannot carry the assigned stops (volume: " + groupVolume
                                 + " m³, weight: " + groupWeight + " kg).",
                         HttpStatus.BAD_REQUEST);
+            }
+
+            // Driver license class compatibility check
+            if (vehicle.getRequiredLicense() != null) {
+                if (driver.getLicenseClass() == null || driver.getLicenseClass().ordinal() < vehicle.getRequiredLicense().ordinal()) {
+                    throw new BusinessException(ErrorCode.DRIVER_LICENSE_INCOMPATIBLE,
+                            "Driver " + driver.getFullName() + " license class (" + (driver.getLicenseClass() != null ? driver.getLicenseClass() : "None") +
+                            ") is insufficient for vehicle required license (" + vehicle.getRequiredLicense() + ").",
+                            HttpStatus.BAD_REQUEST);
+                }
             }
 
             Trip trip = buildTrip(td, vehicle, driver, dispatcher, groupWeight, groupVolume);
@@ -655,10 +675,20 @@ public class TripServiceImpl implements TripService {
 
         // Guard 2: Capacity check (trip total load vs vehicle max capacity)
         if (vehicle.getMaxVolumeM3().compareTo(trip.getTotalVolumeM3()) < 0
-                || vehicle.getMaxWeightKg().compareTo(trip.getTotalWeightKg()) < 0) {
+                || vehicle.getPayloadKg().compareTo(trip.getTotalWeightKg()) < 0) {
             throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
                     "Vehicle " + vehicle.getPlateNumber() + " capacity is insufficient for the trip load.",
                     HttpStatus.BAD_REQUEST);
+        }
+
+        // Guard 2.5: Driver license class compatibility check
+        if (vehicle.getRequiredLicense() != null) {
+            if (driver.getLicenseClass() == null || driver.getLicenseClass().ordinal() < vehicle.getRequiredLicense().ordinal()) {
+                throw new BusinessException(ErrorCode.DRIVER_LICENSE_INCOMPATIBLE,
+                        "Driver " + driver.getFullName() + " license class (" + (driver.getLicenseClass() != null ? driver.getLicenseClass() : "None") +
+                        ") is insufficient for vehicle required license (" + vehicle.getRequiredLicense() + ").",
+                        HttpStatus.BAD_REQUEST);
+            }
         }
 
         // Guard 3: Vehicle busy check on the same day (excluding current trip)

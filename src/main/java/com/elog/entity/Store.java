@@ -26,8 +26,20 @@ public class Store {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(length = 255)
-    private String address;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "province_code", referencedColumnName = "code")
+    private Province province;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "district_code", referencedColumnName = "code")
+    private District district;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ward_code", referencedColumnName = "code")
+    private Ward ward;
+
+    @Column(name = "address_detail", length = 255)
+    private String addressDetail;
 
     @Column(name = "contact_name", length = 100)
     private String contactName;
@@ -44,6 +56,16 @@ public class Store {
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private Boolean isActive = true;
+
+    @Column(name = "allowed_delivery_hours", nullable = false)
+    @Builder.Default
+    private String allowedDeliveryHours = "All";
+
+    @Column(name = "max_allowed_vehicle_weight", precision = 10, scale = 3)
+    private java.math.BigDecimal maxAllowedVehicleWeight;
+
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

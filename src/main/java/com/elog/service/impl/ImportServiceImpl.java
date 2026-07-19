@@ -3,6 +3,7 @@ package com.elog.service.impl;
 import com.elog.dto.response.ApiResponse;
 import com.elog.dto.response.ImportBatchResponse;
 import com.elog.dto.response.ImportErrorResponse;
+import com.elog.dto.response.ImportedOrderDetailResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -50,16 +51,18 @@ public class ImportServiceImpl implements ImportService {
         // Step 2: Parse Excel rows (so size check throws BEFORE creating db batch)
         List<RowData> rows = parseExcelFile(file);
 
-        // Step 3: Check existing active batch for this delivery date
+        // Step 3: Handle existing active batches for this delivery date if replacing
         Optional<ImportBatch> existingBatch = batchRepository.findActiveByDate(deliveryDate);
         if (existingBatch.isPresent()) {
-            if (!confirmReplace) {
-                throw new DuplicateBatchException(existingBatch.get().getId(), deliveryDate);
+            log.info("Found existing active batch {} for date {}", existingBatch.get().getId(), deliveryDate);
+        }
+
+        if (confirmReplace) {
+            List<ImportBatch> activeBatches = batchRepository.findAllActiveByDate(deliveryDate);
+            for (ImportBatch oldBatch : activeBatches) {
+                oldBatch.setIsActive(false);
+                batchRepository.save(oldBatch);
             }
-            // Deactivate old batch (soft replace)
-            ImportBatch oldBatch = existingBatch.get();
-            oldBatch.setIsActive(false);
-            batchRepository.save(oldBatch);
             batchRepository.flush(); // Force update to DB before inserting new active batch to prevent UNIQUE constraint violation
         }
 
@@ -309,6 +312,10 @@ public class ImportServiceImpl implements ImportService {
                 data.storeCode = getCellStringValue(row.getCell(1));
                 data.sku = getCellStringValue(row.getCell(2));
                 data.quantityRaw = getCellStringValue(row.getCell(3));
+                data.deliveryTimeWindow = getCellStringValue(row.getCell(4));
+                data.recipientName = getCellStringValue(row.getCell(5));
+                data.recipientPhone = getCellStringValue(row.getCell(6));
+                data.notes = getCellStringValue(row.getCell(7));
                 rows.add(data);
             }
         } catch (BusinessException e) {
@@ -394,20 +401,37 @@ public class ImportServiceImpl implements ImportService {
 
         // Find or create Order
         String orderKey = orderRef + "|" + store.getId();
-        Order order = orderCache.computeIfAbsent(orderKey, k -> {
-            Optional<Order> existing = orderRepository.findByBatchAndOrderRefAndStore(
-                    batch.getId(), orderRef, store.getId());
-            return existing.orElseGet(() -> {
+        Order order = orderCache.get(orderKey);
+        if (order == null) {
+            Optional<Order> existingOrderOpt = orderRepository.findActiveByOrderRefAndDeliveryDate(orderRef, deliveryDate);
+            if (existingOrderOpt.isPresent()) {
+                Order existingOrder = existingOrderOpt.get();
+                existingOrder.setStore(store);
+                existingOrder.setDeliveryDate(deliveryDate);
+                existingOrder.setImportBatch(batch);
+                existingOrder.setDeliveryTimeWindow(row.deliveryTimeWindow);
+                existingOrder.setRecipientName(row.recipientName);
+                existingOrder.setRecipientPhone(row.recipientPhone);
+                existingOrder.setNotes(row.notes);
+                order = orderRepository.save(existingOrder);
+                
+                orderItemRepository.deleteByOrderId(order.getId());
+            } else {
                 Order newOrder = Order.builder()
                         .importBatch(batch)
                         .orderRef(orderRef)
                         .store(store)
                         .deliveryDate(deliveryDate)
+                        .deliveryTimeWindow(row.deliveryTimeWindow)
+                        .recipientName(row.recipientName)
+                        .recipientPhone(row.recipientPhone)
+                        .notes(row.notes)
                         .status("ACCEPTED")
                         .build();
-                return orderRepository.save(newOrder);
-            });
-        });
+                order = orderRepository.save(newOrder);
+            }
+            orderCache.put(orderKey, order);
+        }
 
         // Create or update OrderItem with snapshot (Accumulation for identical product in same order)
         String orderItemKey = order.getId() + "|" + product.getId();
@@ -496,6 +520,39 @@ public class ImportServiceImpl implements ImportService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ImportedOrderDetailResponse> getImportedOrders(Long batchId) {
+        // Verify batch exists
+        if (!batchRepository.existsById(batchId)) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+                    "Import batch not found: " + batchId, HttpStatus.NOT_FOUND);
+        }
+
+        List<Order> orders = orderRepository.findByImportBatchId(batchId);
+        List<ImportedOrderDetailResponse> results = new ArrayList<>();
+
+        for (Order order : orders) {
+            for (OrderItem item : order.getItems()) {
+                results.add(ImportedOrderDetailResponse.builder()
+                        .orderRef(order.getOrderRef())
+                        .storeCode(order.getStore().getCode())
+                        .storeName(order.getStore().getName())
+                        .sku(item.getSku())
+                        .productName(item.getProduct() != null ? item.getProduct().getProductName() : null)
+                        .quantity(item.getQuantity())
+                        .weightKg(item.getLineWeightKg())
+                        .volumeM3(item.getLineVolumeM3())
+                        .deliveryTimeWindow(order.getDeliveryTimeWindow())
+                        .recipientName(order.getRecipientName())
+                        .recipientPhone(order.getRecipientPhone())
+                        .notes(order.getNotes())
+                        .build());
+            }
+        }
+        return results;
+    }
+
     // ── Inner exception for per-row rejection ─────────────────────────────────
 
     private static class RowRejectedException extends RuntimeException {
@@ -525,9 +582,13 @@ public class ImportServiceImpl implements ImportService {
         String storeCode;
         String sku;
         String quantityRaw;
+        String deliveryTimeWindow;
+        String recipientName;
+        String recipientPhone;
+        String notes;
 
         String toRawString() {
-            return String.join(",", nvl(orderRef), nvl(storeCode), nvl(sku), nvl(quantityRaw));
+            return String.join(",", nvl(orderRef), nvl(storeCode), nvl(sku), nvl(quantityRaw), nvl(deliveryTimeWindow), nvl(recipientName), nvl(recipientPhone), nvl(notes));
         }
 
         private String nvl(String s) {

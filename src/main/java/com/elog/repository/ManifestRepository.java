@@ -11,6 +11,8 @@ public interface ManifestRepository extends JpaRepository<Manifest, Long> {
 
     boolean existsByTripDraftId(Long tripDraftId);
 
+    Optional<Manifest> findByTripDraftId(Long tripDraftId);
+
     @Query("SELECT m FROM Manifest m " +
            "JOIN FETCH m.tripDraft td " +
            "JOIN FETCH td.route " +

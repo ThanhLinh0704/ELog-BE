@@ -51,6 +51,18 @@ public class Order {
     @JoinColumn(name = "trip_draft_id")
     private TripDraft tripDraft;
 
+    @Column(name = "delivery_time_window", length = 100)
+    private String deliveryTimeWindow;
+
+    @Column(name = "recipient_name", length = 100)
+    private String recipientName;
+
+    @Column(name = "recipient_phone", length = 20)
+    private String recipientPhone;
+
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
