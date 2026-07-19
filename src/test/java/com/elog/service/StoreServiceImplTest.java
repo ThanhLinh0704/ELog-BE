@@ -5,10 +5,16 @@ import com.elog.dto.response.*;
 import com.elog.entity.Route;
 import com.elog.entity.RouteStop;
 import com.elog.entity.Store;
+import com.elog.entity.Province;
+import com.elog.entity.District;
+import com.elog.entity.Ward;
 import com.elog.exception.BusinessException;
 import com.elog.mapper.StoreMapper;
 import com.elog.repository.RouteStopRepository;
 import com.elog.repository.StoreRepository;
+import com.elog.repository.ProvinceRepository;
+import com.elog.repository.DistrictRepository;
+import com.elog.repository.WardRepository;
 import com.elog.service.impl.StoreServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,26 +38,42 @@ class StoreServiceImplTest {
     @Mock
     RouteStopRepository routeStopRepository;
     @Mock
+    ProvinceRepository provinceRepository;
+    @Mock
+    DistrictRepository districtRepository;
+    @Mock
+    WardRepository wardRepository;
+    @Mock
     StoreMapper storeMapper;
     @InjectMocks
     StoreServiceImpl storeService;
 
     private StoreCreateRequest validCreateRequest;
     private Store savedStore;
+    private Province prov;
+    private District dist;
+    private Ward ward;
 
     @BeforeEach
     void setUp() {
         validCreateRequest = new StoreCreateRequest();
         validCreateRequest.setStoreCode("ST-Q1-001");
         validCreateRequest.setStoreName("Dien May Test");
-        validCreateRequest.setAddress("10 Le Lai, Q.1, TP.HCM");
+        validCreateRequest.setProvinceCode("79");
+        validCreateRequest.setDistrictCode("760");
+        validCreateRequest.setWardCode("26740");
+        validCreateRequest.setAddressDetail("10 Le Lai");
         validCreateRequest.setContactPhone("0901234567");
         validCreateRequest.setLatitude(10.7756587);
         validCreateRequest.setLongitude(106.7004238);
 
+        prov = Province.builder().code("79").fullName("Thành phố Hồ Chí Minh").build();
+        dist = District.builder().code("760").fullName("Quận 1").province(prov).build();
+        ward = Ward.builder().code("26740").fullName("Phường Bến Nghé").district(dist).build();
+
         savedStore = Store.builder()
                 .id(1L).code("ST-Q1-001").name("Dien May Test")
-                .address("10 Le Lai, Q.1, TP.HCM").isActive(true)
+                .province(prov).district(dist).ward(ward).addressDetail("10 Le Lai").isActive(true)
                 .latitude(10.7756587).longitude(106.7004238)
                 .build();
     }
@@ -61,11 +83,14 @@ class StoreServiceImplTest {
     @Test
     void createStore_success() {
         when(storeRepository.existsByCode("ST-Q1-001")).thenReturn(false);
+        when(provinceRepository.findById("79")).thenReturn(Optional.of(prov));
+        when(districtRepository.findById("760")).thenReturn(Optional.of(dist));
+        when(wardRepository.findById("26740")).thenReturn(Optional.of(ward));
         when(storeMapper.toEntity(validCreateRequest)).thenReturn(savedStore);
         when(storeRepository.save(any(Store.class))).thenReturn(savedStore);
         when(routeStopRepository.findFirstByStoreId(1L)).thenReturn(Optional.empty());
         StoreResponse expectedResponse = StoreResponse.builder().id(1L).storeCode("ST-Q1-001").build();
-        when(storeMapper.toResponse(savedStore, null)).thenReturn(expectedResponse);
+        when(storeMapper.toResponse(any(), any(), any())).thenReturn(expectedResponse);
 
         StoreResponse result = storeService.createStore(validCreateRequest);
 
@@ -117,7 +142,7 @@ class StoreServiceImplTest {
         when(storeRepository.findById(1L)).thenReturn(Optional.of(savedStore));
         when(routeStopRepository.findFirstByStoreId(1L)).thenReturn(Optional.empty());
         StoreResponse expected = StoreResponse.builder().id(1L).build();
-        when(storeMapper.toResponse(savedStore, null)).thenReturn(expected);
+        when(storeMapper.toResponse(any(), any(), any())).thenReturn(expected);
 
         StoreResponse result = storeService.getStoreById(1L);
 
@@ -161,7 +186,7 @@ class StoreServiceImplTest {
         when(storeRepository.save(any())).thenReturn(savedStore);
         when(routeStopRepository.findFirstByStoreId(1L)).thenReturn(Optional.empty());
         StoreResponse expected = StoreResponse.builder().id(1L).isActive(false).build();
-        when(storeMapper.toResponse(any(), any())).thenReturn(expected);
+        when(storeMapper.toResponse(any(), any(), any())).thenReturn(expected);
 
         StoreStatusUpdateRequest req = new StoreStatusUpdateRequest();
         req.setIsActive(false);

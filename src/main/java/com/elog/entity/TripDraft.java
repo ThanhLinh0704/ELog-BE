@@ -82,6 +82,7 @@ public class TripDraft {
     @JoinColumn(name = "validated_by")
     private User validatedBy;
 
+
     @OneToMany(mappedBy = "tripDraft", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequenceNo ASC")
     @Builder.Default

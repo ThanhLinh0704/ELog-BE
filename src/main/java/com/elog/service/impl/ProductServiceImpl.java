@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -39,6 +40,8 @@ public class ProductServiceImpl implements ProductService {
             throw new BusinessException(ErrorCode.PRODUCT_SKU_DUPLICATE,
                     "SKU already exists: " + request.getSku(), HttpStatus.CONFLICT);
         }
+
+        validateProductCapacityRatio(request.getWeightKg(), request.getLengthM(), request.getWidthM(), request.getHeightM());
 
         Product product = productMapper.toEntity(request);
         Product saved = productRepository.save(product);
@@ -106,6 +109,8 @@ public class ProductServiceImpl implements ProductService {
                     "SKU cannot be changed", HttpStatus.BAD_REQUEST);
         }
 
+        validateProductCapacityRatio(request.getWeightKg(), request.getLengthM(), request.getWidthM(), request.getHeightM());
+
         product.setProductName(request.getProductName());
         product.setWeightKg(request.getWeightKg());
         product.setLengthM(request.getLengthM());
@@ -113,6 +118,10 @@ public class ProductServiceImpl implements ProductService {
         product.setHeightM(request.getHeightM());
         product.setVolumeM3(productMapper.calculateVolume(
                 request.getLengthM(), request.getWidthM(), request.getHeightM()));
+        product.setShape(request.getShape());
+        product.setIsFragile(request.getIsFragile() != null ? request.getIsFragile() : false);
+        product.setPackageImageUrl(request.getPackageImageUrl());
+        product.setDescription(request.getDescription());
 
         Product saved = productRepository.save(product);
         return productMapper.toResponse(saved);
@@ -138,5 +147,19 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.PRODUCT_NOT_FOUND,
                         "Product not found with id: " + id, HttpStatus.NOT_FOUND));
+    }
+
+    private void validateProductCapacityRatio(BigDecimal weightKg, BigDecimal lengthM, BigDecimal widthM, BigDecimal heightM) {
+        if (weightKg != null && lengthM != null && widthM != null && heightM != null) {
+            double volume = lengthM.multiply(widthM).multiply(heightM).doubleValue();
+            if (volume > 0) {
+                double ratio = weightKg.doubleValue() / volume;
+                if (ratio < 5.0 || ratio > 15000.0) {
+                    throw new BusinessException(ErrorCode.INVALID_CAPACITY_RATIO,
+                            "Tỉ trọng sản phẩm không hợp lý (5-15000 kg/m³). Khai báo hiện tại: " + Math.round(ratio) + " kg/m³.",
+                            HttpStatus.BAD_REQUEST);
+                }
+            }
+        }
     }
 }

@@ -22,6 +22,10 @@ public class ProductMapper {
                 .heightM(request.getHeightM())
                 .volumeM3(calculateVolume(request.getLengthM(), request.getWidthM(), request.getHeightM()))
                 .isActive(true)
+                .shape(request.getShape())
+                .isFragile(request.getIsFragile() != null ? request.getIsFragile() : false)
+                .packageImageUrl(request.getPackageImageUrl())
+                .description(request.getDescription())
                 .build();
     }
 
@@ -36,6 +40,10 @@ public class ProductMapper {
                 .heightM(product.getHeightM())
                 .volumeM3(product.getVolumeM3())
                 .isActive(product.getIsActive())
+                .shape(product.getShape())
+                .isFragile(product.getIsFragile())
+                .packageImageUrl(product.getPackageImageUrl())
+                .description(product.getDescription())
                 .createdAt(product.getCreatedAt())
                 .updatedAt(product.getUpdatedAt())
                 .build();
@@ -49,6 +57,10 @@ public class ProductMapper {
                 .weightKg(product.getWeightKg())
                 .volumeM3(product.getVolumeM3())
                 .isActive(product.getIsActive())
+                .shape(product.getShape())
+                .isFragile(product.getIsFragile())
+                .packageImageUrl(product.getPackageImageUrl())
+                .description(product.getDescription())
                 .build();
     }
 

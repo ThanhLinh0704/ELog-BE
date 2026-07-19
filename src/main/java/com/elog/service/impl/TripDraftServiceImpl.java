@@ -36,6 +36,8 @@ public class TripDraftServiceImpl implements TripDraftService {
     private final UserRepository userRepository;
     private final EtaCalculationService etaCalculationService;
     private final OrderItemRepository orderItemRepository;
+    private final TripRepository tripRepository;
+    private final ManifestRepository manifestRepository;
 
     @Override
     @Transactional
@@ -392,6 +394,43 @@ public class TripDraftServiceImpl implements TripDraftService {
                 .build();
     }
 
+    @Override
+    @Transactional
+    public void revertToDraft(Long tripDraftId, String currentUsername) {
+        TripDraft draft = findDraftOrThrow(tripDraftId);
+
+        // Guard: cannot revert if already assigned to a Trip
+        if (tripRepository.existsByTripDraftId(tripDraftId)) {
+            throw new BusinessException(
+                    ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED,
+                    "Trip Draft already assigned to a Trip. Cannot revert to DRAFT.",
+                    HttpStatus.CONFLICT);
+        }
+
+        // Delete the generated Manifest associated with this TripDraft if any exists
+        manifestRepository.findByTripDraftId(tripDraftId).ifPresent(m -> {
+            manifestRepository.delete(m);
+            log.info("US-11: Deleted manifest associated with TripDraft id={}", tripDraftId);
+        });
+
+        // Revert status to DRAFT
+        draft.setStatus("DRAFT");
+        draft.setConfirmedAt(null);
+        draft.setConfirmedBy(null);
+        draft.setValidatedAt(null);
+        draft.setValidatedBy(null);
+        draft.setVolumeCheckResult(ConstraintResult.NOT_CHECKED);
+        draft.setWeightCheckResult(ConstraintResult.NOT_CHECKED);
+
+        // Reset planned_eta of stops to null
+        for (TripDraftStop stop : draft.getStops()) {
+            stop.setPlannedEta(null);
+        }
+
+        tripDraftRepository.save(draft);
+        log.info("US-11: TripDraft id={} reverted to DRAFT status by {}", tripDraftId, currentUsername);
+    }
+
     // ── Shared helpers ───────────────────────────────────────────
 
     private TripDraft findDraftOrThrow(Long id) {
@@ -463,5 +502,40 @@ public class TripDraftServiceImpl implements TripDraftService {
                 .stopVolumeM3(stopVolume)
                 .stopWeightKg(stopWeight)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StopOrderItemResponse> getStopOrderItems(Long tripDraftId, Long stopId) {
+        TripDraftStop stop = tripDraftStopRepository.findById(stopId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "TripDraftStop not found with id: " + stopId,
+                        HttpStatus.NOT_FOUND));
+
+        if (!stop.getTripDraft().getId().equals(tripDraftId)) {
+            throw new BusinessException(
+                    ErrorCode.RESOURCE_NOT_FOUND,
+                    "Stop " + stopId + " does not belong to Trip Draft " + tripDraftId,
+                    HttpStatus.NOT_FOUND);
+        }
+
+        List<OrderItem> items = orderItemRepository.findByStopForManifest(
+                stop.getStore().getId(), tripDraftId);
+
+        if (items == null) {
+            return Collections.emptyList();
+        }
+
+        return items.stream()
+                .map(item -> StopOrderItemResponse.builder()
+                        .orderRef(item.getOrder().getOrderRef())
+                        .sku(item.getSku())
+                        .productName(item.getProduct().getProductName())
+                        .quantity(item.getQuantity())
+                        .weightKg(item.getLineWeightKg())
+                        .volumeM3(item.getLineVolumeM3())
+                        .build())
+                .toList();
     }
 }

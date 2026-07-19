@@ -24,4 +24,8 @@ public interface TripDraftService {
     RecalculateEtaResponse recalculateEta(Long tripDraftId, RecalculateEtaRequest request);
 
     ConfirmResponse confirmTripDraft(Long tripDraftId, String currentUsername);
+
+    void revertToDraft(Long tripDraftId, String currentUsername);
+
+    List<StopOrderItemResponse> getStopOrderItems(Long tripDraftId, Long stopId);
 }

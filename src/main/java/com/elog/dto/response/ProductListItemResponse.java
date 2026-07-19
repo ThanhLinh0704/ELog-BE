@@ -16,4 +16,8 @@ public class ProductListItemResponse {
     private BigDecimal weightKg;
     private BigDecimal volumeM3;
     private Boolean isActive;
+    private String shape;
+    private Boolean isFragile;
+    private String packageImageUrl;
+    private String description;
 }

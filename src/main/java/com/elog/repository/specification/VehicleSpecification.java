@@ -15,7 +15,9 @@ public class VehicleSpecification {
             String pattern = "%" + keyword.toLowerCase() + "%";
             return cb.or(
                     cb.like(cb.lower(root.get("plateNumber")), pattern),
-                    cb.like(cb.lower(root.get("vehicleType")), pattern)
+                    cb.like(cb.lower(root.get("vehicleCode")), pattern),
+                    cb.like(cb.lower(root.get("vehicleType")), pattern),
+                    cb.like(cb.lower(root.get("vehicleClass")), pattern)
             );
         };
     }
@@ -30,7 +32,7 @@ public class VehicleSpecification {
     public static Specification<Vehicle> hasMinimumWeight(BigDecimal minWeightKg) {
         return (root, query, cb) -> {
             if (minWeightKg == null) return null;
-            return cb.greaterThanOrEqualTo(root.get("maxWeightKg"), minWeightKg);
+            return cb.greaterThanOrEqualTo(root.get("payloadKg"), minWeightKg);
         };
     }
 

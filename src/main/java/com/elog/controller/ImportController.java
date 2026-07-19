@@ -4,6 +4,7 @@ import com.elog.dto.response.ApiResponse;
 import com.elog.dto.response.DuplicateBatchResponse;
 import com.elog.dto.response.ImportBatchResponse;
 import com.elog.dto.response.ImportErrorResponse;
+import com.elog.dto.response.ImportedOrderDetailResponse;
 import com.elog.entity.User;
 import com.elog.repository.UserRepository;
 import com.elog.service.ImportService;
@@ -80,6 +81,15 @@ public class ImportController {
     @PreAuthorize("hasAnyAuthority('order:import', 'trip:read')")
     public ResponseEntity<ApiResponse<ImportBatchResponse>> getBatchById(@PathVariable Long batchId) {
         ImportBatchResponse response = importService.getBatchById(batchId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{batchId}/orders")
+    @Operation(summary = "Get list of successfully imported orders and products details for a batch")
+    @PreAuthorize("hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'SYSTEM_ADMIN')")
+    public ResponseEntity<ApiResponse<List<ImportedOrderDetailResponse>>> getImportedOrders(
+            @PathVariable Long batchId) {
+        List<ImportedOrderDetailResponse> response = importService.getImportedOrders(batchId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

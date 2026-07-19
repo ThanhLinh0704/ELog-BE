@@ -20,6 +20,10 @@ public class ProductResponse {
     private BigDecimal heightM;
     private BigDecimal volumeM3;
     private Boolean isActive;
+    private String shape;
+    private Boolean isFragile;
+    private String packageImageUrl;
+    private String description;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

@@ -3,6 +3,7 @@ package com.elog.service;
 import com.elog.dto.response.ApiResponse;
 import com.elog.dto.response.ImportBatchResponse;
 import com.elog.dto.response.ImportErrorResponse;
+import com.elog.dto.response.ImportedOrderDetailResponse;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,4 +22,6 @@ public interface ImportService {
     ApiResponse<List<ImportErrorResponse>> getBatchErrors(Long batchId, String errorCode, Pageable pageable);
 
     byte[] exportBatchErrors(Long batchId);
+
+    List<ImportedOrderDetailResponse> getImportedOrders(Long batchId);
 }

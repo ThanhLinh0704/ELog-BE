@@ -60,12 +60,33 @@ public class RouteMapper {
                         .id(store.getId())
                         .storeCode(store.getCode())
                         .storeName(store.getName())
-                        .address(store.getAddress())
+                        .address(formatFullAddress(store))
                         .contactName(store.getContactName())
                         .contactPhone(store.getContactPhone())
                         .hasCoordinates(hasCoords)
                         .build())
                 .coordinatesWarning(coordinatesWarning)
                 .build();
+    }
+
+    private String formatFullAddress(Store store) {
+        if (store == null) return null;
+        StringBuilder sb = new StringBuilder();
+        if (store.getAddressDetail() != null && !store.getAddressDetail().isEmpty()) {
+            sb.append(store.getAddressDetail());
+        }
+        if (store.getWard() != null) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(store.getWard().getFullName());
+        }
+        if (store.getDistrict() != null) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(store.getDistrict().getFullName());
+        }
+        if (store.getProvince() != null) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(store.getProvince().getFullName());
+        }
+        return sb.toString();
     }
 }
