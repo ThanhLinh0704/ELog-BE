@@ -32,6 +32,7 @@ public class TripDraftController {
     private final TripDraftService tripDraftService;
     private final CapacityValidationService capacityValidationService;
     private final ManifestService manifestService;
+    private final com.elog.service.DepartureAdjustmentService departureAdjustmentService;
 
     // ── US-10 endpoints ──────────────────────────────────────────
 
@@ -175,6 +176,15 @@ public class TripDraftController {
     public ResponseEntity<ApiResponse<ManifestByStopResponse>> getManifestByStop(
             @PathVariable Long id) {
         ManifestByStopResponse response = manifestService.getManifestByStop(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/{id}/optimal-departure")
+    @Operation(summary = "Tính toán gợi ý giờ xuất phát tối ưu tránh vi phạm Time Window (Smart Departure Adjustment)")
+    @PreAuthorize("hasAuthority('trip:write')")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getOptimalDeparture(
+            @PathVariable Long id) {
+        java.util.Map<String, Object> response = departureAdjustmentService.calculateOptimalDepartureTime(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

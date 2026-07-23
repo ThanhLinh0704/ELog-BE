@@ -146,6 +146,19 @@ public class VehicleServiceImpl implements VehicleService {
         return vehicleMapper.toResponse(saved);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<VehicleResponse> findAvailableVehiclesForTrip(Long tripId) {
+        List<Vehicle> availableVehicles = vehicleRepository.findAll().stream()
+                .filter(v -> Boolean.TRUE.equals(v.getIsActive()))
+                .filter(v -> v.getStatus() == com.elog.entity.VehicleStatus.AVAILABLE)
+                .toList();
+
+        return availableVehicles.stream()
+                .map(vehicleMapper::toResponse)
+                .toList();
+    }
+
     private Vehicle findOrThrow(Long id) {
         return vehicleRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.VEHICLE_NOT_FOUND,

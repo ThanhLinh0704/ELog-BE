@@ -103,6 +103,43 @@ public class HaversineEtaCalculator implements EtaCalculationService {
             long travelMinutes = Math.round((distanceKm / avgSpeedKmh) * 60);
             currentEta = currentEta.plusMinutes(travelMinutes);
 
+            // Time window calculation & waiting time check
+            LocalTime twStart = store.getTimeWindowStart();
+            LocalTime twEnd = store.getTimeWindowEnd();
+
+            // Fallback: Parse allowedDeliveryHours e.g. "10:00-12:00" if timeWindowStart is null
+            if (twStart == null && store.getAllowedDeliveryHours() != null 
+                    && !store.getAllowedDeliveryHours().equalsIgnoreCase("All")) {
+                try {
+                    String[] parts = store.getAllowedDeliveryHours().split("-");
+                    if (parts.length == 2) {
+                        twStart = LocalTime.parse(parts[0].trim());
+                        twEnd = LocalTime.parse(parts[1].trim());
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse allowedDeliveryHours for store {}: {}", store.getCode(), store.getAllowedDeliveryHours());
+                }
+            }
+
+            LocalTime arrivalTime = currentEta.toLocalTime();
+            if (twStart != null && arrivalTime.isBefore(twStart)) {
+                long waitMin = java.time.temporal.ChronoUnit.MINUTES.between(arrivalTime, twStart);
+                stop.setPlannedWaitingTimeMin((int) waitMin);
+                if (waitMin <= 30) {
+                    // Accept waiting time, adjust departure from stop using twStart
+                    currentEta = LocalDateTime.of(currentEta.toLocalDate(), twStart);
+                    stop.setViolationCode(null);
+                } else {
+                    stop.setViolationCode("TIME_WINDOW_EARLY");
+                }
+            } else if (twEnd != null && arrivalTime.isAfter(twEnd)) {
+                stop.setPlannedWaitingTimeMin(0);
+                stop.setViolationCode("TIME_WINDOW_LATE");
+            } else {
+                stop.setPlannedWaitingTimeMin(0);
+                stop.setViolationCode(null);
+            }
+
             // Set planned ETA
             stop.setPlannedEta(currentEta);
 

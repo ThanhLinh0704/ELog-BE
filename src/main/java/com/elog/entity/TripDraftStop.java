@@ -48,4 +48,10 @@ public class TripDraftStop {
 
     @Column(name = "override_note", length = 255)
     private String overrideNote;
+
+    @Column(name = "planned_waiting_time_min")
+    private Integer plannedWaitingTimeMin;
+
+    @Column(name = "violation_code", length = 50)
+    private String violationCode;
 }

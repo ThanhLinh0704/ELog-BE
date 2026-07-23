@@ -68,4 +68,14 @@ public class ExceptionController {
         DeliveryExceptionResponse response = exceptionService.resolveException(id, request, username);
         return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     }
+
+    @GetMapping("/api/exceptions/violations")
+    @Operation(summary = "Danh sách tổng hợp các vi phạm Time Window và Tải trọng xe cho Dispatcher Dashboard")
+    @PreAuthorize("hasAuthority('trip:read')")
+    public ResponseEntity<ApiResponse<ExceptionListResponse>> listViolations(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        LocalDate effectiveDate = (date != null) ? date : LocalDate.now();
+        ExceptionListResponse response = exceptionService.listExceptions(effectiveDate, "TIME_EXCEPTION", "false");
+        return ResponseEntity.ok(ApiResponse.success(response, "Danh sách vi phạm vận hành"));
+    }
 }

@@ -6,6 +6,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "stores")
@@ -63,6 +64,15 @@ public class Store {
 
     @Column(name = "max_allowed_vehicle_weight", precision = 10, scale = 3)
     private java.math.BigDecimal maxAllowedVehicleWeight;
+
+    @Column(name = "time_window_start")
+    private LocalTime timeWindowStart;
+
+    @Column(name = "time_window_end")
+    private LocalTime timeWindowEnd;
+
+    @Column(name = "restricted_vehicle_types", length = 255)
+    private String restrictedVehicleTypes;
 
     @Column(name = "image_url", length = 512)
     private String imageUrl;

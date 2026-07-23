@@ -30,4 +30,6 @@ public interface VehicleService {
     VehicleResponse updateVehicle(Long id, VehicleUpdateRequest request);
 
     VehicleResponse updateVehicleStatus(Long id, VehicleStatusUpdateRequest request);
+
+    List<VehicleResponse> findAvailableVehiclesForTrip(Long tripId);
 }
