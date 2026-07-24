@@ -229,4 +229,13 @@ public class TripDraftController {
         tripDraftService.reIncludeOrder(id, orderId);
         return ResponseEntity.ok(ApiResponse.success(null, "Đã thêm lại đơn hàng vào chuyến thành công"));
     }
+
+    @GetMapping("/{id}/excluded-orders")
+    @Operation(summary = "Lấy danh sách các đơn hàng bị tách (UNASSIGNED) thuộc tuyến của đợt gom")
+    @PreAuthorize("hasAuthority('trip:read')")
+    public ResponseEntity<ApiResponse<List<StopOrderItemResponse>>> getExcludedOrders(
+            @PathVariable Long id) {
+        List<StopOrderItemResponse> response = tripDraftService.getExcludedOrders(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }

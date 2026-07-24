@@ -36,4 +36,6 @@ public interface TripDraftService {
     void excludeOrder(Long tripDraftId, Long orderId);
 
     void reIncludeOrder(Long tripDraftId, Long orderId);
+
+    List<StopOrderItemResponse> getExcludedOrders(Long tripDraftId);
 }

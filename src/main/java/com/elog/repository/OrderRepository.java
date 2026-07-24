@@ -50,5 +50,19 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            "WHERE o.importBatch.id = :batchId " +
            "ORDER BY o.orderRef ASC, i.sku ASC")
     List<Order> findByImportBatchId(@Param("batchId") Long batchId);
+
+    @Query("SELECT DISTINCT o FROM Order o " +
+           "JOIN FETCH o.store s " +
+           "LEFT JOIN FETCH o.items i " +
+           "LEFT JOIN FETCH i.product p " +
+           "WHERE o.tripDraft IS NULL " +
+           "AND o.status = 'UNASSIGNED' " +
+           "AND o.deliveryDate = :deliveryDate " +
+           "AND o.store.id IN :storeIds " +
+           "AND o.importBatch.isActive = true " +
+           "ORDER BY o.orderRef ASC")
+    List<Order> findExcludedOrdersByDeliveryDateAndStores(
+            @Param("deliveryDate") LocalDate deliveryDate,
+            @Param("storeIds") List<Long> storeIds);
 }
 

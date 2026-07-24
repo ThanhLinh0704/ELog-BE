@@ -626,6 +626,7 @@ public class TripDraftServiceImpl implements TripDraftService {
         }
 
         order.setTripDraft(null);
+        order.setStatus("UNASSIGNED");
         orderRepository.save(order);
 
         // Recalculate draft weight, volume, and stop order counts / active states
@@ -657,6 +658,7 @@ public class TripDraftServiceImpl implements TripDraftService {
                         HttpStatus.NOT_FOUND));
 
         order.setTripDraft(draft);
+        order.setStatus("IMPORTED");
         orderRepository.save(order);
 
         // Recalculate draft weight, volume, and stop order counts / active states
@@ -668,6 +670,40 @@ public class TripDraftServiceImpl implements TripDraftService {
         }
 
         log.info("Order id={} re-included into TripDraft id={}", orderId, tripDraftId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StopOrderItemResponse> getExcludedOrders(Long tripDraftId) {
+        TripDraft draft = findDraftOrThrow(tripDraftId);
+        List<Long> storeIds = draft.getStops().stream()
+                .map(stop -> stop.getStore().getId())
+                .toList();
+
+        if (storeIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Order> excludedOrders = orderRepository.findExcludedOrdersByDeliveryDateAndStores(
+                draft.getDeliveryDate(), storeIds);
+
+        List<StopOrderItemResponse> response = new ArrayList<>();
+        for (Order order : excludedOrders) {
+            if (order.getItems() != null) {
+                for (OrderItem item : order.getItems()) {
+                    response.add(StopOrderItemResponse.builder()
+                            .orderId(order.getId())
+                            .orderRef(order.getOrderRef())
+                            .sku(item.getSku())
+                            .productName(item.getProduct() != null ? item.getProduct().getProductName() : null)
+                            .quantity(item.getQuantity())
+                            .weightKg(item.getLineWeightKg())
+                            .volumeM3(item.getLineVolumeM3())
+                            .build());
+                }
+            }
+        }
+        return response;
     }
 
     private void recalculateDraftTotals(TripDraft draft) {
