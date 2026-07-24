@@ -386,6 +386,7 @@ class TripDraftServiceImplTest {
 
         assertThat(response).hasSize(1);
         StopOrderItemResponse resItem = response.get(0);
+        assertThat(resItem.getOrderId()).isEqualTo(200L);
         assertThat(resItem.getOrderRef()).isEqualTo("DH-001");
         assertThat(resItem.getSku()).isEqualTo("SKU-001");
         assertThat(resItem.getProductName()).isEqualTo("TV LG");

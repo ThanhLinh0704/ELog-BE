@@ -529,6 +529,7 @@ public class TripDraftServiceImpl implements TripDraftService {
 
         return items.stream()
                 .map(item -> StopOrderItemResponse.builder()
+                        .orderId(item.getOrder().getId())
                         .orderRef(item.getOrder().getOrderRef())
                         .sku(item.getSku())
                         .productName(item.getProduct().getProductName())
