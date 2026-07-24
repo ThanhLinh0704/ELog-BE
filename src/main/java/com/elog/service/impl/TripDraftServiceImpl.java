@@ -538,4 +538,113 @@ public class TripDraftServiceImpl implements TripDraftService {
                         .build())
                 .toList();
     }
+
+    @Override
+    @Transactional
+    public TripDraftResponse adjustDepartureTime(Long tripDraftId, com.elog.dto.request.AdjustDepartureTimeRequest request) {
+        TripDraft draft = findDraftOrThrow(tripDraftId);
+        draft.setPlannedDepartureTime(request.getNewDepartureTime());
+        tripDraftRepository.save(draft);
+
+        // Recalculate ETA for all stops
+        recalculateEta(tripDraftId, new RecalculateEtaRequest());
+
+        return getTripDraftById(tripDraftId);
+    }
+
+    @Override
+    @Transactional
+    public void settleDelay(Long tripDraftId, Long orderId, com.elog.dto.request.SettleDelayRequest request, String username) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "Order not found with id: " + orderId,
+                        HttpStatus.NOT_FOUND));
+
+        if (order.getTripDraft() == null || !order.getTripDraft().getId().equals(tripDraftId)) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_REQUEST,
+                    "Order " + orderId + " does not belong to Trip Draft " + tripDraftId,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElse(null);
+
+        order.setIsDeliveryTimeOverridden(true);
+        order.setTimeOverrideReason(request.getReason());
+        order.setTimeOverrideAt(LocalDateTime.now());
+        if (user != null) {
+            order.setTimeOverrideBy(user.getId());
+        }
+        orderRepository.save(order);
+        log.info("Order id={} delay settled by user={}: {}", orderId, username, request.getReason());
+    }
+
+    @Override
+    @Transactional
+    public void excludeOrder(Long tripDraftId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "Order not found with id: " + orderId,
+                        HttpStatus.NOT_FOUND));
+
+        if (order.getTripDraft() == null || !order.getTripDraft().getId().equals(tripDraftId)) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_REQUEST,
+                    "Order " + orderId + " does not belong to Trip Draft " + tripDraftId,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        TripDraft draft = order.getTripDraft();
+        order.setTripDraft(null);
+        orderRepository.save(order);
+
+        // Recalculate draft weight and volume
+        recalculateDraftTotals(draft);
+        log.info("Order id={} excluded from TripDraft id={}", orderId, tripDraftId);
+    }
+
+    @Override
+    @Transactional
+    public void reIncludeOrder(Long tripDraftId, Long orderId) {
+        TripDraft draft = findDraftOrThrow(tripDraftId);
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "Order not found with id: " + orderId,
+                        HttpStatus.NOT_FOUND));
+
+        order.setTripDraft(draft);
+        orderRepository.save(order);
+
+        // Recalculate draft weight and volume
+        recalculateDraftTotals(draft);
+        log.info("Order id={} re-included into TripDraft id={}", orderId, tripDraftId);
+    }
+
+    private void recalculateDraftTotals(TripDraft draft) {
+        List<Order> remainingOrders = orderRepository.findByTripDraftId(draft.getId());
+        BigDecimal totalVolume = BigDecimal.ZERO;
+        BigDecimal totalWeight = BigDecimal.ZERO;
+
+        for (Order order : remainingOrders) {
+            List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
+            if (items != null) {
+                for (OrderItem item : items) {
+                    if (item.getLineVolumeM3() != null) {
+                        totalVolume = totalVolume.add(item.getLineVolumeM3());
+                    }
+                    if (item.getLineWeightKg() != null) {
+                        totalWeight = totalWeight.add(item.getLineWeightKg());
+                    }
+                }
+            }
+        }
+
+        draft.setTotalVolumeM3(totalVolume);
+        draft.setTotalWeightKg(totalWeight);
+        tripDraftRepository.save(draft);
+    }
 }

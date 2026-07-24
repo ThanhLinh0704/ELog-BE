@@ -123,11 +123,16 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                             break;
                         }
                         for (Order order : draftOrders) {
-                            if (order.getStore().getId().equals(store.getId()) && order.getDeliveryTimeWindow() != null) {
-                                if (!isTimeWithinOrderWindow(etaTime, order.getDeliveryTimeWindow())) {
-                                    etaAllowed = false;
-                                    etaViolationReason = "Planned ETA (" + etaTime + ") violates delivery window (" + order.getDeliveryTimeWindow() + ") for order " + order.getOrderRef();
-                                    break;
+                            if (order.getStore().getId().equals(store.getId())) {
+                                if (Boolean.TRUE.equals(order.getIsDeliveryTimeOverridden())) {
+                                    continue;
+                                }
+                                if (order.getDeliveryTimeWindow() != null && !order.getDeliveryTimeWindow().trim().isEmpty()) {
+                                    if (!isTimeWithinOrderWindow(etaTime, order.getDeliveryTimeWindow())) {
+                                        etaAllowed = false;
+                                        etaViolationReason = "Planned ETA (" + etaTime + ") violates delivery window (" + order.getDeliveryTimeWindow() + ") for order " + order.getOrderRef();
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -309,11 +314,16 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                                 break;
                             }
                             for (Order order : draftOrders) {
-                                if (order.getStore().getId().equals(store.getId()) && order.getDeliveryTimeWindow() != null) {
-                                    if (!isTimeWithinOrderWindow(etaTime, order.getDeliveryTimeWindow())) {
-                                        etaAllowed = false;
-                                        etaViolationReason = "Planned ETA (" + etaTime + ") violates delivery window (" + order.getDeliveryTimeWindow() + ") for order " + order.getOrderRef();
-                                        break;
+                                if (order.getStore().getId().equals(store.getId())) {
+                                    if (Boolean.TRUE.equals(order.getIsDeliveryTimeOverridden())) {
+                                        continue;
+                                    }
+                                    if (order.getDeliveryTimeWindow() != null && !order.getDeliveryTimeWindow().trim().isEmpty()) {
+                                        if (!isTimeWithinOrderWindow(etaTime, order.getDeliveryTimeWindow())) {
+                                            etaAllowed = false;
+                                            etaViolationReason = "Planned ETA (" + etaTime + ") violates delivery window (" + order.getDeliveryTimeWindow() + ") for order " + order.getOrderRef();
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -419,6 +429,8 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                 .build();
     }
 
+    private static final int GRACE_PERIOD_MINUTES = 20;
+
     private boolean isTimeWithinOrderWindow(LocalTime time, String window) {
         if (window == null || window.trim().isEmpty()) {
             return true;
@@ -427,14 +439,14 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
         
         if (cleanWindow.contains("hành chính") || cleanWindow.contains("hanh chinh")) {
             LocalTime start = LocalTime.of(8, 0);
-            LocalTime end = LocalTime.of(17, 0);
+            LocalTime end = LocalTime.of(17, 0).plusMinutes(GRACE_PERIOD_MINUTES);
             return !time.isBefore(start) && !time.isAfter(end);
         }
         
         if (cleanWindow.contains("trước") || cleanWindow.contains("truoc")) {
             LocalTime limit = parseTimeFromString(cleanWindow.replaceAll("trước|truoc", "").trim());
             if (limit != null) {
-                return !time.isAfter(limit);
+                return !time.isAfter(limit.plusMinutes(GRACE_PERIOD_MINUTES));
             }
             return true;
         }
@@ -453,10 +465,11 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                 LocalTime start = parseTimeFromString(parts[0].trim());
                 LocalTime end = parseTimeFromString(parts[1].trim());
                 if (start != null && end != null) {
-                    if (start.isAfter(end)) {
-                        return !time.isBefore(start) || !time.isAfter(end);
+                    LocalTime endWithGrace = end.plusMinutes(GRACE_PERIOD_MINUTES);
+                    if (start.isAfter(endWithGrace)) {
+                        return !time.isBefore(start) || !time.isAfter(endWithGrace);
                     } else {
-                        return !time.isBefore(start) && !time.isAfter(end);
+                        return !time.isBefore(start) && !time.isAfter(endWithGrace);
                     }
                 }
             }
@@ -464,7 +477,7 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
         
         LocalTime directTime = parseTimeFromString(cleanWindow);
         if (directTime != null) {
-            return !time.isAfter(directTime);
+            return !time.isAfter(directTime.plusMinutes(GRACE_PERIOD_MINUTES));
         }
         
         return true;

@@ -20,5 +20,7 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             @Param("tripDraftId") Long tripDraftId);
 
     void deleteByOrderId(Long orderId);
+
+    List<OrderItem> findByOrderId(Long orderId);
 }
 

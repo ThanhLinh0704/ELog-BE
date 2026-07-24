@@ -187,4 +187,46 @@ public class TripDraftController {
         java.util.Map<String, Object> response = departureAdjustmentService.calculateOptimalDepartureTime(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
+
+    @PostMapping("/{id}/adjust-departure-time")
+    @Operation(summary = "Điều chỉnh giờ xuất phát của chuyến và tự động tính lại ETA")
+    @PreAuthorize("hasAuthority('trip:write')")
+    public ResponseEntity<ApiResponse<TripDraftResponse>> adjustDepartureTime(
+            @PathVariable Long id,
+            @Valid @RequestBody com.elog.dto.request.AdjustDepartureTimeRequest request) {
+        TripDraftResponse response = tripDraftService.adjustDepartureTime(id, request);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã điều chỉnh giờ xuất phát thành công"));
+    }
+
+    @PostMapping("/{id}/orders/{orderId}/settle-delay")
+    @Operation(summary = "Ghi nhận dàn xếp thành công nhận trễ với người nhận đơn hàng")
+    @PreAuthorize("hasAuthority('trip:write')")
+    public ResponseEntity<ApiResponse<Void>> settleDelay(
+            @PathVariable Long id,
+            @PathVariable Long orderId,
+            @Valid @RequestBody com.elog.dto.request.SettleDelayRequest request) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        tripDraftService.settleDelay(id, orderId, request, currentUsername);
+        return ResponseEntity.ok(ApiResponse.success(null, "Ghi nhận dàn xếp giao trễ thành công"));
+    }
+
+    @PostMapping("/{id}/orders/{orderId}/exclude")
+    @Operation(summary = "Tách đơn hàng vi phạm ra khỏi chuyến đưa về hàng chờ ngoại lệ")
+    @PreAuthorize("hasAuthority('trip:write')")
+    public ResponseEntity<ApiResponse<Void>> excludeOrder(
+            @PathVariable Long id,
+            @PathVariable Long orderId) {
+        tripDraftService.excludeOrder(id, orderId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã tách đơn hàng khỏi chuyến thành công"));
+    }
+
+    @PostMapping("/{id}/orders/{orderId}/re-include")
+    @Operation(summary = "Thêm lại đơn hàng từ hàng chờ ngoại lệ vào chuyến draft")
+    @PreAuthorize("hasAuthority('trip:write')")
+    public ResponseEntity<ApiResponse<Void>> reIncludeOrder(
+            @PathVariable Long id,
+            @PathVariable Long orderId) {
+        tripDraftService.reIncludeOrder(id, orderId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã thêm lại đơn hàng vào chuyến thành công"));
+    }
 }

@@ -53,6 +53,8 @@ class ImportServiceImplTest {
     private StoreRepository storeRepository;
     @Mock
     private ProductRepository productRepository;
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private ImportServiceImpl importService;
