@@ -1,7 +1,6 @@
 package com.elog.service;
 
 import com.elog.dto.request.ProductCreateRequest;
-import com.elog.dto.request.ProductUpdateRequest;
 import com.elog.dto.response.ProductResponse;
 import com.elog.entity.Product;
 import com.elog.exception.BusinessException;
@@ -18,7 +17,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

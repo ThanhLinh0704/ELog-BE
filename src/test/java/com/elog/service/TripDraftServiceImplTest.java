@@ -175,17 +175,6 @@ class TripDraftServiceImplTest {
         when(tripDraftRepository.findByRouteIdAndDeliveryDate(10L, deliveryDate))
                 .thenReturn(Optional.empty());
 
-        TripDraft savedDraft = TripDraft.builder()
-                .id(50L)
-                .route(route)
-                .deliveryDate(deliveryDate)
-                .totalVolumeM3(BigDecimal.valueOf(2.0))
-                .totalWeightKg(BigDecimal.valueOf(150))
-                .activeStopCount(1)
-                .skippedStopCount(1)
-                .status("DRAFT")
-                .build();
-
         when(tripDraftRepository.save(any(TripDraft.class))).thenAnswer(invocation -> {
             TripDraft td = invocation.getArgument(0);
             td.setId(50L);
@@ -283,6 +272,7 @@ class TripDraftServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void getTripDrafts_success() {
         org.springframework.data.domain.Pageable pageable = mock(org.springframework.data.domain.Pageable.class);
         org.springframework.data.domain.Page<TripDraft> page = mock(org.springframework.data.domain.Page.class);

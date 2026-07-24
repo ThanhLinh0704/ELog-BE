@@ -2,7 +2,6 @@ package com.elog.service;
 
 import com.elog.dto.response.*;
 import com.elog.entity.*;
-import com.elog.exception.BusinessException;
 import com.elog.repository.OrderRepository;
 import com.elog.repository.TripDraftRepository;
 import com.elog.repository.UserRepository;
@@ -14,19 +13,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)

@@ -63,6 +63,7 @@ public class Order {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Builder.Default
     @Column(name = "is_delivery_time_overridden")
     private Boolean isDeliveryTimeOverridden = false;
 

@@ -544,11 +544,17 @@ public class TripDraftServiceImpl implements TripDraftService {
     @Transactional
     public TripDraftResponse adjustDepartureTime(Long tripDraftId, com.elog.dto.request.AdjustDepartureTimeRequest request) {
         TripDraft draft = findDraftOrThrow(tripDraftId);
+        if ("CONFIRMED".equals(draft.getStatus()) || "CANCELLED".equals(draft.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.TRIP_DRAFT_LOCKED,
+                    "Trip Draft already confirmed or cancelled (status=" + draft.getStatus() + "). Adjustment not allowed.",
+                    HttpStatus.CONFLICT);
+        }
         draft.setPlannedDepartureTime(request.getNewDepartureTime());
         tripDraftRepository.save(draft);
 
         // Recalculate ETA for all stops
-        recalculateEta(tripDraftId, new RecalculateEtaRequest());
+        recalculateEta(tripDraftId, new RecalculateEtaRequest(request.getNewDepartureTime()));
 
         return getTripDraftById(tripDraftId);
     }
@@ -569,6 +575,14 @@ public class TripDraftServiceImpl implements TripDraftService {
                     HttpStatus.BAD_REQUEST);
         }
 
+        TripDraft draft = order.getTripDraft();
+        if ("CONFIRMED".equals(draft.getStatus()) || "CANCELLED".equals(draft.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.TRIP_DRAFT_LOCKED,
+                    "Trip Draft already confirmed or cancelled (status=" + draft.getStatus() + "). Settlement not allowed.",
+                    HttpStatus.CONFLICT);
+        }
+
         User user = userRepository.findByUsername(username)
                 .orElse(null);
 
@@ -579,6 +593,11 @@ public class TripDraftServiceImpl implements TripDraftService {
             order.setTimeOverrideBy(user.getId());
         }
         orderRepository.save(order);
+
+        if (draft.getPlannedDepartureTime() != null) {
+            recalculateEta(tripDraftId, new RecalculateEtaRequest(draft.getPlannedDepartureTime()));
+        }
+
         log.info("Order id={} delay settled by user={}: {}", orderId, username, request.getReason());
     }
 
@@ -599,11 +618,24 @@ public class TripDraftServiceImpl implements TripDraftService {
         }
 
         TripDraft draft = order.getTripDraft();
+        if ("CONFIRMED".equals(draft.getStatus()) || "CANCELLED".equals(draft.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.TRIP_DRAFT_LOCKED,
+                    "Trip Draft already confirmed or cancelled (status=" + draft.getStatus() + "). Order exclusion not allowed.",
+                    HttpStatus.CONFLICT);
+        }
+
         order.setTripDraft(null);
         orderRepository.save(order);
 
-        // Recalculate draft weight and volume
+        // Recalculate draft weight, volume, and stop order counts / active states
         recalculateDraftTotals(draft);
+
+        // Recalculate ETA for remaining active stops
+        if (draft.getPlannedDepartureTime() != null) {
+            recalculateEta(tripDraftId, new RecalculateEtaRequest(draft.getPlannedDepartureTime()));
+        }
+
         log.info("Order id={} excluded from TripDraft id={}", orderId, tripDraftId);
     }
 
@@ -611,6 +643,13 @@ public class TripDraftServiceImpl implements TripDraftService {
     @Transactional
     public void reIncludeOrder(Long tripDraftId, Long orderId) {
         TripDraft draft = findDraftOrThrow(tripDraftId);
+        if ("CONFIRMED".equals(draft.getStatus()) || "CANCELLED".equals(draft.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.TRIP_DRAFT_LOCKED,
+                    "Trip Draft already confirmed or cancelled (status=" + draft.getStatus() + "). Order re-inclusion not allowed.",
+                    HttpStatus.CONFLICT);
+        }
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.RESOURCE_NOT_FOUND,
@@ -620,8 +659,14 @@ public class TripDraftServiceImpl implements TripDraftService {
         order.setTripDraft(draft);
         orderRepository.save(order);
 
-        // Recalculate draft weight and volume
+        // Recalculate draft weight, volume, and stop order counts / active states
         recalculateDraftTotals(draft);
+
+        // Recalculate ETA for active stops
+        if (draft.getPlannedDepartureTime() != null) {
+            recalculateEta(tripDraftId, new RecalculateEtaRequest(draft.getPlannedDepartureTime()));
+        }
+
         log.info("Order id={} re-included into TripDraft id={}", orderId, tripDraftId);
     }
 
@@ -646,6 +691,29 @@ public class TripDraftServiceImpl implements TripDraftService {
 
         draft.setTotalVolumeM3(totalVolume);
         draft.setTotalWeightKg(totalWeight);
+
+        // Recalculate stop orderCounts and active status
+        List<TripDraftStop> stops = tripDraftStopRepository.findByTripDraftIdOrderBySequenceNoAsc(draft.getId());
+        int activeCount = 0;
+        int skippedCount = 0;
+
+        for (TripDraftStop stop : stops) {
+            long count = remainingOrders.stream()
+                    .filter(o -> o.getStore().getId().equals(stop.getStore().getId()))
+                    .count();
+            stop.setOrderCount((int) count);
+            boolean isActive = count > 0;
+            stop.setIsActive(isActive);
+            if (isActive) {
+                activeCount++;
+            } else {
+                skippedCount++;
+            }
+        }
+        tripDraftStopRepository.saveAll(stops);
+
+        draft.setActiveStopCount(activeCount);
+        draft.setSkippedStopCount(skippedCount);
         tripDraftRepository.save(draft);
     }
 }

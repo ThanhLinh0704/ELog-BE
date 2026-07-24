@@ -53,10 +53,10 @@ public class HaversineEtaCalculator implements EtaCalculationService {
                         "Trip Draft not found with id: " + tripDraftId,
                         HttpStatus.NOT_FOUND));
 
-        if (!"DRAFT".equals(draft.getStatus())) {
+        if ("CONFIRMED".equals(draft.getStatus()) || "CANCELLED".equals(draft.getStatus())) {
             throw new BusinessException(
                     ErrorCode.TRIP_DRAFT_LOCKED,
-                    "Trip Draft already confirmed (status=" + draft.getStatus() + "). Cannot recalculate ETA.",
+                    "Trip Draft already confirmed or cancelled (status=" + draft.getStatus() + "). Cannot recalculate ETA.",
                     HttpStatus.CONFLICT);
         }
 
@@ -94,7 +94,10 @@ public class HaversineEtaCalculator implements EtaCalculationService {
 
             // Add service time of PREVIOUS stop (not for the first stop)
             if (i > 0) {
-                int prevServiceMin = activeStops.get(i - 1).getRouteStop().getAvgServiceTimeMin();
+                TripDraftStop prevStop = activeStops.get(i - 1);
+                int prevServiceMin = (prevStop.getRouteStop() != null && prevStop.getRouteStop().getAvgServiceTimeMin() != null)
+                        ? prevStop.getRouteStop().getAvgServiceTimeMin()
+                        : 15;
                 currentEta = currentEta.plusMinutes(prevServiceMin);
             }
 

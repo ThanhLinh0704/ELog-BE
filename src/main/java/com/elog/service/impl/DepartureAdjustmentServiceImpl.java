@@ -1,11 +1,9 @@
 package com.elog.service.impl;
 
-import com.elog.entity.Store;
 import com.elog.entity.TripDraft;
 import com.elog.entity.TripDraftStop;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
-import com.elog.repository.SystemConfigRepository;
 import com.elog.repository.TripDraftRepository;
 import com.elog.repository.TripDraftStopRepository;
 import com.elog.service.DepartureAdjustmentService;
@@ -27,7 +25,6 @@ public class DepartureAdjustmentServiceImpl implements DepartureAdjustmentServic
 
     private final TripDraftRepository tripDraftRepo;
     private final TripDraftStopRepository stopRepo;
-    private final SystemConfigRepository configRepo;
 
     @Override
     @Transactional(readOnly = true)

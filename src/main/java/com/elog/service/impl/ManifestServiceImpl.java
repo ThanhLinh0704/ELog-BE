@@ -232,9 +232,6 @@ public class ManifestServiceImpl implements ManifestService {
         Map<Integer, List<ManifestLine>> groupedByStop = lines.stream()
                 .collect(Collectors.groupingBy(ManifestLine::getStopSequenceNo, LinkedHashMap::new, Collectors.toList()));
 
-        // Find min/max stop_sequence_no for LIFO loading notes
-        int maxSeqNo = groupedByStop.keySet().stream().mapToInt(Integer::intValue).max().orElse(0);
-        int minSeqNo = groupedByStop.keySet().stream().mapToInt(Integer::intValue).min().orElse(0);
 
         List<ManifestByStopResponse.ManifestStopGroup> stopGroups = new ArrayList<>();
 

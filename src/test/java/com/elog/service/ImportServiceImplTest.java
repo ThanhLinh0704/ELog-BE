@@ -8,7 +8,6 @@ import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
 import com.elog.repository.*;
 import com.elog.service.impl.ImportServiceImpl;
-import com.elog.service.impl.ImportServiceImpl.DuplicateBatchException;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
@@ -474,6 +473,7 @@ class ImportServiceImplTest {
     // ── Additional coverage tests ───────────────────────────
 
     @Test
+    @SuppressWarnings("unchecked")
     void getBatches_withDeliveryDate_success() {
         LocalDate date = LocalDate.now();
         Pageable pageable = mock(Pageable.class);
@@ -495,6 +495,7 @@ class ImportServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void getBatches_withoutDeliveryDate_success() {
         Pageable pageable = mock(Pageable.class);
         Page<ImportBatch> page = mock(Page.class);
@@ -536,6 +537,7 @@ class ImportServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void getBatchErrors_success() {
         when(batchRepository.existsById(1L)).thenReturn(true);
         ImportError error = ImportError.builder().rowNumber(5).rawData("raw").errorCode("SKU_NOT_FOUND").fieldName("sku").errorReason("reason").build();
@@ -1013,6 +1015,7 @@ class ImportServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void getBatchErrors_emptyErrorCode_success() {
         when(batchRepository.existsById(1L)).thenReturn(true);
         ImportError error = ImportError.builder().rowNumber(5).rawData("raw").errorCode("SKU_NOT_FOUND").fieldName("sku").errorReason("reason").build();
@@ -1155,7 +1158,6 @@ class ImportServiceImplTest {
 
     @Test
     void getImportedOrders_success() {
-        ImportBatch batch = ImportBatch.builder().id(1L).build();
         when(batchRepository.existsById(1L)).thenReturn(true);
 
         Store store = Store.builder().id(10L).code("ST-001").name("Store 1").build();
