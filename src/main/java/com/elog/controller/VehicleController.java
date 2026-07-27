@@ -48,6 +48,15 @@ public class VehicleController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @GetMapping("/available")
+    @Operation(summary = "Get available vehicles for trip assignment")
+    @PreAuthorize("hasAnyAuthority('vehicle:read', 'vehicle:write')")
+    public ResponseEntity<ApiResponse<List<VehicleResponse>>> getAvailableVehicles(
+            @RequestParam(required = false) Long tripId) {
+        List<VehicleResponse> vehicles = vehicleService.findAvailableVehiclesForTrip(tripId);
+        return ResponseEntity.ok(ApiResponse.success(vehicles));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Get vehicle detail by ID")
     @PreAuthorize("hasAnyAuthority('vehicle:read', 'vehicle:write')")

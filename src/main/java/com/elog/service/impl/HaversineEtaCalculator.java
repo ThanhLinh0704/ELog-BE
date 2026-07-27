@@ -53,10 +53,10 @@ public class HaversineEtaCalculator implements EtaCalculationService {
                         "Trip Draft not found with id: " + tripDraftId,
                         HttpStatus.NOT_FOUND));
 
-        if (!"DRAFT".equals(draft.getStatus())) {
+        if ("CONFIRMED".equals(draft.getStatus()) || "CANCELLED".equals(draft.getStatus())) {
             throw new BusinessException(
                     ErrorCode.TRIP_DRAFT_LOCKED,
-                    "Trip Draft already confirmed (status=" + draft.getStatus() + "). Cannot recalculate ETA.",
+                    "Trip Draft already confirmed or cancelled (status=" + draft.getStatus() + "). Cannot recalculate ETA.",
                     HttpStatus.CONFLICT);
         }
 
@@ -94,7 +94,10 @@ public class HaversineEtaCalculator implements EtaCalculationService {
 
             // Add service time of PREVIOUS stop (not for the first stop)
             if (i > 0) {
-                int prevServiceMin = activeStops.get(i - 1).getRouteStop().getAvgServiceTimeMin();
+                TripDraftStop prevStop = activeStops.get(i - 1);
+                int prevServiceMin = (prevStop.getRouteStop() != null && prevStop.getRouteStop().getAvgServiceTimeMin() != null)
+                        ? prevStop.getRouteStop().getAvgServiceTimeMin()
+                        : 15;
                 currentEta = currentEta.plusMinutes(prevServiceMin);
             }
 
@@ -102,6 +105,43 @@ public class HaversineEtaCalculator implements EtaCalculationService {
             double distanceKm = haversine(prevLat, prevLng, stopLat, stopLng);
             long travelMinutes = Math.round((distanceKm / avgSpeedKmh) * 60);
             currentEta = currentEta.plusMinutes(travelMinutes);
+
+            // Time window calculation & waiting time check
+            LocalTime twStart = store.getTimeWindowStart();
+            LocalTime twEnd = store.getTimeWindowEnd();
+
+            // Fallback: Parse allowedDeliveryHours e.g. "10:00-12:00" if timeWindowStart is null
+            if (twStart == null && store.getAllowedDeliveryHours() != null 
+                    && !store.getAllowedDeliveryHours().equalsIgnoreCase("All")) {
+                try {
+                    String[] parts = store.getAllowedDeliveryHours().split("-");
+                    if (parts.length == 2) {
+                        twStart = LocalTime.parse(parts[0].trim());
+                        twEnd = LocalTime.parse(parts[1].trim());
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to parse allowedDeliveryHours for store {}: {}", store.getCode(), store.getAllowedDeliveryHours());
+                }
+            }
+
+            LocalTime arrivalTime = currentEta.toLocalTime();
+            if (twStart != null && arrivalTime.isBefore(twStart)) {
+                long waitMin = java.time.temporal.ChronoUnit.MINUTES.between(arrivalTime, twStart);
+                stop.setPlannedWaitingTimeMin((int) waitMin);
+                if (waitMin <= 30) {
+                    // Accept waiting time, adjust departure from stop using twStart
+                    currentEta = LocalDateTime.of(currentEta.toLocalDate(), twStart);
+                    stop.setViolationCode(null);
+                } else {
+                    stop.setViolationCode("TIME_WINDOW_EARLY");
+                }
+            } else if (twEnd != null && arrivalTime.isAfter(twEnd)) {
+                stop.setPlannedWaitingTimeMin(0);
+                stop.setViolationCode("TIME_WINDOW_LATE");
+            } else {
+                stop.setPlannedWaitingTimeMin(0);
+                stop.setViolationCode(null);
+            }
 
             // Set planned ETA
             stop.setPlannedEta(currentEta);

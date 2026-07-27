@@ -529,6 +529,7 @@ public class TripDraftServiceImpl implements TripDraftService {
 
         return items.stream()
                 .map(item -> StopOrderItemResponse.builder()
+                        .orderId(item.getOrder().getId())
                         .orderRef(item.getOrder().getOrderRef())
                         .sku(item.getSku())
                         .productName(item.getProduct().getProductName())
@@ -537,5 +538,218 @@ public class TripDraftServiceImpl implements TripDraftService {
                         .volumeM3(item.getLineVolumeM3())
                         .build())
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public TripDraftResponse adjustDepartureTime(Long tripDraftId, com.elog.dto.request.AdjustDepartureTimeRequest request) {
+        TripDraft draft = findDraftOrThrow(tripDraftId);
+        if ("CONFIRMED".equals(draft.getStatus()) || "CANCELLED".equals(draft.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.TRIP_DRAFT_LOCKED,
+                    "Trip Draft already confirmed or cancelled (status=" + draft.getStatus() + "). Adjustment not allowed.",
+                    HttpStatus.CONFLICT);
+        }
+        draft.setPlannedDepartureTime(request.getNewDepartureTime());
+        tripDraftRepository.save(draft);
+
+        // Recalculate ETA for all stops
+        recalculateEta(tripDraftId, new RecalculateEtaRequest(request.getNewDepartureTime()));
+
+        return getTripDraftById(tripDraftId);
+    }
+
+    @Override
+    @Transactional
+    public void settleDelay(Long tripDraftId, Long orderId, com.elog.dto.request.SettleDelayRequest request, String username) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "Order not found with id: " + orderId,
+                        HttpStatus.NOT_FOUND));
+
+        if (order.getTripDraft() == null || !order.getTripDraft().getId().equals(tripDraftId)) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_REQUEST,
+                    "Order " + orderId + " does not belong to Trip Draft " + tripDraftId,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        TripDraft draft = order.getTripDraft();
+        if ("CONFIRMED".equals(draft.getStatus()) || "CANCELLED".equals(draft.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.TRIP_DRAFT_LOCKED,
+                    "Trip Draft already confirmed or cancelled (status=" + draft.getStatus() + "). Settlement not allowed.",
+                    HttpStatus.CONFLICT);
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElse(null);
+
+        order.setIsDeliveryTimeOverridden(true);
+        order.setTimeOverrideReason(request.getReason());
+        order.setTimeOverrideAt(LocalDateTime.now());
+        if (user != null) {
+            order.setTimeOverrideBy(user.getId());
+        }
+        orderRepository.save(order);
+
+        if (draft.getPlannedDepartureTime() != null) {
+            recalculateEta(tripDraftId, new RecalculateEtaRequest(draft.getPlannedDepartureTime()));
+        }
+
+        log.info("Order id={} delay settled by user={}: {}", orderId, username, request.getReason());
+    }
+
+    @Override
+    @Transactional
+    public void excludeOrder(Long tripDraftId, Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "Order not found with id: " + orderId,
+                        HttpStatus.NOT_FOUND));
+
+        if (order.getTripDraft() == null || !order.getTripDraft().getId().equals(tripDraftId)) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_REQUEST,
+                    "Order " + orderId + " does not belong to Trip Draft " + tripDraftId,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        TripDraft draft = order.getTripDraft();
+        if ("CONFIRMED".equals(draft.getStatus()) || "CANCELLED".equals(draft.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.TRIP_DRAFT_LOCKED,
+                    "Trip Draft already confirmed or cancelled (status=" + draft.getStatus() + "). Order exclusion not allowed.",
+                    HttpStatus.CONFLICT);
+        }
+
+        order.setTripDraft(null);
+        order.setStatus("UNASSIGNED");
+        orderRepository.save(order);
+
+        // Recalculate draft weight, volume, and stop order counts / active states
+        recalculateDraftTotals(draft);
+
+        // Recalculate ETA for remaining active stops
+        if (draft.getPlannedDepartureTime() != null) {
+            recalculateEta(tripDraftId, new RecalculateEtaRequest(draft.getPlannedDepartureTime()));
+        }
+
+        log.info("Order id={} excluded from TripDraft id={}", orderId, tripDraftId);
+    }
+
+    @Override
+    @Transactional
+    public void reIncludeOrder(Long tripDraftId, Long orderId) {
+        TripDraft draft = findDraftOrThrow(tripDraftId);
+        if ("CONFIRMED".equals(draft.getStatus()) || "CANCELLED".equals(draft.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.TRIP_DRAFT_LOCKED,
+                    "Trip Draft already confirmed or cancelled (status=" + draft.getStatus() + "). Order re-inclusion not allowed.",
+                    HttpStatus.CONFLICT);
+        }
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "Order not found with id: " + orderId,
+                        HttpStatus.NOT_FOUND));
+
+        order.setTripDraft(draft);
+        order.setStatus("IMPORTED");
+        orderRepository.save(order);
+
+        // Recalculate draft weight, volume, and stop order counts / active states
+        recalculateDraftTotals(draft);
+
+        // Recalculate ETA for active stops
+        if (draft.getPlannedDepartureTime() != null) {
+            recalculateEta(tripDraftId, new RecalculateEtaRequest(draft.getPlannedDepartureTime()));
+        }
+
+        log.info("Order id={} re-included into TripDraft id={}", orderId, tripDraftId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StopOrderItemResponse> getExcludedOrders(Long tripDraftId) {
+        TripDraft draft = findDraftOrThrow(tripDraftId);
+        List<Long> storeIds = draft.getStops().stream()
+                .map(stop -> stop.getStore().getId())
+                .toList();
+
+        if (storeIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Order> excludedOrders = orderRepository.findExcludedOrdersByDeliveryDateAndStores(
+                draft.getDeliveryDate(), storeIds);
+
+        List<StopOrderItemResponse> response = new ArrayList<>();
+        for (Order order : excludedOrders) {
+            if (order.getItems() != null) {
+                for (OrderItem item : order.getItems()) {
+                    response.add(StopOrderItemResponse.builder()
+                            .orderId(order.getId())
+                            .orderRef(order.getOrderRef())
+                            .sku(item.getSku())
+                            .productName(item.getProduct() != null ? item.getProduct().getProductName() : null)
+                            .quantity(item.getQuantity())
+                            .weightKg(item.getLineWeightKg())
+                            .volumeM3(item.getLineVolumeM3())
+                            .build());
+                }
+            }
+        }
+        return response;
+    }
+
+    private void recalculateDraftTotals(TripDraft draft) {
+        List<Order> remainingOrders = orderRepository.findByTripDraftId(draft.getId());
+        BigDecimal totalVolume = BigDecimal.ZERO;
+        BigDecimal totalWeight = BigDecimal.ZERO;
+
+        for (Order order : remainingOrders) {
+            List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
+            if (items != null) {
+                for (OrderItem item : items) {
+                    if (item.getLineVolumeM3() != null) {
+                        totalVolume = totalVolume.add(item.getLineVolumeM3());
+                    }
+                    if (item.getLineWeightKg() != null) {
+                        totalWeight = totalWeight.add(item.getLineWeightKg());
+                    }
+                }
+            }
+        }
+
+        draft.setTotalVolumeM3(totalVolume);
+        draft.setTotalWeightKg(totalWeight);
+
+        // Recalculate stop orderCounts and active status
+        List<TripDraftStop> stops = tripDraftStopRepository.findByTripDraftIdOrderBySequenceNoAsc(draft.getId());
+        int activeCount = 0;
+        int skippedCount = 0;
+
+        for (TripDraftStop stop : stops) {
+            long count = remainingOrders.stream()
+                    .filter(o -> o.getStore().getId().equals(stop.getStore().getId()))
+                    .count();
+            stop.setOrderCount((int) count);
+            boolean isActive = count > 0;
+            stop.setIsActive(isActive);
+            if (isActive) {
+                activeCount++;
+            } else {
+                skippedCount++;
+            }
+        }
+        tripDraftStopRepository.saveAll(stops);
+
+        draft.setActiveStopCount(activeCount);
+        draft.setSkippedStopCount(skippedCount);
+        tripDraftRepository.save(draft);
     }
 }

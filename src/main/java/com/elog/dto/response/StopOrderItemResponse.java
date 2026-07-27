@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class StopOrderItemResponse {
+    private Long orderId;
     private String orderRef;
     private String sku;
     private String productName;

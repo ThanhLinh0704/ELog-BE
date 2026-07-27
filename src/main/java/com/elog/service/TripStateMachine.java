@@ -46,13 +46,21 @@ public class TripStateMachine {
         switch (newStatus) {
             case DISPATCHED -> {
                 trip.setLockedAt(LocalDateTime.now());
-                // lockedBy is set by caller (need User entity)
+                if (trip.getVehicle() != null) {
+                    trip.getVehicle().setStatus(com.elog.entity.VehicleStatus.AVAILABLE);
+                }
             }
             case IN_PROGRESS -> {
                 trip.setActualDepartureTime(LocalDateTime.now());
+                if (trip.getVehicle() != null) {
+                    trip.getVehicle().setStatus(com.elog.entity.VehicleStatus.IN_USE);
+                }
             }
             case COMPLETED -> {
                 trip.setCompletedAt(LocalDateTime.now());
+                if (trip.getVehicle() != null) {
+                    trip.getVehicle().setStatus(com.elog.entity.VehicleStatus.AVAILABLE);
+                }
             }
             default -> { /* VALIDATED has no side effects */ }
         }

@@ -175,17 +175,6 @@ class TripDraftServiceImplTest {
         when(tripDraftRepository.findByRouteIdAndDeliveryDate(10L, deliveryDate))
                 .thenReturn(Optional.empty());
 
-        TripDraft savedDraft = TripDraft.builder()
-                .id(50L)
-                .route(route)
-                .deliveryDate(deliveryDate)
-                .totalVolumeM3(BigDecimal.valueOf(2.0))
-                .totalWeightKg(BigDecimal.valueOf(150))
-                .activeStopCount(1)
-                .skippedStopCount(1)
-                .status("DRAFT")
-                .build();
-
         when(tripDraftRepository.save(any(TripDraft.class))).thenAnswer(invocation -> {
             TripDraft td = invocation.getArgument(0);
             td.setId(50L);
@@ -283,6 +272,7 @@ class TripDraftServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void getTripDrafts_success() {
         org.springframework.data.domain.Pageable pageable = mock(org.springframework.data.domain.Pageable.class);
         org.springframework.data.domain.Page<TripDraft> page = mock(org.springframework.data.domain.Page.class);
@@ -386,6 +376,7 @@ class TripDraftServiceImplTest {
 
         assertThat(response).hasSize(1);
         StopOrderItemResponse resItem = response.get(0);
+        assertThat(resItem.getOrderId()).isEqualTo(200L);
         assertThat(resItem.getOrderRef()).isEqualTo("DH-001");
         assertThat(resItem.getSku()).isEqualTo("SKU-001");
         assertThat(resItem.getProductName()).isEqualTo("TV LG");
@@ -418,5 +409,29 @@ class TripDraftServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.NOT_FOUND)
                 .hasMessageContaining("does not belong to Trip Draft");
+    }
+
+    @Test
+    void getExcludedOrders_success() {
+        TripDraft draft = TripDraft.builder().id(50L).deliveryDate(LocalDate.now()).build();
+        Store store = Store.builder().id(10L).code("ST-001").build();
+        TripDraftStop stop = TripDraftStop.builder().id(100L).store(store).tripDraft(draft).build();
+        draft.setStops(List.of(stop));
+
+        Product product = Product.builder().id(1L).sku("SKU-999").productName("Excluded Prod").build();
+        Order excludedOrder = Order.builder().id(300L).orderRef("DH-EXCLUDED").deliveryDate(draft.getDeliveryDate()).store(store).status("UNASSIGNED").build();
+        OrderItem item = OrderItem.builder().id(500L).order(excludedOrder).product(product).sku("SKU-999").quantity(2).lineWeightKg(BigDecimal.valueOf(20.0)).lineVolumeM3(BigDecimal.valueOf(0.5)).build();
+        excludedOrder.setItems(List.of(item));
+
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+        when(orderRepository.findExcludedOrdersByDeliveryDateAndStores(eq(draft.getDeliveryDate()), eq(List.of(10L))))
+                .thenReturn(List.of(excludedOrder));
+
+        List<StopOrderItemResponse> result = tripDraftService.getExcludedOrders(50L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getOrderId()).isEqualTo(300L);
+        assertThat(result.get(0).getOrderRef()).isEqualTo("DH-EXCLUDED");
+        assertThat(result.get(0).getSku()).isEqualTo("SKU-999");
     }
 }

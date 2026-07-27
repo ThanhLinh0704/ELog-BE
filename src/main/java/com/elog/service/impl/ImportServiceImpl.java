@@ -38,6 +38,7 @@ public class ImportServiceImpl implements ImportService {
     private final ImportErrorRepository errorRepository;
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
+    private final UserRepository userRepository;
 
     // ── POST /api/imports ─────────────────────────────────────────────────────
 
@@ -506,6 +507,15 @@ public class ImportServiceImpl implements ImportService {
     }
 
     private ImportBatchResponse toResponse(ImportBatch batch, long ordersCreated) {
+        String uploadedByName = null;
+        if (batch.getUploadedBy() != null) {
+            uploadedByName = userRepository.findById(batch.getUploadedBy())
+                    .map(u -> (u.getFullName() != null && !u.getFullName().isBlank())
+                            ? u.getFullName()
+                            : u.getUsername())
+                    .orElse("User #" + batch.getUploadedBy());
+        }
+
         return ImportBatchResponse.builder()
                 .batchId(batch.getId())
                 .deliveryDate(batch.getDeliveryDate())
@@ -517,6 +527,7 @@ public class ImportServiceImpl implements ImportService {
                 .status(batch.getStatus())
                 .isActive(batch.getIsActive())
                 .createdAt(batch.getCreatedAt())
+                .uploadedBy(uploadedByName)
                 .build();
     }
 

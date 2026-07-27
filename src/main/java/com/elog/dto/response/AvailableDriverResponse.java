@@ -2,7 +2,6 @@ package com.elog.dto.response;
 
 import lombok.*;
 
-import java.util.List;
 
 @Data
 @Builder

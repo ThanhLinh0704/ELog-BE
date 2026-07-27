@@ -293,6 +293,18 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                 : null;
     }
 
+    private Double getStoreLat(TripStop stop) {
+        return stop.getRouteStop() != null && stop.getRouteStop().getStore() != null
+                ? stop.getRouteStop().getStore().getLatitude()
+                : null;
+    }
+
+    private Double getStoreLng(TripStop stop) {
+        return stop.getRouteStop() != null && stop.getRouteStop().getStore() != null
+                ? stop.getRouteStop().getStore().getLongitude()
+                : null;
+    }
+
     private int getEtaThresholdMinutes() {
         return systemConfigRepo.findByConfigKey("ETA_THRESHOLD_MINUTES")
                 .map(c -> Integer.parseInt(c.getConfigValue()))
@@ -406,6 +418,8 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                 .delayMinutes(stop.getActualArrivalTime() != null ? delayMin : null)
                 .hasException(stop.getStatus() == TripStopStatus.EXCEPTION)
                 .exceptions(exDetails)
+                .latitude(getStoreLat(stop))
+                .longitude(getStoreLng(stop))
                 .build();
     }
 

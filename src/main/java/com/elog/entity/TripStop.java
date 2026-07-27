@@ -61,4 +61,10 @@ public class TripStop {
 
     @Column(name = "notes")
     private String notes;
+
+    @Column(name = "planned_waiting_time_min")
+    private Integer plannedWaitingTimeMin;
+
+    @Column(name = "violation_code", length = 50)
+    private String violationCode;
 }

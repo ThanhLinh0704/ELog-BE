@@ -3,7 +3,6 @@ package com.elog.dto.response;
 import lombok.Builder;
 import lombok.Getter;
 
-import java.time.LocalTime;
 
 /** Response cho POST /api/trips/{id}/start */
 @Getter

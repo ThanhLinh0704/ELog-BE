@@ -28,4 +28,14 @@ public interface TripDraftService {
     void revertToDraft(Long tripDraftId, String currentUsername);
 
     List<StopOrderItemResponse> getStopOrderItems(Long tripDraftId, Long stopId);
+
+    TripDraftResponse adjustDepartureTime(Long tripDraftId, com.elog.dto.request.AdjustDepartureTimeRequest request);
+
+    void settleDelay(Long tripDraftId, Long orderId, com.elog.dto.request.SettleDelayRequest request, String username);
+
+    void excludeOrder(Long tripDraftId, Long orderId);
+
+    void reIncludeOrder(Long tripDraftId, Long orderId);
+
+    List<StopOrderItemResponse> getExcludedOrders(Long tripDraftId);
 }

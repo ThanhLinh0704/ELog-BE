@@ -63,6 +63,19 @@ public class Order {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
+    @Builder.Default
+    @Column(name = "is_delivery_time_overridden")
+    private Boolean isDeliveryTimeOverridden = false;
+
+    @Column(name = "time_override_reason")
+    private String timeOverrideReason;
+
+    @Column(name = "time_override_by")
+    private Long timeOverrideBy;
+
+    @Column(name = "time_override_at")
+    private LocalDateTime timeOverrideAt;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

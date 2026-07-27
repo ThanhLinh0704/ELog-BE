@@ -54,6 +54,10 @@ public class TripProgressResponse {
 
         private boolean hasException;
         private List<ExceptionDetail> exceptions;
+
+        // Tọa độ cửa hàng — null nếu store chưa có tọa độ
+        private Double latitude;
+        private Double longitude;
     }
 
     @Getter

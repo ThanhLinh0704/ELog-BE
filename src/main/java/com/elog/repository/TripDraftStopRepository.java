@@ -11,6 +11,8 @@ public interface TripDraftStopRepository extends JpaRepository<TripDraftStop, Lo
 
     List<TripDraftStop> findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(Long tripDraftId);
 
+    List<TripDraftStop> findByTripDraftIdOrderBySequenceNoAsc(Long tripDraftId);
+
     int countByTripDraftIdAndIsActiveTrue(Long tripDraftId);
 
     int countByTripDraftIdAndIsActiveTrueAndPlannedEtaIsNull(Long tripDraftId);

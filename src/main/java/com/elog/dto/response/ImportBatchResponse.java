@@ -21,4 +21,5 @@ public class ImportBatchResponse {
     private String status;
     private Boolean isActive;
     private LocalDateTime createdAt;
+    private String uploadedBy;
 }
