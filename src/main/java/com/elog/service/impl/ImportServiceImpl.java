@@ -40,6 +40,11 @@ public class ImportServiceImpl implements ImportService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
 
+    // Auto-pipeline dependencies
+    private final com.elog.service.TripDraftService tripDraftService;
+    private final com.elog.service.EtaCalculationService etaCalculationService;
+    private final com.elog.service.RecommendationService recommendationService;
+
     // ── POST /api/imports ─────────────────────────────────────────────────────
 
     @Override
@@ -129,7 +134,60 @@ public class ImportServiceImpl implements ImportService {
 
         long ordersCreated = orderRepository.countByBatchId(batch.getId());
 
+        // ── Step 6: Auto-Pipeline — consolidate → ETA → recommendation ────────
+        triggerAutoPipeline(deliveryDate);
+
         return toResponse(batch, ordersCreated);
+    }
+
+    /**
+     * Auto-Pipeline: after successful import, consolidate trip drafts,
+     * calculate ETA, and generate vehicle recommendations.
+     * Wrapped in try-catch so import itself is never rolled back.
+     */
+    private void triggerAutoPipeline(LocalDate deliveryDate) {
+        try {
+            log.info("Auto-Pipeline: starting for deliveryDate={}", deliveryDate);
+
+            // 6a. Consolidate orders into TripDrafts
+            var consolidateResult = tripDraftService.consolidate(deliveryDate);
+            log.info("Auto-Pipeline: consolidated {} trip drafts",
+                    consolidateResult.getTripDraftsCreatedOrUpdated());
+
+            if (consolidateResult.getTripDrafts() == null || consolidateResult.getTripDrafts().isEmpty()) {
+                log.info("Auto-Pipeline: no trip drafts created, skipping ETA and recommendation");
+                return;
+            }
+
+            // Default departure time from config, fallback 07:00
+            java.time.LocalTime defaultDeparture = java.time.LocalTime.of(7, 0);
+
+            // 6b + 6c. For each trip draft: calculate ETA → run recommendation
+            for (var draftResponse : consolidateResult.getTripDrafts()) {
+                try {
+                    if (draftResponse.getActiveStopCount() == null || draftResponse.getActiveStopCount() == 0) {
+                        continue;
+                    }
+                    // ETA calculation
+                    etaCalculationService.calculateAndPersist(draftResponse.getId(), defaultDeparture);
+                    log.info("Auto-Pipeline: ETA calculated for TripDraft id={}", draftResponse.getId());
+
+                    // Recommendation
+                    var recommendation = recommendationService.recommendTop3(draftResponse.getId());
+                    log.info("Auto-Pipeline: recommendation for TripDraft id={}: planType={}, count={}",
+                            draftResponse.getId(), recommendation.getPlanType(),
+                            recommendation.getRecommendations() != null ? recommendation.getRecommendations().size() : 0);
+                } catch (Exception ex) {
+                    log.warn("Auto-Pipeline: failed for TripDraft id={}: {}",
+                            draftResponse.getId(), ex.getMessage(), ex);
+                }
+            }
+
+            log.info("Auto-Pipeline: completed for deliveryDate={}", deliveryDate);
+        } catch (Exception ex) {
+            log.error("Auto-Pipeline: critical error for deliveryDate={}: {}",
+                    deliveryDate, ex.getMessage(), ex);
+        }
     }
 
     // ── GET /api/imports ──────────────────────────────────────────────────────
