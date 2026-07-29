@@ -511,7 +511,7 @@ public class ImportServiceImpl implements ImportService {
                         .importBatch(batch)
                         .orderRef(orderRef)
                         .store(store)
-                        .deliveryDate(deliveryDate)
+                        .deliveryDate(rowDeliveryDate)
                         .deliveryTimeWindow(row.deliveryTimeWindow)
                         .recipientName(row.recipientName)
                         .recipientPhone(row.recipientPhone)

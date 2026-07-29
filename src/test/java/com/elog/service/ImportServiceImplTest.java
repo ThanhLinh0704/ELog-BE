@@ -209,6 +209,36 @@ class ImportServiceImplTest {
         verify(batchRepository).save(existing);
     }
 
+    @Test
+    void parseRow_nullBatchDeliveryDate_newOrder_usesRowDeliveryDate() throws IOException {
+        LocalDate rowDate = LocalDate.of(2026, 8, 4);
+        List<String[]> rowsData = new ArrayList<>();
+        rowsData.add(new String[]{"DH160325-99", "ST-BT-001", "REF-SAM-300", "2", "04/08/2026"});
+        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
+
+        when(batchRepository.findActiveByDate(null)).thenReturn(Optional.empty());
+        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
+            ImportBatch b = invocation.getArgument(0);
+            b.setId(1L);
+            return b;
+        });
+
+        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
+        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(anyString(), any(LocalDate.class)))
+                .thenReturn(Optional.empty());
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
+            Order o = invocation.getArgument(0);
+            o.setId(100L);
+            return o;
+        });
+
+        ImportBatchResponse response = importService.importExcel(file, null, false, 1L);
+
+        assertThat(response.getAcceptedRows()).isEqualTo(1);
+        verify(orderRepository).save(argThat(o -> rowDate.equals(o.getDeliveryDate())));
+    }
+
     // ── L1-EIS-01 ──────────────────────────────────────────
     @Test
     void parseRow_validRow_createsOrderItemWithSnapshot() throws IOException {
