@@ -3,6 +3,7 @@ package com.elog.mapper;
 import com.elog.dto.request.VehicleCreateRequest;
 import com.elog.dto.response.VehicleListItemResponse;
 import com.elog.dto.response.VehicleResponse;
+import com.elog.entity.LicenseClass;
 import com.elog.entity.Vehicle;
 import com.elog.entity.VehicleStatus;
 import org.springframework.stereotype.Component;
@@ -36,7 +37,8 @@ public class VehicleMapper {
     public VehicleResponse toResponse(Vehicle vehicle) {
         Long driverId = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getId() : null;
         String driverName = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getFullName() : null;
-        LicenseClass driverLicense = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getLicenseClass() : null;
+        LicenseClass driverLicense = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getLicenseClass()
+                : null;
 
         return VehicleResponse.builder()
                 .id(vehicle.getId())
@@ -91,7 +93,8 @@ public class VehicleMapper {
     }
 
     public String normalizePlate(String plateNumber) {
-        if (plateNumber == null) return null;
+        if (plateNumber == null)
+            return null;
         return plateNumber.trim().toUpperCase();
     }
 }
