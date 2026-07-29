@@ -15,7 +15,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,7 +37,14 @@ public class DriverTripServiceImpl implements DriverTripService {
     @Override
     @Transactional(readOnly = true)
     public DriverTripResponse getActiveTrip(String driverUsername) {
-        TripExecution execution = tripExecutionRepo.findActiveByDriverUsername(driverUsername)
+        LocalDate today = LocalDate.now();
+
+        TripExecution execution = tripExecutionRepo
+                .findByDriverUsernameAndStatusIn(driverUsername, List.of("IN_PROGRESS", "ASSIGNED"))
+                .stream()
+                .filter(te -> "IN_PROGRESS".equals(te.getStatus())
+                        || (te.getTrip() != null && te.getTrip().getDeliveryDate() != null && !te.getTrip().getDeliveryDate().isAfter(today)))
+                .findFirst()
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.RESOURCE_NOT_FOUND,
                         "Không tìm thấy chuyến xe đang phân công cho tài xế: " + driverUsername,
@@ -54,6 +63,7 @@ public class DriverTripServiceImpl implements DriverTripService {
                         HttpStatus.NOT_FOUND));
 
         verifyDriverAccess(execution, driverUsername);
+        validateDeliveryDate(execution);
 
         if (!"ASSIGNED".equals(execution.getStatus())) {
             throw new BusinessException(
@@ -82,6 +92,7 @@ public class DriverTripServiceImpl implements DriverTripService {
                         HttpStatus.NOT_FOUND));
 
         verifyDriverAccess(execution, driverUsername);
+        validateDeliveryDate(execution);
 
         if (!"IN_PROGRESS".equals(execution.getStatus())) {
             throw new BusinessException(
@@ -130,6 +141,7 @@ public class DriverTripServiceImpl implements DriverTripService {
                         HttpStatus.NOT_FOUND));
 
         verifyDriverAccess(execution, driverUsername);
+        validateDeliveryDate(execution);
 
         if (!"IN_PROGRESS".equals(execution.getStatus())) {
             throw new BusinessException(
@@ -237,6 +249,19 @@ public class DriverTripServiceImpl implements DriverTripService {
                     ErrorCode.UNAUTHORIZED_ACCESS,
                     "Bạn không được phép thao tác trên chuyến xe của tài xế khác",
                     HttpStatus.FORBIDDEN);
+        }
+    }
+
+    private void validateDeliveryDate(TripExecution execution) {
+        if (execution.getTrip() != null && execution.getTrip().getDeliveryDate() != null) {
+            LocalDate deliveryDate = execution.getTrip().getDeliveryDate();
+            if (deliveryDate.isAfter(LocalDate.now())) {
+                String formattedDate = deliveryDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                throw new BusinessException(
+                        ErrorCode.VALIDATION_FAILED,
+                        "Chưa đến ngày giao hàng (ngày giao: " + formattedDate + "). Không thể thực hiện chuyến xe trước ngày giao.",
+                        HttpStatus.BAD_REQUEST);
+            }
         }
     }
 

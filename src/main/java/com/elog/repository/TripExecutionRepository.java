@@ -10,8 +10,7 @@ import java.util.Optional;
 
 public interface TripExecutionRepository extends JpaRepository<TripExecution, Long> {
 
-    @Query("SELECT te FROM TripExecution te WHERE te.driver.username = :username AND te.status IN ('ASSIGNED', 'IN_PROGRESS')")
-    Optional<TripExecution> findActiveByDriverUsername(@Param("username") String username);
+    List<TripExecution> findByDriverUsernameAndStatusIn(String username, List<String> statuses);
 
     @Query("SELECT te FROM TripExecution te WHERE te.trip.tripId = :tripId")
     Optional<TripExecution> findByTripId(@Param("tripId") Long tripId);

@@ -116,4 +116,29 @@ class DriverTripServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Chuyến xe đã được xác nhận về kho trước đó");
     }
+
+    @Test
+    @DisplayName("startTrip thất bại khi chuyến xe thuộc về ngày trong tương lai")
+    void startTrip_futureDeliveryDate_throwsException() {
+        trip.setDeliveryDate(LocalDate.now().plusDays(2));
+        execution.setStatus("ASSIGNED");
+        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+
+        assertThatThrownBy(() -> driverTripService.startTrip(50L, "driver1"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Chưa đến ngày giao hàng");
+    }
+
+    @Test
+    @DisplayName("getActiveTrip lọc bỏ chuyến xe ASSIGNED ở ngày tương lai")
+    void getActiveTrip_assignedFutureDate_ignored() {
+        trip.setDeliveryDate(LocalDate.now().plusDays(1));
+        execution.setStatus("ASSIGNED");
+        when(tripExecutionRepo.findByDriverUsernameAndStatusIn("driver1", java.util.List.of("IN_PROGRESS", "ASSIGNED")))
+                .thenReturn(java.util.List.of(execution));
+
+        assertThatThrownBy(() -> driverTripService.getActiveTrip("driver1"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Không tìm thấy chuyến xe đang phân công");
+    }
 }
