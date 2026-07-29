@@ -58,20 +58,18 @@ public class ImportServiceImpl implements ImportService {
         List<RowData> rows = parseExcelFile(file);
 
         // Step 3: Handle existing active batches for this delivery date if replacing
-        if (deliveryDate != null) {
-            Optional<ImportBatch> existingBatch = batchRepository.findActiveByDate(deliveryDate);
-            if (existingBatch.isPresent()) {
-                log.info("Found existing active batch {} for date {}", existingBatch.get().getId(), deliveryDate);
-            }
+        Optional<ImportBatch> existingBatch = batchRepository.findActiveByDate(deliveryDate);
+        if (existingBatch.isPresent()) {
+            log.info("Found existing active batch {} for date {}", existingBatch.get().getId(), deliveryDate);
+        }
 
-            if (confirmReplace) {
-                List<ImportBatch> activeBatches = batchRepository.findAllActiveByDate(deliveryDate);
-                for (ImportBatch oldBatch : activeBatches) {
-                    oldBatch.setIsActive(false);
-                    batchRepository.save(oldBatch);
-                }
-                batchRepository.flush(); // Force update to DB before inserting new active batch to prevent UNIQUE constraint violation
+        if (confirmReplace) {
+            List<ImportBatch> activeBatches = batchRepository.findAllActiveByDate(deliveryDate);
+            for (ImportBatch oldBatch : activeBatches) {
+                oldBatch.setIsActive(false);
+                batchRepository.save(oldBatch);
             }
+            batchRepository.flush(); // Force update to DB before inserting new active batch to prevent UNIQUE constraint violation
         }
 
         // Step 4: Create new batch
@@ -737,19 +735,4 @@ public class ImportServiceImpl implements ImportService {
         }
     }
 
-    // ── Custom exception for duplicate batch (HTTP 409) ───────────────────────
-
-    public static class DuplicateBatchException extends RuntimeException {
-        private final Long existingBatchId;
-        private final LocalDate deliveryDate;
-
-        public DuplicateBatchException(Long existingBatchId, LocalDate deliveryDate) {
-            super("Đã có dữ liệu nhập cho ngày " + deliveryDate);
-            this.existingBatchId = existingBatchId;
-            this.deliveryDate = deliveryDate;
-        }
-
-        public Long getExistingBatchId() { return existingBatchId; }
-        public LocalDate getDeliveryDate() { return deliveryDate; }
-    }
 }

@@ -188,6 +188,27 @@ class ImportServiceImplTest {
         verify(batchRepository).save(existing);
     }
 
+    @Test
+    void createBatch_nullDeliveryDate_confirmReplaceTrue_deactivatesOld() throws IOException {
+        MultipartFile file = createMockExcelFile("import.xlsx", Collections.emptyList());
+        ImportBatch existing = ImportBatch.builder().id(8L).deliveryDate(null).isActive(true).build();
+
+        when(batchRepository.findActiveByDate(null)).thenReturn(Optional.of(existing));
+        when(batchRepository.findAllActiveByDate(null)).thenReturn(List.of(existing));
+        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
+            ImportBatch b = invocation.getArgument(0);
+            if (b.getId() == null) b.setId(9L);
+            return b;
+        });
+
+        ImportBatchResponse response = importService.importExcel(file, null, true, 1L);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getBatchId()).isEqualTo(9L);
+        assertThat(existing.getIsActive()).isFalse(); // verify old deactivated when deliveryDate is null
+        verify(batchRepository).save(existing);
+    }
+
     // ── L1-EIS-01 ──────────────────────────────────────────
     @Test
     void parseRow_validRow_createsOrderItemWithSnapshot() throws IOException {

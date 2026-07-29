@@ -1,7 +1,6 @@
 package com.elog.controller;
 
 import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.DuplicateBatchResponse;
 import com.elog.dto.response.ImportBatchResponse;
 import com.elog.dto.response.ImportErrorResponse;
 import com.elog.dto.response.ImportedOrderDetailResponse;
@@ -49,20 +48,9 @@ public class ImportController {
                 .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
         Long userId = user.getId();
 
-        try {
-            ImportBatchResponse response = importService.importExcel(file, deliveryDate, confirmReplace, userId);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(ApiResponse.success(response, "Import hoàn tất"));
-        } catch (ImportServiceImpl.DuplicateBatchException e) {
-            DuplicateBatchResponse body = DuplicateBatchResponse.builder()
-                    .error("DUPLICATE_DELIVERY_DATE")
-                    .message("Đã có dữ liệu nhập cho ngày " + e.getDeliveryDate()
-                            + " (batch #" + e.getExistingBatchId()
-                            + "). Gửi lại với confirmReplace=true để thay thế.")
-                    .existingBatchId(e.getExistingBatchId())
-                    .build();
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
-        }
+        ImportBatchResponse response = importService.importExcel(file, deliveryDate, confirmReplace, userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response, "Import hoàn tất"));
     }
 
     @GetMapping
