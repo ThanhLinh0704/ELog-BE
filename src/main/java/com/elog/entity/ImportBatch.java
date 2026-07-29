@@ -20,7 +20,7 @@ public class ImportBatch {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "delivery_date", nullable = false)
+    @Column(name = "delivery_date")
     private LocalDate deliveryDate;
 
     @Column(name = "file_name", nullable = false)
