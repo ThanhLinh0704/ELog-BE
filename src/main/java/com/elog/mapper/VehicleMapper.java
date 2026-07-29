@@ -34,6 +34,10 @@ public class VehicleMapper {
     }
 
     public VehicleResponse toResponse(Vehicle vehicle) {
+        Long driverId = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getId() : null;
+        String driverName = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getFullName() : null;
+        LicenseClass driverLicense = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getLicenseClass() : null;
+
         return VehicleResponse.builder()
                 .id(vehicle.getId())
                 .vehicleCode(vehicle.getVehicleCode())
@@ -54,6 +58,9 @@ public class VehicleMapper {
                 .imageUrl(vehicle.getImageUrl())
                 .permitInfo(vehicle.getPermitInfo())
                 .description(vehicle.getDescription())
+                .assignedDriverId(driverId)
+                .assignedDriverName(driverName)
+                .assignedDriverLicenseClass(driverLicense)
                 .createdAt(vehicle.getCreatedAt())
                 .updatedAt(vehicle.getUpdatedAt())
                 .build();

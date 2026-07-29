@@ -20,6 +20,7 @@ public class DriverTripResponse {
     private LocalDate deliveryDate;
     private String status; // ASSIGNED, IN_PROGRESS, COMPLETED, etc.
     private Integer assignmentVersion;
+    private LocalDateTime returnedToWarehouseAt;
 
     // Vehicle info
     private String vehicleCode;

@@ -46,6 +46,8 @@ class TripServiceImplTest {
     private OrderItemRepository orderItemRepository;
     @Mock
     private TripStateMachine tripStateMachine;
+    @Mock
+    private TripExecutionRepository tripExecutionRepository;
 
     @InjectMocks
     private TripServiceImpl tripService;

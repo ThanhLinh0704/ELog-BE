@@ -17,4 +17,13 @@ public interface TripExecutionRepository extends JpaRepository<TripExecution, Lo
     Optional<TripExecution> findByTripId(@Param("tripId") Long tripId);
 
     List<TripExecution> findByDriverId(Long driverId);
+
+    @Query("SELECT te FROM TripExecution te WHERE te.trip.vehicle.id = :vehicleId")
+    List<TripExecution> findByVehicleId(@Param("vehicleId") Long vehicleId);
+
+    @Query("SELECT te FROM TripExecution te WHERE te.trip.vehicle.id = :vehicleId AND te.returnedToWarehouseAt IS NULL AND te.status != 'CANCELLED'")
+    List<TripExecution> findUnreturnedByVehicleId(@Param("vehicleId") Long vehicleId);
+
+    @Query("SELECT te FROM TripExecution te WHERE te.driver.id = :driverId AND te.returnedToWarehouseAt IS NULL AND te.status != 'CANCELLED'")
+    List<TripExecution> findUnreturnedByDriverId(@Param("driverId") Long driverId);
 }

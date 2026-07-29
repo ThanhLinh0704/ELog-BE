@@ -20,5 +20,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     boolean existsByEmail(String email);
 
-    
+    @org.springframework.data.jpa.repository.Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = 'ROLE_DRIVER' AND u.isActive = true")
+    java.util.List<User> findAllActiveDrivers();
 }

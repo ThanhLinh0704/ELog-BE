@@ -62,4 +62,14 @@ public class DriverTripController {
         TripOutcomeResponse response = driverTripService.completeTrip(executionId, username);
         return ResponseEntity.ok(ApiResponse.success(response, "Đã hoàn tất chuyến xe và gửi kết quả nghiệm thu"));
     }
+
+    @PostMapping("/{executionId}/return-to-warehouse")
+    @Operation(summary = "Tài xế bấm Xác nhận xe đã về tới kho (Giải phóng xe IN_USE -> AVAILABLE)")
+    @PreAuthorize("hasAuthority('trip:write')")
+    public ResponseEntity<ApiResponse<DriverTripResponse>> returnToWarehouse(
+            @PathVariable Long executionId) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        DriverTripResponse response = driverTripService.returnToWarehouse(executionId, username);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã xác nhận xe về tới kho thành công"));
+    }
 }

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -13,6 +14,7 @@ import java.math.BigDecimal;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ImportedOrderDetailResponse {
     private String orderRef;
+    private LocalDate deliveryDate;
     private String storeCode;
     private String storeName;
     private String sku;

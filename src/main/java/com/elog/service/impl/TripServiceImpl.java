@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -36,6 +37,7 @@ public class TripServiceImpl implements TripService {
     private final ManifestRepository manifestRepository;
     private final OrderItemRepository orderItemRepository;
     private final TripStateMachine tripStateMachine;
+    private final TripExecutionRepository tripExecutionRepository;
 
     // ── US-15 TASK-02 ──────────────────────────────────────────────
 
@@ -147,7 +149,17 @@ public class TripServiceImpl implements TripService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.VEHICLE_NOT_FOUND,
                         "Vehicle not found.", HttpStatus.NOT_FOUND));
 
-        User driver = findDriverOrThrow(request.getDriverId());
+        Long driverId = request.getDriverId();
+        if (driverId == null) {
+            if (vehicle.getAssignedDriver() != null) {
+                driverId = vehicle.getAssignedDriver().getId();
+            } else {
+                throw new BusinessException(ErrorCode.FIELD_REQUIRED,
+                        "Driver ID is required because vehicle has no assigned fixed driver.", HttpStatus.BAD_REQUEST);
+            }
+        }
+
+        User driver = findDriverOrThrow(driverId);
         User dispatcher = findUserByUsernameOrThrow(currentUsername);
 
         // Guard 2: Vehicle must be eligible (dual-constraint)
@@ -169,24 +181,8 @@ public class TripServiceImpl implements TripService {
             }
         }
 
-        // Guard 3: Vehicle not busy on same day (NAC-04e)
-        List<TripStatus> busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
-        if (tripRepository.existsByVehicleIdAndDeliveryDateAndStatusIn(
-                vehicle.getId(), td.getDeliveryDate(), busyStatuses)) {
-            throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,
-                    "Vehicle " + vehicle.getPlateNumber()
-                            + " already has an active trip on " + td.getDeliveryDate() + ".",
-                    HttpStatus.CONFLICT);
-        }
-
-        // Guard 4: Driver not busy on same day (NAC-15a)
-        if (tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(
-                driver.getId(), td.getDeliveryDate(), busyStatuses)) {
-            throw new BusinessException(ErrorCode.DRIVER_CONFLICT,
-                    "Driver " + driver.getFullName()
-                            + " already assigned to another trip on " + td.getDeliveryDate() + ".",
-                    HttpStatus.CONFLICT);
-        }
+        // Guard 3 & 4: Comprehensive vehicle & driver availability check (unreturned, active trip, time overlap)
+        validateVehicleAndDriverAvailability(vehicle, driver, td.getDeliveryDate(), td.getPlannedDepartureTime(), null);
 
         // Create Trip
         Trip trip = buildTrip(td, vehicle, driver, dispatcher,
@@ -244,23 +240,8 @@ public class TripServiceImpl implements TripService {
                             "Vehicle not found.", HttpStatus.NOT_FOUND));
             User driver = findDriverOrThrow(assignment.getDriverId());
 
-            // Vehicle conflict check
-            if (tripRepository.existsByVehicleIdAndDeliveryDateAndStatusIn(
-                    vehicle.getId(), td.getDeliveryDate(), busyStatuses)) {
-                throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,
-                        "Vehicle " + vehicle.getPlateNumber()
-                                + " already has an active trip on " + td.getDeliveryDate() + ".",
-                        HttpStatus.CONFLICT);
-            }
-
-            // Driver conflict check
-            if (tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(
-                    driver.getId(), td.getDeliveryDate(), busyStatuses)) {
-                throw new BusinessException(ErrorCode.DRIVER_CONFLICT,
-                        "Driver " + driver.getFullName()
-                                + " already assigned to another trip on " + td.getDeliveryDate() + ".",
-                        HttpStatus.CONFLICT);
-            }
+            // Vehicle & driver availability check (unreturned, active trip, time overlap)
+            validateVehicleAndDriverAvailability(vehicle, driver, td.getDeliveryDate(), td.getPlannedDepartureTime(), null);
 
             // Get the specific stops for this split group
             List<TripDraftStop> groupStops = assignment.getStopIds().stream()
@@ -690,22 +671,8 @@ public class TripServiceImpl implements TripService {
             }
         }
 
-        // Guard 3: Vehicle busy check on the same day (excluding current trip)
-        List<TripStatus> busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
-        if (tripRepository.existsByVehicleIdAndDeliveryDateAndStatusInAndTripIdNot(
-                vehicle.getId(), trip.getDeliveryDate(), busyStatuses, tripId)) {
-            throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,
-                    "Vehicle " + vehicle.getPlateNumber() + " is already assigned to another active trip on " + trip.getDeliveryDate(),
-                    HttpStatus.CONFLICT);
-        }
-
-        // Guard 4: Driver busy check on the same day (excluding current trip)
-        if (tripRepository.existsByDriverIdAndDeliveryDateAndStatusInAndTripIdNot(
-                driver.getId(), trip.getDeliveryDate(), busyStatuses, tripId)) {
-            throw new BusinessException(ErrorCode.DRIVER_CONFLICT,
-                    "Driver " + driver.getFullName() + " is already assigned to another active trip on " + trip.getDeliveryDate(),
-                    HttpStatus.CONFLICT);
-        }
+        // Guard 3 & 4: Comprehensive vehicle & driver availability check (excluding current trip)
+        validateVehicleAndDriverAvailability(vehicle, driver, trip.getDeliveryDate(), trip.getPlannedDepartureTime(), tripId);
 
         // Update and save
         trip.setVehicle(vehicle);
@@ -716,6 +683,101 @@ public class TripServiceImpl implements TripService {
                 tripId, currentUsername, vehicle.getPlateNumber(), driver.getFullName());
 
         return buildTripResponse(trip, null);
+    }
+
+    private void validateVehicleAndDriverAvailability(Vehicle vehicle, User driver, LocalDate deliveryDate, LocalTime plannedDepartureTime, Long excludeTripId) {
+        List<TripStatus> busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+
+        // 1. Vehicle active trip check on same day
+        if (excludeTripId == null) {
+            if (tripRepository.existsByVehicleIdAndDeliveryDateAndStatusIn(vehicle.getId(), deliveryDate, busyStatuses)) {
+                throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,
+                        "Vehicle " + vehicle.getPlateNumber() + " already has an active trip on " + deliveryDate + ".",
+                        HttpStatus.CONFLICT);
+            }
+        } else {
+            if (tripRepository.existsByVehicleIdAndDeliveryDateAndStatusInAndTripIdNot(vehicle.getId(), deliveryDate, busyStatuses, excludeTripId)) {
+                throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,
+                        "Vehicle " + vehicle.getPlateNumber() + " already has an active trip on " + deliveryDate + ".",
+                        HttpStatus.CONFLICT);
+            }
+        }
+
+        // 2. Driver active trip check on same day
+        if (excludeTripId == null) {
+            if (tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(driver.getId(), deliveryDate, busyStatuses)) {
+                throw new BusinessException(ErrorCode.DRIVER_CONFLICT,
+                        "Driver " + driver.getFullName() + " already assigned to another trip on " + deliveryDate + ".",
+                        HttpStatus.CONFLICT);
+            }
+        } else {
+            if (tripRepository.existsByDriverIdAndDeliveryDateAndStatusInAndTripIdNot(driver.getId(), deliveryDate, busyStatuses, excludeTripId)) {
+                throw new BusinessException(ErrorCode.DRIVER_CONFLICT,
+                        "Driver " + driver.getFullName() + " already assigned to another trip on " + deliveryDate + ".",
+                        HttpStatus.CONFLICT);
+            }
+        }
+
+        // 3. Vehicle unreturned check
+        List<TripExecution> unreturnedVehicles = tripExecutionRepository.findUnreturnedByVehicleId(vehicle.getId());
+        for (TripExecution te : unreturnedVehicles) {
+            if (excludeTripId != null && te.getTrip() != null && te.getTrip().getTripId().equals(excludeTripId)) {
+                continue;
+            }
+            throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,
+                    "Vehicle " + vehicle.getPlateNumber() + " is currently IN_USE on trip #" 
+                            + (te.getTrip() != null ? te.getTrip().getTripId() : te.getId()) 
+                            + " and has not confirmed return to warehouse yet.",
+                    HttpStatus.CONFLICT);
+        }
+
+        // 4. Driver unreturned check
+        List<TripExecution> unreturnedDrivers = tripExecutionRepository.findUnreturnedByDriverId(driver.getId());
+        for (TripExecution te : unreturnedDrivers) {
+            if (excludeTripId != null && te.getTrip() != null && te.getTrip().getTripId().equals(excludeTripId)) {
+                continue;
+            }
+            throw new BusinessException(ErrorCode.DRIVER_CONFLICT,
+                    "Driver " + driver.getFullName() + " is currently active on trip #" 
+                            + (te.getTrip() != null ? te.getTrip().getTripId() : te.getId()) 
+                            + " and has not confirmed return to warehouse yet.",
+                    HttpStatus.CONFLICT);
+        }
+
+        // 5. Time window overlap check (vs previous returned trips)
+        if (plannedDepartureTime != null) {
+            LocalDateTime newDeparture = LocalDateTime.of(deliveryDate, plannedDepartureTime);
+
+            List<TripExecution> vehicleHistory = tripExecutionRepository.findByVehicleId(vehicle.getId());
+            for (TripExecution te : vehicleHistory) {
+                if (te.getReturnedToWarehouseAt() != null) {
+                    LocalDateTime earliestAvailable = te.getReturnedToWarehouseAt().plusMinutes(30);
+                    if (newDeparture.isBefore(earliestAvailable)) {
+                        throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,
+                                "Vehicle " + vehicle.getPlateNumber() + " returned to warehouse at "
+                                        + te.getReturnedToWarehouseAt().format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy"))
+                                        + ". New departure at " + newDeparture.format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy"))
+                                        + " violates return window.",
+                                HttpStatus.CONFLICT);
+                    }
+                }
+            }
+
+            List<TripExecution> driverHistory = tripExecutionRepository.findByDriverId(driver.getId());
+            for (TripExecution te : driverHistory) {
+                if (te.getReturnedToWarehouseAt() != null) {
+                    LocalDateTime earliestAvailable = te.getReturnedToWarehouseAt().plusMinutes(30);
+                    if (newDeparture.isBefore(earliestAvailable)) {
+                        throw new BusinessException(ErrorCode.DRIVER_CONFLICT,
+                                "Driver " + driver.getFullName() + " returned to warehouse at "
+                                        + te.getReturnedToWarehouseAt().format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy"))
+                                        + ". New departure at " + newDeparture.format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy"))
+                                        + " violates return window.",
+                                HttpStatus.CONFLICT);
+                    }
+                }
+            }
+        }
     }
 }
 

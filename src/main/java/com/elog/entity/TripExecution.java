@@ -47,6 +47,9 @@ public class TripExecution {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "returned_to_warehouse_at")
+    private LocalDateTime returnedToWarehouseAt;
+
     @OneToMany(mappedBy = "tripExecution", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<DeliveryOrderResult> orderResults = new ArrayList<>();

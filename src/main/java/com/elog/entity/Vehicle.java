@@ -79,6 +79,10 @@ public class Vehicle {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_driver_id")
+    private User assignedDriver;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

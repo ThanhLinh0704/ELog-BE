@@ -193,7 +193,43 @@ public class DriverTripServiceImpl implements DriverTripService {
                 .build();
     }
 
-    // ── Helper Methods ────────────────────────────────────────────────────────
+    @Override
+    @Transactional
+    public DriverTripResponse returnToWarehouse(Long executionId, String driverUsername) {
+        TripExecution execution = tripExecutionRepo.findById(executionId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "Không tìm thấy chuyến xe với ID: " + executionId,
+                        HttpStatus.NOT_FOUND));
+
+        verifyDriverAccess(execution, driverUsername);
+
+        if (!List.of("COMPLETED", "COMPLETED_WITH_EXCEPTIONS").contains(execution.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.VALIDATION_FAILED,
+                    "Chuyến xe chưa hoàn thành (trạng thái hiện tại: " + execution.getStatus() + "). Không thể xác nhận về kho.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        if (execution.getReturnedToWarehouseAt() != null) {
+            throw new BusinessException(
+                    ErrorCode.VALIDATION_FAILED,
+                    "Chuyến xe đã được xác nhận về kho trước đó lúc: " + execution.getReturnedToWarehouseAt(),
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        execution.setReturnedToWarehouseAt(LocalDateTime.now());
+        tripExecutionRepo.save(execution);
+
+        // Update vehicle status back to AVAILABLE
+        Trip trip = execution.getTrip();
+        if (trip != null && trip.getVehicle() != null) {
+            trip.getVehicle().setStatus(VehicleStatus.AVAILABLE);
+        }
+
+        log.info("Driver {} confirmed return to warehouse for trip execution ID {}. Vehicle released to AVAILABLE.", driverUsername, executionId);
+        return buildDriverTripResponse(execution);
+    }
 
     private void verifyDriverAccess(TripExecution execution, String driverUsername) {
         if (execution.getDriver() == null || !driverUsername.equals(execution.getDriver().getUsername())) {
@@ -318,6 +354,7 @@ public class DriverTripServiceImpl implements DriverTripService {
                 .deliveryDate(trip != null ? trip.getDeliveryDate() : null)
                 .status(execution.getStatus())
                 .assignmentVersion(execution.getAssignmentVersion())
+                .returnedToWarehouseAt(execution.getReturnedToWarehouseAt())
                 .vehicleCode(trip != null && trip.getVehicle() != null ? trip.getVehicle().getVehicleCode() : null)
                 .plateNumber(trip != null && trip.getVehicle() != null ? trip.getVehicle().getPlateNumber() : null)
                 .driverName(execution.getDriver() != null ? execution.getDriver().getFullName() : null)

@@ -58,9 +58,7 @@ public class TripStateMachine {
             }
             case COMPLETED -> {
                 trip.setCompletedAt(LocalDateTime.now());
-                if (trip.getVehicle() != null) {
-                    trip.getVehicle().setStatus(com.elog.entity.VehicleStatus.AVAILABLE);
-                }
+                // Note: Vehicle remains IN_USE until driver confirms returnToWarehouse
             }
             default -> { /* VALIDATED has no side effects */ }
         }

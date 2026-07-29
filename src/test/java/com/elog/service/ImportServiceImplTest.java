@@ -1211,4 +1211,36 @@ class ImportServiceImplTest {
                 .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.NOT_FOUND)
                 .hasMessageContaining("Import batch not found: 99");
     }
+
+    @Test
+    void importExcel_9ColumnMultiDate_success() throws Exception {
+        LocalDate fallbackDate = LocalDate.of(2026, 8, 1);
+        List<String[]> rows = List.of(
+                new String[]{"DH-101", "ST-BT-001", "REF-SAM-300", "2", "2026-08-01", "08:00 - 12:00", "Nguyen A", "0901234567", "Note 1"},
+                new String[]{"DH-102", "ST-BT-001", "REF-SAM-300", "3", "2026-08-02", "13:00 - 17:00", "Nguyen B", "0907654321", "Note 2"}
+        );
+        MultipartFile file = createMockExcelFile("orders_multi_date.xlsx", rows);
+
+        when(batchRepository.findActiveByDate(any())).thenReturn(Optional.empty());
+        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(i -> {
+            ImportBatch b = i.getArgument(0);
+            b.setId(10L);
+            return b;
+        });
+        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
+        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> {
+            Order o = i.getArgument(0);
+            o.setId(100L);
+            return o;
+        });
+        when(orderRepository.countByBatchId(10L)).thenReturn(2L);
+
+        ImportBatchResponse response = importService.importExcel(file, fallbackDate, false, 1L);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getBatchId()).isEqualTo(10L);
+        assertThat(response.getAcceptedRows()).isEqualTo(2);
+        assertThat(response.getRejectedRows()).isEqualTo(0);
+    }
 }

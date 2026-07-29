@@ -39,7 +39,7 @@ public class ImportController {
     @PreAuthorize("hasAuthority('order:import')")
     public ResponseEntity<?> importOrders(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("deliveryDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
+            @RequestParam(value = "deliveryDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
             @RequestParam(value = "confirmReplace", required = false, defaultValue = "false") boolean confirmReplace,
             Authentication authentication) {
 
@@ -88,8 +88,9 @@ public class ImportController {
     @Operation(summary = "Get list of successfully imported orders and products details for a batch")
     @PreAuthorize("hasAnyAuthority('order:import', 'trip:read')")
     public ResponseEntity<ApiResponse<List<ImportedOrderDetailResponse>>> getImportedOrders(
-            @PathVariable Long batchId) {
-        List<ImportedOrderDetailResponse> response = importService.getImportedOrders(batchId);
+            @PathVariable Long batchId,
+            @RequestParam(value = "deliveryDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate) {
+        List<ImportedOrderDetailResponse> response = importService.getImportedOrders(batchId, deliveryDate);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

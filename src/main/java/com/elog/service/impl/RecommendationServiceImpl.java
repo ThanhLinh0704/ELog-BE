@@ -53,18 +53,23 @@ public class RecommendationServiceImpl implements RecommendationService {
     private final OrderRepository orderRepo;
     private final SystemConfigRepository configRepo;
     private final ConstraintValidationService constraintValidationService;
+    private final TripExecutionRepository tripExecutionRepo;
 
     // ── Internal helper classes ───────────────────────────────────────────────
 
     /** Per-stop cargo summary for splitting. */
     private record StopCargo(TripDraftStop stop, BigDecimal volumeM3, BigDecimal weightKg) {}
 
+    /** Paired driver resolution result. */
+    private record PairedDriverInfo(User driver, boolean isTemporary) {}
+
     /** Scored candidate for single-vehicle. */
     private record ScoredVehicle(Vehicle vehicle, BigDecimal score, String explanation,
-                                 List<User> eligibleDrivers) {}
+                                 PairedDriverInfo driverInfo) {}
 
     /** Scored candidate for two-vehicle pair. */
     private record ScoredPair(Vehicle vehicleA, Vehicle vehicleB,
+                              PairedDriverInfo driverInfoA, PairedDriverInfo driverInfoB,
                               int splitPoint,
                               List<StopCargo> subA, List<StopCargo> subB,
                               BigDecimal scoreA, BigDecimal scoreB,
@@ -179,17 +184,18 @@ public class RecommendationServiceImpl implements RecommendationService {
                 continue;
             }
 
-            // Check driver availability
-            List<User> eligibleDrivers = findEligibleDrivers(v, deliveryDate, allDrivers, busyStatuses);
-            if (eligibleDrivers.isEmpty()) {
+            // Resolve driver pairing (assigned driver first, fallback to temporary driver)
+            PairedDriverInfo driverInfo = resolveDriverForVehicle(v, deliveryDate, allDrivers, busyStatuses);
+            if (driverInfo == null) {
                 continue; // No driver with compatible license available
             }
 
             // ── Tier 2: Soft Scoring ──────────────────────────────────────
+            List<User> eligibleDrivers = List.of(driverInfo.driver());
             BigDecimal score = calculateSoftScore(v, draft, stops, maxCostPerKm, maxSpeedKmh, eligibleDrivers);
             String explanation = buildSingleExplanation(v, draft, score);
 
-            candidates.add(new ScoredVehicle(v, score, explanation, eligibleDrivers));
+            candidates.add(new ScoredVehicle(v, score, explanation, driverInfo));
         }
 
         // Sort descending by score
@@ -260,27 +266,23 @@ public class RecommendationServiceImpl implements RecommendationService {
 
             // Pair up VA != VB, both must have eligible drivers
             for (Vehicle va : candidatesA) {
+                PairedDriverInfo driverInfoA = resolveDriverForVehicle(va, deliveryDate, allDrivers, busyStatuses);
+                if (driverInfoA == null) continue;
+
                 for (Vehicle vb : candidatesB) {
                     if (va.getId().equals(vb.getId())) continue;
 
-                    // Check driver availability for both
-                    List<User> driversA = findEligibleDrivers(va, deliveryDate, allDrivers, busyStatuses);
-                    List<User> driversB = findEligibleDrivers(vb, deliveryDate, allDrivers, busyStatuses);
+                    PairedDriverInfo driverInfoB = resolveDriverForVehicle(vb, deliveryDate, allDrivers, busyStatuses);
+                    if (driverInfoB == null) continue;
 
-                    // Need at least 2 distinct drivers
-                    if (driversA.isEmpty() || driversB.isEmpty()) continue;
-                    Set<Long> driverIdsA = driversA.stream().map(User::getId).collect(Collectors.toSet());
-                    Set<Long> driverIdsB = driversB.stream().map(User::getId).collect(Collectors.toSet());
-                    // Check there are at least 2 distinct drivers across both sets
-                    Set<Long> allDriverIds = new HashSet<>(driverIdsA);
-                    allDriverIds.addAll(driverIdsB);
-                    if (allDriverIds.size() < 2) continue;
+                    // Cannot assign same driver to both sub-trips
+                    if (driverInfoA.driver().getId().equals(driverInfoB.driver().getId())) continue;
 
                     // Score each sub-trip
                     BigDecimal scoreA = calculateSoftScoreForSub(va, subAVolume, subAWeight, stopsA,
-                            maxCostPerKm, maxSpeedKmh, driversA);
+                            maxCostPerKm, maxSpeedKmh, List.of(driverInfoA.driver()));
                     BigDecimal scoreB = calculateSoftScoreForSub(vb, subBVolume, subBWeight, stopsB,
-                            maxCostPerKm, maxSpeedKmh, driversB);
+                            maxCostPerKm, maxSpeedKmh, List.of(driverInfoB.driver()));
 
                     // PairScore = (scoreA + scoreB) / 2 - penalty
                     BigDecimal pairScore = scoreA.add(scoreB)
@@ -292,7 +294,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                             va.getPlateNumber(), vb.getPlateNumber(), k,
                             scoreA.doubleValue(), scoreB.doubleValue(), MULTI_VEHICLE_PENALTY.doubleValue());
 
-                    allPairs.add(new ScoredPair(va, vb, k, subA, subB, scoreA, scoreB, pairScore, explanation));
+                    allPairs.add(new ScoredPair(va, vb, driverInfoA, driverInfoB, k, subA, subB, scoreA, scoreB, pairScore, explanation));
                 }
             }
         }
@@ -317,9 +319,14 @@ public class RecommendationServiceImpl implements RecommendationService {
             return fails; // fast-fail
         }
 
-        // HC-2: Schedule conflict
+        // HC-2: Schedule conflict & unreturned check
         if (tripRepo.existsByVehicleIdAndDeliveryDateAndStatusIn(v.getId(), deliveryDate, busyStatuses)) {
             fails.add("Vehicle has conflicting trip on " + deliveryDate);
+            return fails;
+        }
+
+        if (!tripExecutionRepo.findUnreturnedByVehicleId(v.getId()).isEmpty()) {
+            fails.add("Vehicle is IN_USE and has not confirmed return to warehouse yet");
             return fails;
         }
 
@@ -367,6 +374,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                                                  LocalDate deliveryDate, List<TripStatus> busyStatuses) {
         if (v.getStatus() != VehicleStatus.AVAILABLE) return false;
         if (tripRepo.existsByVehicleIdAndDeliveryDateAndStatusIn(v.getId(), deliveryDate, busyStatuses)) return false;
+        if (!tripExecutionRepo.findUnreturnedByVehicleId(v.getId()).isEmpty()) return false;
 
         BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(SAFETY_BUFFER);
         BigDecimal effectiveWeight = v.getPayloadKg().multiply(SAFETY_BUFFER);
@@ -602,10 +610,37 @@ public class RecommendationServiceImpl implements RecommendationService {
     // RESPONSE BUILDERS
     // ══════════════════════════════════════════════════════════════════════════
 
+    private PairedDriverInfo resolveDriverForVehicle(Vehicle v, LocalDate date, List<User> allDrivers, List<TripStatus> busyStatuses) {
+        // Step 1: Try fixed assigned driver first
+        User assigned = v.getAssignedDriver();
+        if (assigned != null && Boolean.TRUE.equals(assigned.getIsActive())) {
+            boolean licenseOk = (v.getRequiredLicense() == null) ||
+                    (assigned.getLicenseClass() != null && assigned.getLicenseClass().ordinal() >= v.getRequiredLicense().ordinal());
+            boolean busy = tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(assigned.getId(), date, busyStatuses)
+                    || !tripExecutionRepo.findUnreturnedByDriverId(assigned.getId()).isEmpty();
+
+            if (licenseOk && !busy) {
+                return new PairedDriverInfo(assigned, false);
+            }
+        }
+
+        // Step 2: Fallback to temporary substitute driver
+        List<User> eligibleSubstitutes = findEligibleDrivers(v, date, allDrivers, busyStatuses);
+        if (!eligibleSubstitutes.isEmpty()) {
+            return new PairedDriverInfo(eligibleSubstitutes.get(0), true);
+        }
+
+        return null;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // RESPONSE BUILDERS
+    // ══════════════════════════════════════════════════════════════════════════
+
     private VehicleRecommendationResponse toSingleVehicleResponse(ScoredVehicle sv) {
         return VehicleRecommendationResponse.builder()
                 .planType("SINGLE_VEHICLE")
-                .vehicles(List.of(toVehicleDto(sv.vehicle())))
+                .vehicles(List.of(toVehicleDto(sv.vehicle(), sv.driverInfo())))
                 .subTrips(null)
                 .totalScore(sv.score())
                 .explanation(sv.explanation())
@@ -633,14 +668,17 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         return VehicleRecommendationResponse.builder()
                 .planType("TWO_VEHICLE")
-                .vehicles(List.of(toVehicleDto(sp.vehicleA()), toVehicleDto(sp.vehicleB())))
+                .vehicles(List.of(toVehicleDto(sp.vehicleA(), sp.driverInfoA()), toVehicleDto(sp.vehicleB(), sp.driverInfoB())))
                 .subTrips(List.of(subTripA, subTripB))
                 .totalScore(sp.pairScore())
                 .explanation(sp.explanation())
                 .build();
     }
 
-    private RecommendedVehicleDto toVehicleDto(Vehicle v) {
+    private RecommendedVehicleDto toVehicleDto(Vehicle v, PairedDriverInfo driverInfo) {
+        User driver = driverInfo != null ? driverInfo.driver() : null;
+        Boolean isTemp = driverInfo != null ? driverInfo.isTemporary() : null;
+
         return RecommendedVehicleDto.builder()
                 .vehicleId(v.getId())
                 .vehicleCode(v.getVehicleCode())
@@ -650,6 +688,11 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .maxVolumeM3(v.getMaxVolumeM3())
                 .costPerKm(v.getCostPerKm())
                 .averageSpeedKmh(v.getAverageSpeedKmh())
+                .driverId(driver != null ? driver.getId() : null)
+                .driverName(driver != null ? driver.getFullName() : null)
+                .driverPhone(driver != null ? driver.getEmail() : null)
+                .driverLicenseClass(driver != null ? driver.getLicenseClass() : null)
+                .isTemporaryDriver(isTemp)
                 .build();
     }
 

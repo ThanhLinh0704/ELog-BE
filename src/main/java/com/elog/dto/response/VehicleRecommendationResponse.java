@@ -51,6 +51,13 @@ public class VehicleRecommendationResponse {
         private BigDecimal maxVolumeM3;
         private BigDecimal costPerKm;
         private BigDecimal averageSpeedKmh;
+
+        // Driver pairing info
+        private Long driverId;
+        private String driverName;
+        private String driverPhone;
+        private com.elog.entity.LicenseClass driverLicenseClass;
+        private Boolean isTemporaryDriver;
     }
 
     @Data

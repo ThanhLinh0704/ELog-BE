@@ -27,4 +27,9 @@ public interface DriverTripService {
      * Generates a SUBMITTED TripOutcome.
      */
     TripOutcomeResponse completeTrip(Long executionId, String driverUsername);
+
+    /**
+     * Driver confirms returning to warehouse. Releases vehicle back to AVAILABLE.
+     */
+    DriverTripResponse returnToWarehouse(Long executionId, String driverUsername);
 }

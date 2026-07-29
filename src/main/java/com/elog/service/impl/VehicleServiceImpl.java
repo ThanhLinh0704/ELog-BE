@@ -25,11 +25,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
+import com.elog.entity.User;
+import com.elog.repository.UserRepository;
+
 @Service
 @RequiredArgsConstructor
 public class VehicleServiceImpl implements VehicleService {
 
     private final VehicleRepository vehicleRepository;
+    private final UserRepository userRepository;
     private final VehicleMapper vehicleMapper;
 
     @Override
@@ -49,6 +53,12 @@ public class VehicleServiceImpl implements VehicleService {
         validateVehicleCapacityRatio(request.getPayloadKg(), request.getMaxVolumeM3());
 
         Vehicle vehicle = vehicleMapper.toEntity(request);
+        if (request.getAssignedDriverId() != null) {
+            User driver = userRepository.findById(request.getAssignedDriverId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+                            "Driver not found: " + request.getAssignedDriverId(), HttpStatus.NOT_FOUND));
+            vehicle.setAssignedDriver(driver);
+        }
         Vehicle saved = vehicleRepository.save(vehicle);
         return vehicleMapper.toResponse(saved);
     }
@@ -129,6 +139,15 @@ public class VehicleServiceImpl implements VehicleService {
         vehicle.setImageUrl(request.getImageUrl());
         vehicle.setPermitInfo(request.getPermitInfo());
         vehicle.setDescription(request.getDescription());
+
+        if (request.getAssignedDriverId() != null) {
+            User driver = userRepository.findById(request.getAssignedDriverId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+                            "Driver not found: " + request.getAssignedDriverId(), HttpStatus.NOT_FOUND));
+            vehicle.setAssignedDriver(driver);
+        } else {
+            vehicle.setAssignedDriver(null);
+        }
 
         Vehicle saved = vehicleRepository.save(vehicle);
         return vehicleMapper.toResponse(saved);
