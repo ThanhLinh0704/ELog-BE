@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
@@ -44,6 +45,8 @@ class TripServiceImplTest {
     private ManifestRepository manifestRepository;
     @Mock
     private OrderItemRepository orderItemRepository;
+    @Mock
+    private OrderRepository orderRepository;
     @Mock
     private TripStateMachine tripStateMachine;
     @Mock
@@ -203,5 +206,37 @@ class TripServiceImplTest {
                 .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.BAD_REQUEST);
 
         verify(tripRepository, never()).save(any());
+    }
+
+    @Test
+    void dispatchTrip_createsTripExecution() {
+        Trip trip = Trip.builder()
+                .tripId(100L)
+                .tripDraft(testDraft)
+                .route(testDraft.getRoute())
+                .vehicle(testVehicle)
+                .driver(testDriver)
+                .status(TripStatus.VALIDATED)
+                .deliveryDate(LocalDate.now())
+                .build();
+
+        Order order = Order.builder().id(50L).orderRef("DH-001").build();
+
+        when(tripRepository.findById(100L)).thenReturn(Optional.of(trip));
+        when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
+        when(vehicleRepository.sumActiveMaxVolumeM3()).thenReturn(BigDecimal.valueOf(100.0));
+        when(vehicleRepository.sumActiveMaxWeightKg()).thenReturn(BigDecimal.valueOf(10000.0));
+        when(tripDraftRepository.findByDeliveryDate(any(), any())).thenReturn(new PageImpl<>(List.of(testDraft)));
+        when(tripExecutionRepository.findByTripId(100L)).thenReturn(Optional.empty());
+        when(orderRepository.findByTripDraftId(1L)).thenReturn(List.of(order));
+
+        TripResponse response = tripService.dispatchTrip(100L, "dispatcher01");
+
+        assertThat(response).isNotNull();
+        verify(tripExecutionRepository).save(argThat(te ->
+                te.getTrip().getTripId().equals(100L) &&
+                te.getDriver().getId().equals(testDriver.getId()) &&
+                te.getOrderResults().size() == 1
+        ));
     }
 }

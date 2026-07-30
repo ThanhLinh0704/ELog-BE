@@ -36,6 +36,7 @@ public class TripServiceImpl implements TripService {
     private final UserRepository userRepository;
     private final ManifestRepository manifestRepository;
     private final OrderItemRepository orderItemRepository;
+    private final OrderRepository orderRepository;
     private final TripStateMachine tripStateMachine;
     private final TripExecutionRepository tripExecutionRepository;
 
@@ -376,6 +377,27 @@ public class TripServiceImpl implements TripService {
         tripStateMachine.transition(trip, TripStatus.DISPATCHED, dispatcher.getId());
         trip.setLockedBy(dispatcher);
         tripRepository.save(trip);
+
+        // Create & save TripExecution (FT-09 lifecycle) for the driver if not already existing
+        if (tripExecutionRepository.findByTripId(trip.getTripId()).isEmpty()) {
+            TripExecution execution = TripExecution.builder()
+                    .trip(trip)
+                    .driver(trip.getDriver())
+                    .build();
+
+            if (trip.getTripDraft() != null) {
+                List<Order> orders = orderRepository.findByTripDraftId(trip.getTripDraft().getId());
+                for (Order order : orders) {
+                    execution.getOrderResults().add(DeliveryOrderResult.builder()
+                            .tripExecution(execution)
+                            .order(order)
+                            .status("PENDING")
+                            .build());
+                }
+            }
+
+            tripExecutionRepository.save(execution);
+        }
 
         log.info("Trip {} dispatched by {}", tripId, currentUsername);
 

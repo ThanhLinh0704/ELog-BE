@@ -47,6 +47,8 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                     "You are not assigned to Trip " + tripId, HttpStatus.FORBIDDEN);
         }
 
+        validateDeliveryDate(trip);
+
         if (trip.getStatus() != TripStatus.DISPATCHED) {
             throw new BusinessException(ErrorCode.INVALID_TRIP_TRANSITION,
                     "Trip " + tripId + " is not DISPATCHED. Current status: " + trip.getStatus(),
@@ -84,6 +86,8 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
             throw new BusinessException(ErrorCode.NOT_YOUR_TRIP,
                     "TripStop " + tripStopId + " does not belong to your trip", HttpStatus.FORBIDDEN);
         }
+
+        validateDeliveryDate(trip);
 
         if (trip.getStatus() == TripStatus.COMPLETED) {
             throw new BusinessException(ErrorCode.TRIP_COMPLETED,
@@ -154,6 +158,8 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
             throw new BusinessException(ErrorCode.NOT_YOUR_TRIP,
                     "TripStop " + tripStopId + " does not belong to your trip", HttpStatus.FORBIDDEN);
         }
+
+        validateDeliveryDate(trip);
 
         if (stop.getStatus() != TripStopStatus.IN_PROGRESS) {
             if (stop.getStatus() == TripStopStatus.COMPLETED) {
@@ -279,6 +285,16 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                 .gpsLocation(null)
                 .gpsNote(GPS_NOTE)
                 .build();
+    }
+
+    private void validateDeliveryDate(Trip trip) {
+        if (trip != null && trip.getDeliveryDate() != null && trip.getDeliveryDate().isAfter(LocalDate.now())) {
+            String formattedDate = trip.getDeliveryDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+            throw new BusinessException(
+                    ErrorCode.VALIDATION_FAILED,
+                    "Chưa đến ngày giao hàng (ngày giao: " + formattedDate + "). Không thể thực hiện chuyến xe trước ngày giao.",
+                    HttpStatus.BAD_REQUEST);
+        }
     }
 
     private String getStoreCode(TripStop stop) {
