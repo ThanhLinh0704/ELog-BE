@@ -39,6 +39,7 @@ public class ImportServiceImpl implements ImportService {
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final TripDraftRepository tripDraftRepository;
 
     // Auto-pipeline dependencies
     private final com.elog.service.TripDraftService tripDraftService;
@@ -58,14 +59,13 @@ public class ImportServiceImpl implements ImportService {
         List<RowData> rows = parseExcelFile(file);
 
         // Step 3: Handle existing active batches for this delivery date if replacing
-        Optional<ImportBatch> existingBatch = batchRepository.findActiveByDate(deliveryDate);
-        if (existingBatch.isPresent()) {
-            log.info("Found existing active batch {} for date {}", existingBatch.get().getId(), deliveryDate);
+        List<ImportBatch> existingActiveBatches = batchRepository.findAllActiveByDate(deliveryDate);
+        if (!existingActiveBatches.isEmpty()) {
+            log.info("Found {} existing active batch(es) for date {}", existingActiveBatches.size(), deliveryDate);
         }
 
         if (confirmReplace) {
-            List<ImportBatch> activeBatches = batchRepository.findAllActiveByDate(deliveryDate);
-            for (ImportBatch oldBatch : activeBatches) {
+            for (ImportBatch oldBatch : existingActiveBatches) {
                 oldBatch.setIsActive(false);
                 batchRepository.save(oldBatch);
             }
@@ -106,10 +106,12 @@ public class ImportServiceImpl implements ImportService {
         Map<String, Integer> orderRefFirstRow = new HashMap<>();
         // Cache for tracking created order items to accumulate duplicates
         Map<String, OrderItem> orderItemCache = new HashMap<>();
+        // Cache for tracking locked trip draft per delivery date
+        Map<LocalDate, Boolean> lockedDateCache = new HashMap<>();
 
         for (RowData row : rows) {
             try {
-                processRow(row, batch, deliveryDate, storeCache, productCache, orderCache, orderRefStoreCache, orderRefFirstRow, orderItemCache);
+                processRow(row, batch, deliveryDate, storeCache, productCache, orderCache, orderRefStoreCache, orderRefFirstRow, orderItemCache, lockedDateCache);
                 acceptedRows++;
             } catch (RowRejectedException ex) {
                 rejectedRows++;
@@ -408,7 +410,8 @@ public class ImportServiceImpl implements ImportService {
     private void processRow(RowData row, ImportBatch batch, LocalDate deliveryDate,
                             Map<String, Store> storeCache, Map<String, Product> productCache,
                             Map<String, Order> orderCache, Map<String, Store> orderRefStoreCache,
-                            Map<String, Integer> orderRefFirstRow, Map<String, OrderItem> orderItemCache) {
+                            Map<String, Integer> orderRefFirstRow, Map<String, OrderItem> orderItemCache,
+                            Map<LocalDate, Boolean> lockedDateCache) {
 
         // Validate required fields (MISSING_FIELD)
         String storeCode = row.storeCode != null ? row.storeCode.trim() : "";
@@ -437,6 +440,16 @@ public class ImportServiceImpl implements ImportService {
             } else {
                 throw new RowRejectedException("Ngày giao hàng không đúng định dạng YYYY-MM-DD hoặc DD/MM/YYYY (giá trị: '" + row.deliveryDateRaw + "')", "INVALID_DATE_FORMAT", "delivery_date");
             }
+        }
+
+        // Reject rows targeting a delivery date whose TripDraft is already locked (status != DRAFT)
+        final LocalDate rowDeliveryDateFinal = rowDeliveryDate;
+        boolean dateLocked = lockedDateCache.computeIfAbsent(rowDeliveryDateFinal,
+                d -> tripDraftRepository.existsByDeliveryDateAndStatusNot(d, "DRAFT"));
+        if (dateLocked) {
+            throw new RowRejectedException(
+                    "Ngày giao hàng " + rowDeliveryDate + " đã có Trip Draft được xác nhận (không còn ở trạng thái nháp) — không thể nhập/ghi đè dữ liệu cho ngày này. Vui lòng reset Trip Draft trước khi import lại.",
+                    "DELIVERY_DATE_LOCKED", "delivery_date");
         }
 
         // Validate quantity format (INVALID_QUANTITY)

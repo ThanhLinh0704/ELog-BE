@@ -563,9 +563,15 @@ public class TripServiceImpl implements TripService {
                 .map(Manifest::getManifestId)
                 .orElse(null);
 
+        Optional<TripExecution> executionOpt = tripExecutionRepository.findByTripId(trip.getTripId());
+        Long executionId = executionOpt.map(TripExecution::getId).orElse(null);
+        LocalDateTime returnedToWarehouseAt = executionOpt.map(TripExecution::getReturnedToWarehouseAt).orElse(null);
+
         return TripResponse.builder()
                 .tripId(trip.getTripId())
                 .tripDraftId(trip.getTripDraft().getId())
+                .executionId(executionId)
+                .returnedToWarehouseAt(returnedToWarehouseAt)
                 .fixedRouteCode(trip.getRoute().getCode())
                 .deliveryDate(trip.getDeliveryDate())
                 .status(trip.getStatus().name())

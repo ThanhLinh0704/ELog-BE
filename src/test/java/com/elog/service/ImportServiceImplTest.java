@@ -54,6 +54,8 @@ class ImportServiceImplTest {
     private ProductRepository productRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private TripDraftRepository tripDraftRepository;
 
     @InjectMocks
     private ImportServiceImpl importService;
@@ -127,7 +129,7 @@ class ImportServiceImplTest {
         LocalDate date = LocalDate.now();
         MultipartFile file = createMockExcelFile("import.xlsx", Collections.emptyList());
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -150,7 +152,7 @@ class ImportServiceImplTest {
         MultipartFile file = createMockExcelFile("import.xlsx", Collections.emptyList());
         ImportBatch existing = ImportBatch.builder().id(8L).deliveryDate(date).isActive(true).build();
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.of(existing));
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of(existing));
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(9L);
@@ -172,7 +174,6 @@ class ImportServiceImplTest {
         MultipartFile file = createMockExcelFile("import.xlsx", Collections.emptyList());
         ImportBatch existing = ImportBatch.builder().id(8L).deliveryDate(date).isActive(true).build();
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.of(existing));
         when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of(existing));
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
@@ -193,7 +194,6 @@ class ImportServiceImplTest {
         MultipartFile file = createMockExcelFile("import.xlsx", Collections.emptyList());
         ImportBatch existing = ImportBatch.builder().id(8L).deliveryDate(null).isActive(true).build();
 
-        when(batchRepository.findActiveByDate(null)).thenReturn(Optional.of(existing));
         when(batchRepository.findAllActiveByDate(null)).thenReturn(List.of(existing));
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
@@ -216,7 +216,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-99", "ST-BT-001", "REF-SAM-300", "2", "04/08/2026"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(null)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(null)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -247,7 +247,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -288,7 +288,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "ACC-HDMI-2M", "2"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -318,7 +318,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-HD-099", "REF-SAM-300", "2"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -347,7 +347,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "0"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -374,7 +374,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "1"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -406,7 +406,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "ACC-HDMI-2M", "2"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -437,7 +437,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "3"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -467,7 +467,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-02", "ST-BT-001", "REF-SAM-300", "3"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -498,7 +498,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{null, "ST-BT-001", "REF-SAM-300", "2"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -642,7 +642,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-002", "REF-SAM-300", "3"}); // Mismatch store for same orderRef
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -683,7 +683,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "3"}); // Duplicate SKU in same order
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -725,7 +725,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "4"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(2L);
@@ -818,7 +818,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "", "REF-SAM-300", "2"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -839,7 +839,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "", "2"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -860,7 +860,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "abc"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -881,7 +881,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "-5"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -902,7 +902,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2.5"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -924,7 +924,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"", " ", null, ""});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -970,7 +970,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -997,7 +997,7 @@ class ImportServiceImplTest {
         LocalDate date = LocalDate.now();
         MultipartFile file = createMockExcelFile("import.xlsx", Collections.emptyList());
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenThrow(new DataIntegrityViolationException("Unique constraint violation"));
 
         assertThatThrownBy(() -> importService.importExcel(file, date, false, 1L))
@@ -1121,7 +1121,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", ""});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -1142,7 +1142,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", null});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -1163,7 +1163,7 @@ class ImportServiceImplTest {
         rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2"});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
-        when(batchRepository.findActiveByDate(date)).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
             ImportBatch b = invocation.getArgument(0);
             b.setId(1L);
@@ -1272,7 +1272,7 @@ class ImportServiceImplTest {
         );
         MultipartFile file = createMockExcelFile("orders_multi_date.xlsx", rows);
 
-        when(batchRepository.findActiveByDate(any())).thenReturn(Optional.empty());
+        when(batchRepository.findAllActiveByDate(any())).thenReturn(List.of());
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(i -> {
             ImportBatch b = i.getArgument(0);
             b.setId(10L);
@@ -1293,5 +1293,67 @@ class ImportServiceImplTest {
         assertThat(response.getBatchId()).isEqualTo(10L);
         assertThat(response.getAcceptedRows()).isEqualTo(2);
         assertThat(response.getRejectedRows()).isEqualTo(0);
+    }
+
+    @Test
+    void parseRow_deliveryDateHasLockedTripDraft_rejectsRow() throws Exception {
+        LocalDate date = LocalDate.of(2026, 8, 1);
+        List<String[]> rowsData = Collections.singletonList(
+                new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2", "2026-08-01"}
+        );
+        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
+
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
+        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(i -> {
+            ImportBatch b = i.getArgument(0);
+            b.setId(1L);
+            return b;
+        });
+
+        // Mock locked TripDraft for this delivery date
+        when(tripDraftRepository.existsByDeliveryDateAndStatusNot(date, "DRAFT")).thenReturn(true);
+
+        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
+
+        assertThat(response.getAcceptedRows()).isEqualTo(0);
+        assertThat(response.getRejectedRows()).isEqualTo(1);
+
+        verify(errorRepository).save(argThat(err ->
+                "DELIVERY_DATE_LOCKED".equals(err.getErrorCode()) &&
+                "delivery_date".equals(err.getFieldName())
+        ));
+        verify(orderRepository, never()).save(any(Order.class));
+    }
+
+    @Test
+    void parseRow_deliveryDateNoLockedTripDraft_acceptsRow() throws Exception {
+        LocalDate date = LocalDate.of(2026, 8, 1);
+        List<String[]> rowsData = Collections.singletonList(
+                new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2", "2026-08-01"}
+        );
+        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
+
+        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
+        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(i -> {
+            ImportBatch b = i.getArgument(0);
+            b.setId(1L);
+            return b;
+        });
+        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
+        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
+        when(orderRepository.save(any(Order.class))).thenAnswer(i -> {
+            Order o = i.getArgument(0);
+            o.setId(10L);
+            return o;
+        });
+
+        // Mock unlocked TripDraft (no locked TripDraft found)
+        when(tripDraftRepository.existsByDeliveryDateAndStatusNot(date, "DRAFT")).thenReturn(false);
+
+        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
+
+        assertThat(response.getAcceptedRows()).isEqualTo(1);
+        assertThat(response.getRejectedRows()).isEqualTo(0);
+        verify(orderRepository).save(any(Order.class));
     }
 }
