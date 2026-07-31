@@ -228,6 +228,7 @@ class TripServiceImplTest {
         when(vehicleRepository.sumActiveMaxWeightKg()).thenReturn(BigDecimal.valueOf(10000.0));
         when(tripDraftRepository.findByDeliveryDate(any(), any())).thenReturn(new PageImpl<>(List.of(testDraft)));
         when(tripExecutionRepository.findByTripId(100L)).thenReturn(Optional.empty());
+        when(tripDraftStopRepository.findByTripDraftIdOrderBySequenceNoAsc(1L)).thenReturn(List.of(TripDraftStop.builder().id(10L).build()));
         when(orderRepository.findByTripDraftId(1L)).thenReturn(List.of(order));
 
         TripResponse response = tripService.dispatchTrip(100L, "dispatcher01");

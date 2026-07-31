@@ -386,13 +386,28 @@ public class TripServiceImpl implements TripService {
                     .build();
 
             if (trip.getTripDraft() != null) {
+                List<TripDraftStop> draftStops = tripDraftStopRepository.findByTripDraftIdOrderBySequenceNoAsc(trip.getTripDraft().getId());
+                Map<Long, TripDraftStop> storeToStopMap = new HashMap<>();
+                for (TripDraftStop s : draftStops) {
+                    if (s.getStore() != null) {
+                        storeToStopMap.putIfAbsent(s.getStore().getId(), s);
+                    }
+                }
+
                 List<Order> orders = orderRepository.findByTripDraftId(trip.getTripDraft().getId());
                 for (Order order : orders) {
-                    execution.getOrderResults().add(DeliveryOrderResult.builder()
-                            .tripExecution(execution)
-                            .order(order)
-                            .status("PENDING")
-                            .build());
+                    TripDraftStop stop = (order.getStore() != null) ? storeToStopMap.get(order.getStore().getId()) : null;
+                    if (stop == null && !draftStops.isEmpty()) {
+                        stop = draftStops.get(0);
+                    }
+                    if (stop != null) {
+                        execution.getOrderResults().add(DeliveryOrderResult.builder()
+                                .tripExecution(execution)
+                                .order(order)
+                                .stop(stop)
+                                .status("PENDING")
+                                .build());
+                    }
                 }
             }
 
