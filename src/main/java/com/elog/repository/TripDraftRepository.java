@@ -13,4 +13,6 @@ public interface TripDraftRepository extends JpaRepository<TripDraft, Long> {
     Optional<TripDraft> findByRouteIdAndDeliveryDate(Long routeId, LocalDate deliveryDate);
 
     Page<TripDraft> findByDeliveryDate(LocalDate deliveryDate, Pageable pageable);
+
+    boolean existsByDeliveryDateAndStatusNot(LocalDate deliveryDate, String status);
 }

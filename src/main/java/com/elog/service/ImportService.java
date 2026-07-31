@@ -23,5 +23,7 @@ public interface ImportService {
 
     byte[] exportBatchErrors(Long batchId);
 
+    List<ImportedOrderDetailResponse> getImportedOrders(Long batchId, LocalDate deliveryDate);
+
     List<ImportedOrderDetailResponse> getImportedOrders(Long batchId);
 }

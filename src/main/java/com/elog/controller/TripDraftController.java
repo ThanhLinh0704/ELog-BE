@@ -33,6 +33,7 @@ public class TripDraftController {
     private final CapacityValidationService capacityValidationService;
     private final ManifestService manifestService;
     private final com.elog.service.DepartureAdjustmentService departureAdjustmentService;
+    private final com.elog.service.RecommendationService recommendationService;
 
     // ── US-10 endpoints ──────────────────────────────────────────
 
@@ -237,5 +238,16 @@ public class TripDraftController {
             @PathVariable Long id) {
         List<StopOrderItemResponse> response = tripDraftService.getExcludedOrders(id);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    // ── Recommendation Engine endpoints ───────────────────────────
+
+    @GetMapping("/{id}/recommendations")
+    @Operation(summary = "Get Top-3 vehicle recommendations for a Trip Draft (FT-06/FT-07)")
+    @PreAuthorize("hasAuthority('trip:read')")
+    public ResponseEntity<ApiResponse<RecommendationResultResponse>> getRecommendations(
+            @PathVariable Long id) {
+        RecommendationResultResponse result = recommendationService.recommendTop3(id);
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 }

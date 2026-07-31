@@ -121,6 +121,12 @@ public enum ErrorCode {
     PASSWORD_INVALID(
             "Password must be at least 8 characters, containing at least 1 uppercase letter, 1 number, and 1 special character"),
 
+    // Recommendation Engine
+    NO_FEASIBLE_PLAN("NO_FEASIBLE_PLAN"),
+
+    // Auth & Permission
+    UNAUTHORIZED_ACCESS("UNAUTHORIZED_ACCESS"),
+
     // Generic
     VALIDATION_FAILED("VALIDATION_FAILED"),
     INTERNAL_ERROR("INTERNAL_ERROR");

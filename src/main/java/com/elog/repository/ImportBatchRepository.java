@@ -8,14 +8,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
-import java.util.Optional;
 
 public interface ImportBatchRepository extends JpaRepository<ImportBatch, Long> {
 
-    @Query("SELECT b FROM ImportBatch b WHERE b.deliveryDate = :date AND b.isActive = true")
-    Optional<ImportBatch> findActiveByDate(@Param("date") LocalDate date);
-
-    @Query("SELECT b FROM ImportBatch b WHERE b.deliveryDate = :date AND b.isActive = true")
+    @Query("SELECT b FROM ImportBatch b WHERE ((:date IS NULL AND b.deliveryDate IS NULL) OR (b.deliveryDate = :date)) AND b.isActive = true")
     java.util.List<ImportBatch> findAllActiveByDate(@Param("date") LocalDate date);
 
     @Query("SELECT b FROM ImportBatch b ORDER BY b.createdAt DESC")

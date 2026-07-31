@@ -3,6 +3,7 @@ package com.elog.dto.response;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -15,6 +16,8 @@ import java.util.List;
 public class TripResponse {
     private Long tripId;
     private Long tripDraftId;
+    private Long executionId;
+    private LocalDateTime returnedToWarehouseAt;
     private String fixedRouteCode;
     private LocalDate deliveryDate;
     private String status;

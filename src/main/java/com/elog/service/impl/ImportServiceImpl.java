@@ -39,6 +39,12 @@ public class ImportServiceImpl implements ImportService {
     private final StoreRepository storeRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final TripDraftRepository tripDraftRepository;
+
+    // Auto-pipeline dependencies
+    private final com.elog.service.TripDraftService tripDraftService;
+    private final com.elog.service.EtaCalculationService etaCalculationService;
+    private final com.elog.service.RecommendationService recommendationService;
 
     // ── POST /api/imports ─────────────────────────────────────────────────────
 
@@ -53,14 +59,13 @@ public class ImportServiceImpl implements ImportService {
         List<RowData> rows = parseExcelFile(file);
 
         // Step 3: Handle existing active batches for this delivery date if replacing
-        Optional<ImportBatch> existingBatch = batchRepository.findActiveByDate(deliveryDate);
-        if (existingBatch.isPresent()) {
-            log.info("Found existing active batch {} for date {}", existingBatch.get().getId(), deliveryDate);
+        List<ImportBatch> existingActiveBatches = batchRepository.findAllActiveByDate(deliveryDate);
+        if (!existingActiveBatches.isEmpty()) {
+            log.info("Found {} existing active batch(es) for date {}", existingActiveBatches.size(), deliveryDate);
         }
 
         if (confirmReplace) {
-            List<ImportBatch> activeBatches = batchRepository.findAllActiveByDate(deliveryDate);
-            for (ImportBatch oldBatch : activeBatches) {
+            for (ImportBatch oldBatch : existingActiveBatches) {
                 oldBatch.setIsActive(false);
                 batchRepository.save(oldBatch);
             }
@@ -101,10 +106,12 @@ public class ImportServiceImpl implements ImportService {
         Map<String, Integer> orderRefFirstRow = new HashMap<>();
         // Cache for tracking created order items to accumulate duplicates
         Map<String, OrderItem> orderItemCache = new HashMap<>();
+        // Cache for tracking locked trip draft per delivery date
+        Map<LocalDate, Boolean> lockedDateCache = new HashMap<>();
 
         for (RowData row : rows) {
             try {
-                processRow(row, batch, deliveryDate, storeCache, productCache, orderCache, orderRefStoreCache, orderRefFirstRow, orderItemCache);
+                processRow(row, batch, deliveryDate, storeCache, productCache, orderCache, orderRefStoreCache, orderRefFirstRow, orderItemCache, lockedDateCache);
                 acceptedRows++;
             } catch (RowRejectedException ex) {
                 rejectedRows++;
@@ -129,7 +136,77 @@ public class ImportServiceImpl implements ImportService {
 
         long ordersCreated = orderRepository.countByBatchId(batch.getId());
 
+        // ── Step 6: Auto-Pipeline — consolidate → ETA → recommendation ────────
+        triggerAutoPipelineForBatch(batch.getId(), deliveryDate);
+
         return toResponse(batch, ordersCreated);
+    }
+
+    /**
+     * Auto-Pipeline: after successful import, consolidate trip drafts,
+     * calculate ETA, and generate vehicle recommendations.
+     * Wrapped in try-catch so import itself is never rolled back.
+     */
+    private void triggerAutoPipelineForBatch(Long batchId, LocalDate fallbackDate) {
+        List<Order> batchOrders = orderRepository.findByImportBatchId(batchId);
+        Set<LocalDate> distinctDates = new HashSet<>();
+        for (Order order : batchOrders) {
+            if (order.getDeliveryDate() != null) {
+                distinctDates.add(order.getDeliveryDate());
+            }
+        }
+        if (distinctDates.isEmpty() && fallbackDate != null) {
+            distinctDates.add(fallbackDate);
+        }
+
+        for (LocalDate deliveryDate : distinctDates) {
+            triggerAutoPipeline(deliveryDate);
+        }
+    }
+
+    private void triggerAutoPipeline(LocalDate deliveryDate) {
+        try {
+            log.info("Auto-Pipeline: starting for deliveryDate={}", deliveryDate);
+
+            // 6a. Consolidate orders into TripDrafts
+            var consolidateResult = tripDraftService.consolidate(deliveryDate);
+            log.info("Auto-Pipeline: consolidated {} trip drafts",
+                    consolidateResult.getTripDraftsCreatedOrUpdated());
+
+            if (consolidateResult.getTripDrafts() == null || consolidateResult.getTripDrafts().isEmpty()) {
+                log.info("Auto-Pipeline: no trip drafts created, skipping ETA and recommendation");
+                return;
+            }
+
+            // Default departure time from config, fallback 07:00
+            java.time.LocalTime defaultDeparture = java.time.LocalTime.of(7, 0);
+
+            // 6b + 6c. For each trip draft: calculate ETA → run recommendation
+            for (var draftResponse : consolidateResult.getTripDrafts()) {
+                try {
+                    if (draftResponse.getActiveStopCount() == null || draftResponse.getActiveStopCount() == 0) {
+                        continue;
+                    }
+                    // ETA calculation
+                    etaCalculationService.calculateAndPersist(draftResponse.getId(), defaultDeparture);
+                    log.info("Auto-Pipeline: ETA calculated for TripDraft id={}", draftResponse.getId());
+
+                    // Recommendation
+                    var recommendation = recommendationService.recommendTop3(draftResponse.getId());
+                    log.info("Auto-Pipeline: recommendation for TripDraft id={}: planType={}, count={}",
+                            draftResponse.getId(), recommendation.getPlanType(),
+                            recommendation.getRecommendations() != null ? recommendation.getRecommendations().size() : 0);
+                } catch (Exception ex) {
+                    log.warn("Auto-Pipeline: failed for TripDraft id={}: {}",
+                            draftResponse.getId(), ex.getMessage(), ex);
+                }
+            }
+
+            log.info("Auto-Pipeline: completed for deliveryDate={}", deliveryDate);
+        } catch (Exception ex) {
+            log.error("Auto-Pipeline: critical error for deliveryDate={}: {}",
+                    deliveryDate, ex.getMessage(), ex);
+        }
     }
 
     // ── GET /api/imports ──────────────────────────────────────────────────────
@@ -313,10 +390,11 @@ public class ImportServiceImpl implements ImportService {
                 data.storeCode = getCellStringValue(row.getCell(1));
                 data.sku = getCellStringValue(row.getCell(2));
                 data.quantityRaw = getCellStringValue(row.getCell(3));
-                data.deliveryTimeWindow = getCellStringValue(row.getCell(4));
-                data.recipientName = getCellStringValue(row.getCell(5));
-                data.recipientPhone = getCellStringValue(row.getCell(6));
-                data.notes = getCellStringValue(row.getCell(7));
+                data.deliveryDateRaw = getCellStringValue(row.getCell(4));
+                data.deliveryTimeWindow = getCellStringValue(row.getCell(5));
+                data.recipientName = getCellStringValue(row.getCell(6));
+                data.recipientPhone = getCellStringValue(row.getCell(7));
+                data.notes = getCellStringValue(row.getCell(8));
                 rows.add(data);
             }
         } catch (BusinessException e) {
@@ -332,7 +410,8 @@ public class ImportServiceImpl implements ImportService {
     private void processRow(RowData row, ImportBatch batch, LocalDate deliveryDate,
                             Map<String, Store> storeCache, Map<String, Product> productCache,
                             Map<String, Order> orderCache, Map<String, Store> orderRefStoreCache,
-                            Map<String, Integer> orderRefFirstRow, Map<String, OrderItem> orderItemCache) {
+                            Map<String, Integer> orderRefFirstRow, Map<String, OrderItem> orderItemCache,
+                            Map<LocalDate, Boolean> lockedDateCache) {
 
         // Validate required fields (MISSING_FIELD)
         String storeCode = row.storeCode != null ? row.storeCode.trim() : "";
@@ -348,6 +427,29 @@ public class ImportServiceImpl implements ImportService {
         String quantityRaw = row.quantityRaw != null ? row.quantityRaw.trim() : "";
         if (quantityRaw.isEmpty()) {
             throw new RowRejectedException("Thiếu giá trị Số lượng", "MISSING_FIELD", "quantity");
+        }
+
+        String deliveryDateRaw = row.deliveryDateRaw != null ? row.deliveryDateRaw.trim() : "";
+        LocalDate rowDeliveryDate = parseRowDate(deliveryDateRaw);
+        if (rowDeliveryDate == null && deliveryDate != null) {
+            rowDeliveryDate = deliveryDate;
+        }
+        if (rowDeliveryDate == null) {
+            if (deliveryDateRaw.isEmpty()) {
+                throw new RowRejectedException("Ngày giao hàng không được để trống", "MISSING_FIELD", "delivery_date");
+            } else {
+                throw new RowRejectedException("Ngày giao hàng không đúng định dạng YYYY-MM-DD hoặc DD/MM/YYYY (giá trị: '" + row.deliveryDateRaw + "')", "INVALID_DATE_FORMAT", "delivery_date");
+            }
+        }
+
+        // Reject rows targeting a delivery date whose TripDraft is already locked (status != DRAFT)
+        final LocalDate rowDeliveryDateFinal = rowDeliveryDate;
+        boolean dateLocked = lockedDateCache.computeIfAbsent(rowDeliveryDateFinal,
+                d -> tripDraftRepository.existsByDeliveryDateAndStatusNot(d, "DRAFT"));
+        if (dateLocked) {
+            throw new RowRejectedException(
+                    "Ngày giao hàng " + rowDeliveryDate + " đã có Trip Draft được xác nhận (không còn ở trạng thái nháp) — không thể nhập/ghi đè dữ liệu cho ngày này. Vui lòng reset Trip Draft trước khi import lại.",
+                    "DELIVERY_DATE_LOCKED", "delivery_date");
         }
 
         // Validate quantity format (INVALID_QUANTITY)
@@ -404,11 +506,11 @@ public class ImportServiceImpl implements ImportService {
         String orderKey = orderRef + "|" + store.getId();
         Order order = orderCache.get(orderKey);
         if (order == null) {
-            Optional<Order> existingOrderOpt = orderRepository.findActiveByOrderRefAndDeliveryDate(orderRef, deliveryDate);
+            Optional<Order> existingOrderOpt = orderRepository.findActiveByOrderRefAndDeliveryDate(orderRef, rowDeliveryDate);
             if (existingOrderOpt.isPresent()) {
                 Order existingOrder = existingOrderOpt.get();
                 existingOrder.setStore(store);
-                existingOrder.setDeliveryDate(deliveryDate);
+                existingOrder.setDeliveryDate(rowDeliveryDate);
                 existingOrder.setImportBatch(batch);
                 existingOrder.setDeliveryTimeWindow(row.deliveryTimeWindow);
                 existingOrder.setRecipientName(row.recipientName);
@@ -422,7 +524,7 @@ public class ImportServiceImpl implements ImportService {
                         .importBatch(batch)
                         .orderRef(orderRef)
                         .store(store)
-                        .deliveryDate(deliveryDate)
+                        .deliveryDate(rowDeliveryDate)
                         .deliveryTimeWindow(row.deliveryTimeWindow)
                         .recipientName(row.recipientName)
                         .recipientPhone(row.recipientPhone)
@@ -484,6 +586,14 @@ public class ImportServiceImpl implements ImportService {
         return switch (cell.getCellType()) {
             case STRING -> cell.getStringCellValue();
             case NUMERIC -> {
+                if (DateUtil.isCellDateFormatted(cell)) {
+                    try {
+                        java.time.LocalDateTime ldt = cell.getLocalDateTimeCellValue();
+                        if (ldt != null) {
+                            yield ldt.toLocalDate().toString();
+                        }
+                    } catch (Exception ignored) {}
+                }
                 double d = cell.getNumericCellValue();
                 if (d == Math.floor(d) && !Double.isInfinite(d)) {
                     yield String.valueOf((long) d);
@@ -534,6 +644,12 @@ public class ImportServiceImpl implements ImportService {
     @Override
     @Transactional(readOnly = true)
     public List<ImportedOrderDetailResponse> getImportedOrders(Long batchId) {
+        return getImportedOrders(batchId, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ImportedOrderDetailResponse> getImportedOrders(Long batchId, LocalDate deliveryDate) {
         // Verify batch exists
         if (!batchRepository.existsById(batchId)) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
@@ -544,9 +660,13 @@ public class ImportServiceImpl implements ImportService {
         List<ImportedOrderDetailResponse> results = new ArrayList<>();
 
         for (Order order : orders) {
+            if (deliveryDate != null && !deliveryDate.equals(order.getDeliveryDate())) {
+                continue;
+            }
             for (OrderItem item : order.getItems()) {
                 results.add(ImportedOrderDetailResponse.builder()
                         .orderRef(order.getOrderRef())
+                        .deliveryDate(order.getDeliveryDate())
                         .storeCode(order.getStore().getCode())
                         .storeName(order.getStore().getName())
                         .sku(item.getSku())
@@ -587,19 +707,40 @@ public class ImportServiceImpl implements ImportService {
 
     // ── Inner class for parsed row data ───────────────────────────────────────
 
+    private LocalDate parseRowDate(String dateStr) {
+        if (dateStr == null || dateStr.isBlank()) return null;
+        dateStr = dateStr.trim();
+        try {
+            return LocalDate.parse(dateStr);
+        } catch (Exception ignored) {}
+
+        try {
+            java.time.format.DateTimeFormatter dmy = java.time.format.DateTimeFormatter.ofPattern("d/M/yyyy");
+            return LocalDate.parse(dateStr, dmy);
+        } catch (Exception ignored) {}
+
+        try {
+            java.time.format.DateTimeFormatter dmy2 = java.time.format.DateTimeFormatter.ofPattern("d-M-yyyy");
+            return LocalDate.parse(dateStr, dmy2);
+        } catch (Exception ignored) {}
+
+        return null;
+    }
+
     private static class RowData {
         int rowNumber;
         String orderRef;
         String storeCode;
         String sku;
         String quantityRaw;
+        String deliveryDateRaw;
         String deliveryTimeWindow;
         String recipientName;
         String recipientPhone;
         String notes;
 
         String toRawString() {
-            return String.join(",", nvl(orderRef), nvl(storeCode), nvl(sku), nvl(quantityRaw), nvl(deliveryTimeWindow), nvl(recipientName), nvl(recipientPhone), nvl(notes));
+            return String.join(",", nvl(orderRef), nvl(storeCode), nvl(sku), nvl(quantityRaw), nvl(deliveryDateRaw), nvl(deliveryTimeWindow), nvl(recipientName), nvl(recipientPhone), nvl(notes));
         }
 
         private String nvl(String s) {
@@ -607,19 +748,4 @@ public class ImportServiceImpl implements ImportService {
         }
     }
 
-    // ── Custom exception for duplicate batch (HTTP 409) ───────────────────────
-
-    public static class DuplicateBatchException extends RuntimeException {
-        private final Long existingBatchId;
-        private final LocalDate deliveryDate;
-
-        public DuplicateBatchException(Long existingBatchId, LocalDate deliveryDate) {
-            super("Đã có dữ liệu nhập cho ngày " + deliveryDate);
-            this.existingBatchId = existingBatchId;
-            this.deliveryDate = deliveryDate;
-        }
-
-        public Long getExistingBatchId() { return existingBatchId; }
-        public LocalDate getDeliveryDate() { return deliveryDate; }
-    }
 }

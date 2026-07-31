@@ -70,7 +70,7 @@ class TripDraftServiceImplIntegrationTest {
         LocalDate deliveryDate = LocalDate.now().plusYears(10).plusDays(new java.util.Random().nextInt(1000));
         
         // Deactivate any existing active batch for this date just in case
-        importBatchRepository.findActiveByDate(deliveryDate).ifPresent(b -> {
+        importBatchRepository.findAllActiveByDate(deliveryDate).forEach(b -> {
             b.setIsActive(false);
             importBatchRepository.saveAndFlush(b);
         });

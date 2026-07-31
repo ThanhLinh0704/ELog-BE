@@ -1,7 +1,6 @@
 package com.elog.controller;
 
 import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.DuplicateBatchResponse;
 import com.elog.dto.response.ImportBatchResponse;
 import com.elog.dto.response.ImportErrorResponse;
 import com.elog.dto.response.ImportedOrderDetailResponse;
@@ -39,7 +38,7 @@ public class ImportController {
     @PreAuthorize("hasAuthority('order:import')")
     public ResponseEntity<?> importOrders(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("deliveryDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
+            @RequestParam(value = "deliveryDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
             @RequestParam(value = "confirmReplace", required = false, defaultValue = "false") boolean confirmReplace,
             Authentication authentication) {
 
@@ -49,20 +48,9 @@ public class ImportController {
                 .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
         Long userId = user.getId();
 
-        try {
-            ImportBatchResponse response = importService.importExcel(file, deliveryDate, confirmReplace, userId);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(ApiResponse.success(response, "Import hoàn tất"));
-        } catch (ImportServiceImpl.DuplicateBatchException e) {
-            DuplicateBatchResponse body = DuplicateBatchResponse.builder()
-                    .error("DUPLICATE_DELIVERY_DATE")
-                    .message("Đã có dữ liệu nhập cho ngày " + e.getDeliveryDate()
-                            + " (batch #" + e.getExistingBatchId()
-                            + "). Gửi lại với confirmReplace=true để thay thế.")
-                    .existingBatchId(e.getExistingBatchId())
-                    .build();
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
-        }
+        ImportBatchResponse response = importService.importExcel(file, deliveryDate, confirmReplace, userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response, "Import hoàn tất"));
     }
 
     @GetMapping
@@ -88,8 +76,9 @@ public class ImportController {
     @Operation(summary = "Get list of successfully imported orders and products details for a batch")
     @PreAuthorize("hasAnyAuthority('order:import', 'trip:read')")
     public ResponseEntity<ApiResponse<List<ImportedOrderDetailResponse>>> getImportedOrders(
-            @PathVariable Long batchId) {
-        List<ImportedOrderDetailResponse> response = importService.getImportedOrders(batchId);
+            @PathVariable Long batchId,
+            @RequestParam(value = "deliveryDate", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate) {
+        List<ImportedOrderDetailResponse> response = importService.getImportedOrders(batchId, deliveryDate);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

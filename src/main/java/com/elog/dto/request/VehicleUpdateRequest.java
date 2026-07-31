@@ -68,4 +68,6 @@ public class VehicleUpdateRequest {
     private String permitInfo;
 
     private String description;
+
+    private Long assignedDriverId;
 }
