@@ -62,8 +62,10 @@ public class TripServiceImpl implements TripService {
 
             boolean volumeOk = v.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) >= 0;
             boolean weightOk = v.getPayloadKg().compareTo(td.getTotalWeightKg()) >= 0;
+            String storeWeightViolationReason = validateVehicleStoreWeight(v, td.getStops());
+            boolean routeWeightOk = (storeWeightViolationReason == null);
 
-            if (volumeOk && weightOk) {
+            if (volumeOk && weightOk && routeWeightOk) {
                 eligibleVehicles.add(EligibleVehicleDto.builder()
                         .vehicleId(v.getId())
                         .plateNumber(v.getPlateNumber())
@@ -84,6 +86,10 @@ public class TripServiceImpl implements TripService {
                     reason.append("Weight exceeds capacity (")
                           .append(td.getTotalWeightKg()).append(" kg > ").append(v.getPayloadKg()).append(" kg)");
                 }
+                if (!routeWeightOk) {
+                    if (reason.length() > 0) reason.append(" and ");
+                    reason.append(storeWeightViolationReason);
+                }
 
                 ineligibleVehicles.add(IneligibleVehicleDto.builder()
                         .vehicleId(v.getId())
@@ -92,7 +98,7 @@ public class TripServiceImpl implements TripService {
                         .maxVolumeM3(v.getMaxVolumeM3())
                         .maxWeightKg(v.getPayloadKg())
                         .volumeCheckResult(volumeOk ? ConstraintResult.PASS : ConstraintResult.FAIL)
-                        .weightCheckResult(weightOk ? ConstraintResult.PASS : ConstraintResult.FAIL)
+                        .weightCheckResult((weightOk && routeWeightOk) ? ConstraintResult.PASS : ConstraintResult.FAIL)
                         .failureReason(reason.toString())
                         .build());
             }
@@ -163,12 +169,18 @@ public class TripServiceImpl implements TripService {
         User driver = findDriverOrThrow(driverId);
         User dispatcher = findUserByUsernameOrThrow(currentUsername);
 
-        // Guard 2: Vehicle must be eligible (dual-constraint)
+        // Guard 2: Vehicle must be eligible (dual-constraint & route weight limit)
         if (vehicle.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) < 0
                 || vehicle.getPayloadKg().compareTo(td.getTotalWeightKg()) < 0) {
             throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
                     "Vehicle " + vehicle.getPlateNumber()
                             + " does not meet dual-constraint requirements for this trip.",
+                    HttpStatus.BAD_REQUEST);
+        }
+        String storeWeightViolation = validateVehicleStoreWeight(vehicle, td.getStops());
+        if (storeWeightViolation != null) {
+            throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
+                    "Vehicle " + vehicle.getPlateNumber() + " violates route constraints: " + storeWeightViolation,
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -696,12 +708,20 @@ public class TripServiceImpl implements TripService {
                     "User " + driver.getFullName() + " is not a driver.", HttpStatus.BAD_REQUEST);
         }
 
-        // Guard 2: Capacity check (trip total load vs vehicle max capacity)
+        // Guard 2: Capacity check & store weight limit
         if (vehicle.getMaxVolumeM3().compareTo(trip.getTotalVolumeM3()) < 0
                 || vehicle.getPayloadKg().compareTo(trip.getTotalWeightKg()) < 0) {
             throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
                     "Vehicle " + vehicle.getPlateNumber() + " capacity is insufficient for the trip load.",
                     HttpStatus.BAD_REQUEST);
+        }
+        if (trip.getTripDraft() != null) {
+            String storeWeightViolation = validateVehicleStoreWeight(vehicle, trip.getTripDraft().getStops());
+            if (storeWeightViolation != null) {
+                throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
+                        "Vehicle " + vehicle.getPlateNumber() + " violates route constraints: " + storeWeightViolation,
+                        HttpStatus.BAD_REQUEST);
+            }
         }
 
         // Guard 2.5: Driver license class compatibility check
@@ -821,6 +841,23 @@ public class TripServiceImpl implements TripService {
                 }
             }
         }
+    }
+
+    private String validateVehicleStoreWeight(Vehicle vehicle, List<TripDraftStop> stops) {
+        if (stops == null || vehicle == null || vehicle.getPayloadKg() == null) {
+            return null;
+        }
+        for (TripDraftStop stop : stops) {
+            if (Boolean.TRUE.equals(stop.getIsActive()) && stop.getStore() != null) {
+                Store store = stop.getStore();
+                if (store.getMaxAllowedVehicleWeight() != null
+                        && vehicle.getPayloadKg().compareTo(store.getMaxAllowedVehicleWeight()) > 0) {
+                    return "Vehicle weight (" + vehicle.getPayloadKg() + " kg) exceeds store "
+                            + store.getCode() + " limit (" + store.getMaxAllowedVehicleWeight() + " kg)";
+                }
+            }
+        }
+        return null;
     }
 }
 

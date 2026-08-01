@@ -240,4 +240,94 @@ class TripServiceImplTest {
                 te.getOrderResults().size() == 1
         ));
     }
+
+    @Test
+    void getEligibleVehicles_whenVehicleExceedsStoreWeightLimit_marksAsIneligible() {
+        Store store = Store.builder()
+                .id(1L)
+                .code("ST-007")
+                .maxAllowedVehicleWeight(BigDecimal.valueOf(2000.0)) // limit 2000 kg, vehicle is 3000 kg
+                .build();
+        TripDraftStop stop = TripDraftStop.builder()
+                .id(10L)
+                .store(store)
+                .isActive(true)
+                .build();
+        testDraft.setStops(List.of(stop));
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepository.findByIsActiveTrue()).thenReturn(List.of(testVehicle));
+
+        var response = tripService.getEligibleVehicles(1L);
+
+        assertThat(response.getEligibleVehicles()).isEmpty();
+        assertThat(response.getIneligibleVehicles()).hasSize(1);
+        assertThat(response.getIneligibleVehicles().get(0).getFailureReason())
+                .contains("exceeds store ST-007 limit");
+    }
+
+    @Test
+    void assignVehicleAndDriver_whenVehicleExceedsStoreWeightLimit_throwsException() {
+        Store store = Store.builder()
+                .id(1L)
+                .code("ST-007")
+                .maxAllowedVehicleWeight(BigDecimal.valueOf(2000.0))
+                .build();
+        TripDraftStop stop = TripDraftStop.builder()
+                .id(10L)
+                .store(store)
+                .isActive(true)
+                .build();
+        testDraft.setStops(List.of(stop));
+
+        TripAssignRequest request = new TripAssignRequest();
+        request.setVehicleId(1L);
+        request.setDriverId(2L);
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(testVehicle));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(testDriver));
+        when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
+
+        assertThatThrownBy(() -> tripService.assignVehicleAndDriver(1L, request, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VEHICLE_NOT_ELIGIBLE)
+                .hasMessageContaining("violates route constraints");
+    }
+
+    @Test
+    void updateAssignment_whenVehicleExceedsStoreWeightLimit_throwsException() {
+        Store store = Store.builder()
+                .id(1L)
+                .code("ST-007")
+                .maxAllowedVehicleWeight(BigDecimal.valueOf(2000.0))
+                .build();
+        TripDraftStop stop = TripDraftStop.builder()
+                .id(10L)
+                .store(store)
+                .isActive(true)
+                .build();
+        testDraft.setStops(List.of(stop));
+
+        Trip trip = Trip.builder()
+                .tripId(100L)
+                .tripDraft(testDraft)
+                .status(TripStatus.VALIDATED)
+                .totalVolumeM3(BigDecimal.valueOf(5.0))
+                .totalWeightKg(BigDecimal.valueOf(1000.0))
+                .build();
+
+        TripAssignmentPatchRequest request = new TripAssignmentPatchRequest();
+        request.setVehicleId(1L);
+        request.setDriverId(2L);
+
+        when(tripRepository.findById(100L)).thenReturn(Optional.of(trip));
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(testVehicle));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(testDriver));
+
+        assertThatThrownBy(() -> tripService.updateAssignment(100L, request, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VEHICLE_NOT_ELIGIBLE)
+                .hasMessageContaining("violates route constraints");
+    }
 }
