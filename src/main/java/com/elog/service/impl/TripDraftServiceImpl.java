@@ -38,6 +38,7 @@ public class TripDraftServiceImpl implements TripDraftService {
     private final OrderItemRepository orderItemRepository;
     private final TripRepository tripRepository;
     private final ManifestRepository manifestRepository;
+    private final com.elog.service.PlanningHistoryService planningHistoryService;
 
     @Override
     @Transactional
@@ -190,6 +191,13 @@ public class TripDraftServiceImpl implements TripDraftService {
             List<Long> orderIds = routeOrders.stream().map(Order::getId).toList();
             orderRepository.updateTripDraftId(orderIds, draft.getId());
 
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    draft.getId(), null, com.elog.entity.PlanningEventType.TRIP_DRAFT_CREATED,
+                    com.elog.entity.PlanningActorType.SYSTEM, "System",
+                    null, "DRAFT", "Gom đơn tạo/cập nhật Trip Draft " + draft.getId(),
+                    null, null, null, null,
+                    draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
+
             results.add(toResponse(draft, null));
         }
 
@@ -308,6 +316,13 @@ public class TripDraftServiceImpl implements TripDraftService {
         log.info("US-11: Stop {} (store={}) updated to isActive={} for TripDraft {}",
                 stopId, stop.getStore().getCode(), request.getIsActive(), tripDraftId);
 
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.TRIP_DRAFT_UPDATED,
+                com.elog.entity.PlanningActorType.USER, null,
+                draft.getStatus(), draft.getStatus(), "Cập nhật điểm dừng " + stop.getStore().getCode() + " (isActive=" + request.getIsActive() + ")",
+                null, "Stop ID: " + stop.getId(), null, stop.getStore().getCode(),
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
+
         return toStopResponse(stop);
     }
 
@@ -376,6 +391,13 @@ public class TripDraftServiceImpl implements TripDraftService {
         draft.setConfirmedBy(confirmer);
         tripDraftRepository.save(draft);
 
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.PLAN_CONFIRMED,
+                com.elog.entity.PlanningActorType.USER, currentUsername,
+                "DRAFT", "PLANNED", "Dispatcher xác nhận Trip Draft " + tripDraftId,
+                null, null, null, null,
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
+
         log.info("US-11 DC-07: TripDraft id={} confirmed by {} at {}",
                 tripDraftId, currentUsername, now);
 
@@ -428,6 +450,13 @@ public class TripDraftServiceImpl implements TripDraftService {
         }
 
         tripDraftRepository.save(draft);
+
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.PLAN_REPLANNED,
+                com.elog.entity.PlanningActorType.USER, currentUsername,
+                "PLANNED", "DRAFT", "Hủy xác nhận, chuyển Trip Draft " + tripDraftId + " về DRAFT",
+                null, null, null, null,
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
         log.info("US-11: TripDraft id={} reverted to DRAFT status by {}", tripDraftId, currentUsername);
     }
 
@@ -564,6 +593,13 @@ public class TripDraftServiceImpl implements TripDraftService {
         // Recalculate ETA for all stops
         recalculateEta(tripDraftId, new RecalculateEtaRequest(request.getNewDepartureTime()));
 
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.TRIP_DRAFT_UPDATED,
+                com.elog.entity.PlanningActorType.USER, null,
+                draft.getStatus(), draft.getStatus(), "Điều chỉnh giờ xuất phát thành " + request.getNewDepartureTime(),
+                null, null, null, null,
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
+
         return getTripDraftById(tripDraftId);
     }
 
@@ -606,6 +642,13 @@ public class TripDraftServiceImpl implements TripDraftService {
             recalculateEta(tripDraftId, new RecalculateEtaRequest(draft.getPlannedDepartureTime()));
         }
 
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.TRIP_DRAFT_UPDATED,
+                com.elog.entity.PlanningActorType.USER, username,
+                draft.getStatus(), draft.getStatus(), "Xử lý trễ đơn hàng " + order.getOrderRef() + ": " + request.getReason(),
+                null, order.getOrderRef(), null, order.getStore() != null ? order.getStore().getCode() : null,
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
+
         log.info("Order id={} delay settled by user={}: {}", orderId, username, request.getReason());
     }
 
@@ -645,6 +688,13 @@ public class TripDraftServiceImpl implements TripDraftService {
             recalculateEta(tripDraftId, new RecalculateEtaRequest(draft.getPlannedDepartureTime()));
         }
 
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.TRIP_DRAFT_UPDATED,
+                com.elog.entity.PlanningActorType.USER, null,
+                draft.getStatus(), draft.getStatus(), "Loại trừ đơn hàng " + order.getOrderRef() + " khỏi Trip Draft",
+                null, order.getOrderRef(), null, order.getStore() != null ? order.getStore().getCode() : null,
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
+
         log.info("Order id={} excluded from TripDraft id={}", orderId, tripDraftId);
     }
 
@@ -676,6 +726,13 @@ public class TripDraftServiceImpl implements TripDraftService {
         if (draft.getPlannedDepartureTime() != null) {
             recalculateEta(tripDraftId, new RecalculateEtaRequest(draft.getPlannedDepartureTime()));
         }
+
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.TRIP_DRAFT_UPDATED,
+                com.elog.entity.PlanningActorType.USER, null,
+                draft.getStatus(), draft.getStatus(), "Thêm lại đơn hàng " + order.getOrderRef() + " vào Trip Draft",
+                null, order.getOrderRef(), null, order.getStore() != null ? order.getStore().getCode() : null,
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
 
         log.info("Order id={} re-included into TripDraft id={}", orderId, tripDraftId);
     }

@@ -33,6 +33,7 @@ public class DriverTripServiceImpl implements DriverTripService {
     private final OrderRepository orderRepo;
     private final TripDraftStopRepository tripDraftStopRepo;
     private final UserRepository userRepo;
+    private final TripStopRepository tripStopRepo;
     private final com.elog.service.TripOutcomeHistoryService tripOutcomeHistoryService;
 
     @Override
@@ -79,6 +80,14 @@ public class DriverTripServiceImpl implements DriverTripService {
         tripExecutionRepo.save(execution);
 
         Trip trip = execution.getTrip();
+        if (trip != null) {
+            trip.setStatus(TripStatus.IN_PROGRESS);
+            if (trip.getActualDepartureTime() == null) {
+                trip.setActualDepartureTime(execution.getStartedAt());
+            }
+            tripRepo.save(trip);
+        }
+
         tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
                 executionId, trip != null ? trip.getTripId() : null,
                 com.elog.entity.TripOutcomeEventType.START_TRIP,
@@ -184,6 +193,19 @@ public class DriverTripServiceImpl implements DriverTripService {
                         trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
                         trip != null ? trip.getDeliveryDate() : null, driverUsername
                 ));
+
+                // Sync to System A TripStop entity if exists
+                tripStopRepo.findByTripDraftStopId(stop.getId()).ifPresent(ts -> {
+                    if ("COMPLETED".equals(stopStatusAfter)) {
+                        ts.setStatus(TripStopStatus.COMPLETED);
+                        if (ts.getActualArrivalTime() == null) {
+                            ts.setActualArrivalTime(LocalDateTime.now());
+                        }
+                    } else if ("EXCEPTION".equals(stopStatusAfter)) {
+                        ts.setStatus(TripStopStatus.EXCEPTION);
+                    }
+                    tripStopRepo.save(ts);
+                });
             }
         }
 
@@ -238,6 +260,14 @@ public class DriverTripServiceImpl implements DriverTripService {
         tripExecutionRepo.save(execution);
 
         Trip trip = execution.getTrip();
+        if (trip != null) {
+            trip.setStatus(TripStatus.COMPLETED);
+            if (trip.getCompletedAt() == null) {
+                trip.setCompletedAt(execution.getCompletedAt());
+            }
+            tripRepo.save(trip);
+        }
+
         tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
                 executionId, trip != null ? trip.getTripId() : null,
                 com.elog.entity.TripOutcomeEventType.COMPLETE_TRIP,
@@ -260,6 +290,16 @@ public class DriverTripServiceImpl implements DriverTripService {
                 .version(1)
                 .build();
         tripOutcomeRepo.save(outcome);
+
+        tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                executionId, trip != null ? trip.getTripId() : null,
+                com.elog.entity.TripOutcomeEventType.OUTCOME_SUBMITTED,
+                com.elog.entity.PlanningActorType.SYSTEM, null,
+                "IN_PROGRESS", "SUBMITTED",
+                null, null, null, null, null, null, null, null,
+                trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                trip != null ? trip.getDeliveryDate() : null, driverUsername
+        ));
 
         log.info("Driver {} completed trip execution ID {} with status {}", driverUsername, executionId, finalExecutionStatus);
 

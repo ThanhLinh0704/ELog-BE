@@ -13,6 +13,8 @@ public interface TripStopRepository extends JpaRepository<TripStop, Long> {
 
     List<TripStop> findByTripTripIdOrderBySequenceOrderAsc(Long tripId);
 
+    java.util.Optional<TripStop> findByTripDraftStopId(Long tripDraftStopId);
+
     /** PENDING stops của IN_PROGRESS trips mà ETA đã qua cutoff — dùng bởi TimeExceptionDetectionJob */
     @Query("SELECT ts FROM TripStop ts " +
            "JOIN ts.trip t " +

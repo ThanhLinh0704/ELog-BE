@@ -204,6 +204,20 @@ public class TripServiceImpl implements TripService {
                 td.getTotalWeightKg(), td.getTotalVolumeM3());
         trip = tripRepository.save(trip);
 
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, trip.getTripId(), com.elog.entity.PlanningEventType.OPTION_SELECTED,
+                com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                td.getStatus(), td.getStatus(), "Phân công xe " + vehicle.getPlateNumber() + " cho Trip " + trip.getTripId(),
+                vehicle.getPlateNumber(), null, null, null,
+                td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
+
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, trip.getTripId(), com.elog.entity.PlanningEventType.DRIVER_ASSIGNED,
+                com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                td.getStatus(), td.getStatus(), "Phân công tài xế " + driver.getFullName() + " cho Trip " + trip.getTripId(),
+                null, null, null, null,
+                td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
+
         // Create TripStops from active TripDraftStops
         List<TripDraftStop> activeStops =
                 tripDraftStopRepository.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);
@@ -320,6 +334,20 @@ public class TripServiceImpl implements TripService {
             Trip trip = buildTrip(td, vehicle, driver, dispatcher, groupWeight, groupVolume);
             trip = tripRepository.save(trip);
             createTripStops(trip, groupStops);
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, trip.getTripId(), com.elog.entity.PlanningEventType.OPTION_SELECTED,
+                    com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                    td.getStatus(), td.getStatus(), "Phân công 2 xe: Xe " + vehicle.getPlateNumber() + " cho sub-trip " + trip.getTripId(),
+                    vehicle.getPlateNumber(), null, null, null,
+                    td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, trip.getTripId(), com.elog.entity.PlanningEventType.DRIVER_ASSIGNED,
+                    com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                    td.getStatus(), td.getStatus(), "Phân công tài xế " + driver.getFullName() + " cho sub-trip " + trip.getTripId(),
+                    null, null, null, null,
+                    td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
 
             summaries.add(TripSplitResponse.TripSummary.builder()
                     .tripId(trip.getTripId())
@@ -786,10 +814,35 @@ public class TripServiceImpl implements TripService {
         // Guard 3 & 4: Comprehensive vehicle & driver availability check (excluding current trip)
         validateVehicleAndDriverAvailability(vehicle, driver, trip.getDeliveryDate(), trip.getPlannedDepartureTime(), tripId);
 
+        String oldPlate = trip.getVehicle() != null ? trip.getVehicle().getPlateNumber() : null;
+        String oldDriverName = trip.getDriver() != null ? trip.getDriver().getFullName() : null;
+
         // Update and save
         trip.setVehicle(vehicle);
         trip.setDriver(driver);
         tripRepository.save(trip);
+
+        if (oldPlate != null && !oldPlate.equals(vehicle.getPlateNumber())) {
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    trip.getTripDraft() != null ? trip.getTripDraft().getId() : null, trip.getTripId(),
+                    com.elog.entity.PlanningEventType.OPTION_CHANGED,
+                    com.elog.entity.PlanningActorType.USER, currentUsername,
+                    trip.getStatus().name(), trip.getStatus().name(),
+                    "Đổi xe từ " + oldPlate + " sang " + vehicle.getPlateNumber() + " cho Trip " + tripId,
+                    vehicle.getPlateNumber(), null, null, null,
+                    trip.getRoute() != null ? trip.getRoute().getCode() : null, trip.getDeliveryDate()));
+        }
+
+        if (oldDriverName != null && !oldDriverName.equals(driver.getFullName())) {
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    trip.getTripDraft() != null ? trip.getTripDraft().getId() : null, trip.getTripId(),
+                    com.elog.entity.PlanningEventType.DRIVER_CHANGED,
+                    com.elog.entity.PlanningActorType.USER, currentUsername,
+                    trip.getStatus().name(), trip.getStatus().name(),
+                    "Đổi tài xế từ " + oldDriverName + " sang " + driver.getFullName() + " cho Trip " + tripId,
+                    null, null, null, null,
+                    trip.getRoute() != null ? trip.getRoute().getCode() : null, trip.getDeliveryDate()));
+        }
 
         log.info("Trip {} assignment updated by {}: Vehicle={}, Driver={}",
                 tripId, currentUsername, vehicle.getPlateNumber(), driver.getFullName());

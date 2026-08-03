@@ -132,22 +132,15 @@ public class RecommendationServiceImpl implements RecommendationService {
                     .build();
         }
 
-        // ── Step 2: Fallback two-vehicle ──────────────────────────────────
-        log.warn("No single vehicle fits trip draft {}, triggering 2-vehicle fallback", tripDraftId);
-
-        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
-                tripDraftId, null, com.elog.entity.PlanningEventType.SINGLE_VEHICLE_NOT_FOUND,
-                com.elog.entity.PlanningActorType.RECOMMENDATION_ENGINE, null,
-                draft.getStatus(), draft.getStatus(), "Không tìm thấy phương án 1 xe thỏa mãn tải trọng", null, null, null, null,
-                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
-
+        // ── Step 2: Fallback to Two-Vehicle Engine (FT-07) ────────────────
         planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
                 tripDraftId, null, com.elog.entity.PlanningEventType.TWO_VEHICLE_FALLBACK_TRIGGERED,
                 com.elog.entity.PlanningActorType.RECOMMENDATION_ENGINE, null,
-                draft.getStatus(), draft.getStatus(), "Kích hoạt thuật toán chia tải đề xuất 2 xe", null, null, null, null,
+                draft.getStatus(), draft.getStatus(), "Không tìm thấy phương án 1 xe. Kích hoạt tìm phương án 2 xe", null, null, null, "TWO_VEHICLE",
                 draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
 
-        List<ScoredPair> pairResults = recommendTwoVehicles(draft, activeStops);
+        List<String> twoVehicleReasons = new ArrayList<>();
+        List<ScoredPair> pairResults = recommendTwoVehicles(draft, activeStops, twoVehicleReasons);
 
         if (!pairResults.isEmpty()) {
             List<VehicleRecommendationResponse> top3 = pairResults.stream()
@@ -172,6 +165,7 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         // ── Step 3: No feasible plan ──────────────────────────────────────
         List<String> reasons = collectInfeasibilityReasons(draft, activeStops);
+        reasons.addAll(twoVehicleReasons);
         return RecommendationResultResponse.builder()
                 .tripDraftId(tripDraftId)
                 .planType("NO_PLAN")
@@ -238,7 +232,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     // TWO-VEHICLE ENGINE (FT-07)
     // ══════════════════════════════════════════════════════════════════════════
 
-    private List<ScoredPair> recommendTwoVehicles(TripDraft draft, List<TripDraftStop> stops) {
+    private List<ScoredPair> recommendTwoVehicles(TripDraft draft, List<TripDraftStop> stops, List<String> outReasons) {
         // Build per-stop cargo data
         List<StopCargo> stopCargos = buildStopCargos(draft.getId(), stops);
 
@@ -328,6 +322,10 @@ public class RecommendationServiceImpl implements RecommendationService {
                     allPairs.add(new ScoredPair(va, vb, driverInfoA, driverInfoB, k, subA, subB, scoreA, scoreB, pairScore, explanation));
                 }
             }
+        }
+
+        if (allPairs.isEmpty()) {
+            outReasons.add("Có " + validSplitPoints.size() + " cách chia hợp lệ nhưng không tổ hợp 2 xe nào đáp ứng đồng thời tải trọng/thể tích/giới hạn cửa hàng, hoặc không đủ 2 tài xế khác nhau cho cả 2 xe.");
         }
 
         // Sort descending by pairScore, take top-N

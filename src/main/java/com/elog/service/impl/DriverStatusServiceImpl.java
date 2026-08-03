@@ -11,10 +11,12 @@ import com.elog.exception.ErrorCode;
 import com.elog.repository.DriverStatusHistoryRepository;
 import com.elog.repository.TripRepository;
 import com.elog.repository.UserRepository;
+import com.elog.repository.specification.DriverSpecification;
 import com.elog.service.DriverStatusService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,36 +36,17 @@ public class DriverStatusServiceImpl implements DriverStatusService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<List<DriverResponse>> getDrivers(String keyword, String status, Pageable pageable) {
-        List<User> allUsers = userRepository.findAll();
-        List<User> drivers = allUsers.stream()
-                .filter(u -> u.getRoles().stream().anyMatch(r -> "DRIVER".equals(r.getName())))
-                .filter(u -> {
-                    if (status != null && !status.isBlank()) {
-                        return u.getDriverStatus() != null && u.getDriverStatus().name().equalsIgnoreCase(status);
-                    }
-                    return true;
-                })
-                .filter(u -> {
-                    if (keyword != null && !keyword.isBlank()) {
-                        String kw = keyword.toLowerCase();
-                        boolean matchName = u.getFullName() != null && u.getFullName().toLowerCase().contains(kw);
-                        boolean matchPhone = u.getPhoneNumber() != null && u.getPhoneNumber().toLowerCase().contains(kw);
-                        boolean matchUsername = u.getUsername() != null && u.getUsername().toLowerCase().contains(kw);
-                        return matchName || matchPhone || matchUsername;
-                    }
-                    return true;
-                })
-                .toList();
+        Specification<User> spec = Specification.where(DriverSpecification.isDriver())
+                .and(DriverSpecification.hasDriverStatus(status))
+                .and(DriverSpecification.hasKeyword(keyword));
 
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), drivers.size());
-        List<User> pageContent = (start <= drivers.size()) ? drivers.subList(start, end) : List.of();
+        Page<User> page = userRepository.findAll(spec, pageable);
 
-        List<DriverResponse> responses = pageContent.stream()
+        List<DriverResponse> responses = page.getContent().stream()
                 .map(this::toDriverResponse)
                 .toList();
 
-        return ApiResponse.success(responses, pageable.getPageNumber(), pageable.getPageSize(), drivers.size());
+        return ApiResponse.success(responses, page.getNumber(), page.getSize(), page.getTotalElements());
     }
 
     @Override
@@ -78,7 +61,7 @@ public class DriverStatusServiceImpl implements DriverStatusService {
     public DriverResponse updateStatus(Long driverId, DriverStatusUpdateRequest request, String currentUsername) {
         User driver = findDriverUserOrThrow(driverId);
         User currentActor = userRepository.findByUsername(currentUsername)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "Current user not found"));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "Current user not found", HttpStatus.NOT_FOUND));
 
         if (request.getStatus() == DriverStatus.INACTIVE) {
             if (request.getReasonCode() == null) {
@@ -148,15 +131,17 @@ public class DriverStatusServiceImpl implements DriverStatusService {
                 })
                 .toList();
 
-        return ApiResponse.success(responses, pageable.getPageNumber(), pageable.getPageSize(), page.getTotalElements());
+        return ApiResponse.success(responses, page.getNumber(), page.getSize(), page.getTotalElements());
     }
 
     private User findDriverUserOrThrow(Long driverId) {
         User user = userRepository.findById(driverId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.DRIVER_NOT_FOUND, "Driver not found with ID: " + driverId));
+                .orElseThrow(() -> new BusinessException(ErrorCode.DRIVER_NOT_FOUND,
+                        "Driver not found with ID: " + driverId, HttpStatus.NOT_FOUND));
         boolean isDriver = user.getRoles().stream().anyMatch(r -> "DRIVER".equals(r.getName()));
         if (!isDriver) {
-            throw new BusinessException(ErrorCode.DRIVER_NOT_FOUND, "User with ID " + driverId + " is not a driver");
+            throw new BusinessException(ErrorCode.DRIVER_NOT_FOUND,
+                    "User with ID " + driverId + " is not a driver", HttpStatus.BAD_REQUEST);
         }
         return user;
     }
