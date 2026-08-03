@@ -54,6 +54,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     private final SystemConfigRepository configRepo;
     private final ConstraintValidationService constraintValidationService;
     private final TripExecutionRepository tripExecutionRepo;
+    private final com.elog.service.PlanningHistoryService planningHistoryService;
 
     // ── Internal helper classes ───────────────────────────────────────────────
 
@@ -89,6 +90,12 @@ public class RecommendationServiceImpl implements RecommendationService {
                         "Trip Draft not found: " + tripDraftId,
                         HttpStatus.NOT_FOUND));
 
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.RECOMMENDATION_RUN,
+                com.elog.entity.PlanningActorType.RECOMMENDATION_ENGINE, null,
+                draft.getStatus(), draft.getStatus(), "Khởi chạy thuật toán đề xuất xe", null, null, null, null,
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
+
         List<TripDraftStop> activeStops = tripDraftStopRepo
                 .findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);
 
@@ -107,8 +114,14 @@ public class RecommendationServiceImpl implements RecommendationService {
         if (!singleResults.isEmpty()) {
             List<VehicleRecommendationResponse> top3 = singleResults.stream()
                     .limit(TOP_N)
-                    .map(sv -> toSingleVehicleResponse(sv))
+                    .map(sv -> toSingleVehicleResponse(sv, draft))
                     .toList();
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, null, com.elog.entity.PlanningEventType.RECOMMENDATION_LIST_GENERATED,
+                    com.elog.entity.PlanningActorType.RECOMMENDATION_ENGINE, null,
+                    draft.getStatus(), draft.getStatus(), "Sinh " + top3.size() + " phương án 1 xe đề xuất", top3, null, null, "SINGLE_VEHICLE",
+                    draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
 
             return RecommendationResultResponse.builder()
                     .tripDraftId(tripDraftId)
@@ -122,6 +135,18 @@ public class RecommendationServiceImpl implements RecommendationService {
         // ── Step 2: Fallback two-vehicle ──────────────────────────────────
         log.warn("No single vehicle fits trip draft {}, triggering 2-vehicle fallback", tripDraftId);
 
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.SINGLE_VEHICLE_NOT_FOUND,
+                com.elog.entity.PlanningActorType.RECOMMENDATION_ENGINE, null,
+                draft.getStatus(), draft.getStatus(), "Không tìm thấy phương án 1 xe thỏa mãn tải trọng", null, null, null, null,
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
+
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.TWO_VEHICLE_FALLBACK_TRIGGERED,
+                com.elog.entity.PlanningActorType.RECOMMENDATION_ENGINE, null,
+                draft.getStatus(), draft.getStatus(), "Kích hoạt thuật toán chia tải đề xuất 2 xe", null, null, null, null,
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
+
         List<ScoredPair> pairResults = recommendTwoVehicles(draft, activeStops);
 
         if (!pairResults.isEmpty()) {
@@ -129,6 +154,12 @@ public class RecommendationServiceImpl implements RecommendationService {
                     .limit(TOP_N)
                     .map(sp -> toTwoVehicleResponse(sp))
                     .toList();
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, null, com.elog.entity.PlanningEventType.RECOMMENDATION_LIST_GENERATED,
+                    com.elog.entity.PlanningActorType.RECOMMENDATION_ENGINE, null,
+                    draft.getStatus(), draft.getStatus(), "Sinh " + top3.size() + " phương án 2 xe đề xuất", top3, null, null, "TWO_VEHICLE",
+                    draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
 
             return RecommendationResultResponse.builder()
                     .tripDraftId(tripDraftId)
@@ -330,17 +361,18 @@ public class RecommendationServiceImpl implements RecommendationService {
             return fails;
         }
 
-        // HC-3: Dual capacity with safety buffer (90%)
-        BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(SAFETY_BUFFER);
-        BigDecimal effectiveWeight = v.getPayloadKg().multiply(SAFETY_BUFFER);
+        // HC-3: Dual capacity with safety buffer
+        BigDecimal safetyBuffer = getSafetyBufferRatio();
+        BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(safetyBuffer);
+        BigDecimal effectiveWeight = v.getPayloadKg().multiply(safetyBuffer);
 
         if (draft.getTotalVolumeM3().compareTo(effectiveVolume) > 0) {
             fails.add("Volume " + draft.getTotalVolumeM3() + " m³ > effective capacity "
-                    + effectiveVolume + " m³ (90% of " + v.getMaxVolumeM3() + ")");
+                    + effectiveVolume + " m³ (" + safetyBuffer.multiply(BigDecimal.valueOf(100)) + "% of " + v.getMaxVolumeM3() + ")");
         }
         if (draft.getTotalWeightKg().compareTo(effectiveWeight) > 0) {
             fails.add("Weight " + draft.getTotalWeightKg() + " kg > effective capacity "
-                    + effectiveWeight + " kg (90% of " + v.getPayloadKg() + ")");
+                    + effectiveWeight + " kg (" + safetyBuffer.multiply(BigDecimal.valueOf(100)) + "% of " + v.getPayloadKg() + ")");
         }
         if (!fails.isEmpty()) return fails;
 
@@ -376,8 +408,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         if (tripRepo.existsByVehicleIdAndDeliveryDateAndStatusIn(v.getId(), deliveryDate, busyStatuses)) return false;
         if (!tripExecutionRepo.findUnreturnedByVehicleId(v.getId()).isEmpty()) return false;
 
-        BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(SAFETY_BUFFER);
-        BigDecimal effectiveWeight = v.getPayloadKg().multiply(SAFETY_BUFFER);
+        BigDecimal safetyBuffer = getSafetyBufferRatio();
+        BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(safetyBuffer);
+        BigDecimal effectiveWeight = v.getPayloadKg().multiply(safetyBuffer);
         if (subVolume.compareTo(effectiveVolume) > 0) return false;
         if (subWeight.compareTo(effectiveWeight) > 0) return false;
 
@@ -465,6 +498,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     private List<User> findActiveDrivers() {
         return userRepo.findAll().stream()
                 .filter(u -> Boolean.TRUE.equals(u.getIsActive())
+                        && u.getDriverStatus() == DriverStatus.ACTIVE
                         && u.getRoles().stream().anyMatch(r -> "DRIVER".equals(r.getName())))
                 .toList();
     }
@@ -637,25 +671,62 @@ public class RecommendationServiceImpl implements RecommendationService {
     // RESPONSE BUILDERS
     // ══════════════════════════════════════════════════════════════════════════
 
-    private VehicleRecommendationResponse toSingleVehicleResponse(ScoredVehicle sv) {
+    private VehicleRecommendationResponse toSingleVehicleResponse(ScoredVehicle sv, TripDraft draft) {
+        BigDecimal volPct = BigDecimal.valueOf(safeDiv(draft.getTotalVolumeM3(), sv.vehicle().getMaxVolumeM3()) * 100).setScale(1, RoundingMode.HALF_UP);
+        BigDecimal wgtPct = BigDecimal.valueOf(safeDiv(draft.getTotalWeightKg(), sv.vehicle().getPayloadKg()) * 100).setScale(1, RoundingMode.HALF_UP);
+
+        List<String> warnings = new ArrayList<>();
+        if (Boolean.TRUE.equals(sv.driverInfo().isTemporary())) {
+            warnings.add("Tài xế " + sv.driverInfo().driver().getFullName() + " là tài xế thay thế tạm thời cho xe " + sv.vehicle().getPlateNumber() + ".");
+        }
+        if (volPct.doubleValue() < 30.0 || wgtPct.doubleValue() < 30.0) {
+            warnings.add("Tỷ lệ lấp đầy thấp (<30%).");
+        }
+
         return VehicleRecommendationResponse.builder()
                 .planType("SINGLE_VEHICLE")
                 .vehicles(List.of(toVehicleDto(sv.vehicle(), sv.driverInfo())))
                 .subTrips(null)
                 .totalScore(sv.score())
                 .explanation(sv.explanation())
+                .warnings(warnings.isEmpty() ? null : warnings)
                 .build();
     }
 
     private VehicleRecommendationResponse toTwoVehicleResponse(ScoredPair sp) {
+        BigDecimal volPctA = BigDecimal.valueOf(safeDiv(sumVolume(sp.subA()), sp.vehicleA().getMaxVolumeM3()) * 100).setScale(1, RoundingMode.HALF_UP);
+        BigDecimal wgtPctA = BigDecimal.valueOf(safeDiv(sumWeight(sp.subA()), sp.vehicleA().getPayloadKg()) * 100).setScale(1, RoundingMode.HALF_UP);
+
+        List<String> warningsA = new ArrayList<>();
+        if (Boolean.TRUE.equals(sp.driverInfoA().isTemporary())) {
+            warningsA.add("Tài xế " + sp.driverInfoA().driver().getFullName() + " là tài xế thay thế tạm thời cho xe " + sp.vehicleA().getPlateNumber() + ".");
+        }
+        if (volPctA.doubleValue() < 30.0 || wgtPctA.doubleValue() < 30.0) {
+            warningsA.add("Tỷ lệ lấp đầy thấp (<30%).");
+        }
+
         SubTripDto subTripA = SubTripDto.builder()
                 .label("Sub-trip A")
                 .vehicleId(sp.vehicleA().getId())
                 .stopSequenceNos(sp.subA().stream().map(sc -> sc.stop().getSequenceNo()).toList())
                 .subTotalVolumeM3(sumVolume(sp.subA()))
                 .subTotalWeightKg(sumWeight(sp.subA()))
+                .volumeUtilizationPct(volPctA)
+                .weightUtilizationPct(wgtPctA)
                 .subScore(sp.scoreA())
+                .warnings(warningsA.isEmpty() ? null : warningsA)
                 .build();
+
+        BigDecimal volPctB = BigDecimal.valueOf(safeDiv(sumVolume(sp.subB()), sp.vehicleB().getMaxVolumeM3()) * 100).setScale(1, RoundingMode.HALF_UP);
+        BigDecimal wgtPctB = BigDecimal.valueOf(safeDiv(sumWeight(sp.subB()), sp.vehicleB().getPayloadKg()) * 100).setScale(1, RoundingMode.HALF_UP);
+
+        List<String> warningsB = new ArrayList<>();
+        if (Boolean.TRUE.equals(sp.driverInfoB().isTemporary())) {
+            warningsB.add("Tài xế " + sp.driverInfoB().driver().getFullName() + " là tài xế thay thế tạm thời cho xe " + sp.vehicleB().getPlateNumber() + ".");
+        }
+        if (volPctB.doubleValue() < 30.0 || wgtPctB.doubleValue() < 30.0) {
+            warningsB.add("Tỷ lệ lấp đầy thấp (<30%).");
+        }
 
         SubTripDto subTripB = SubTripDto.builder()
                 .label("Sub-trip B")
@@ -663,8 +734,15 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .stopSequenceNos(sp.subB().stream().map(sc -> sc.stop().getSequenceNo()).toList())
                 .subTotalVolumeM3(sumVolume(sp.subB()))
                 .subTotalWeightKg(sumWeight(sp.subB()))
+                .volumeUtilizationPct(volPctB)
+                .weightUtilizationPct(wgtPctB)
                 .subScore(sp.scoreB())
+                .warnings(warningsB.isEmpty() ? null : warningsB)
                 .build();
+
+        List<String> planWarnings = new ArrayList<>();
+        if (!warningsA.isEmpty()) planWarnings.addAll(warningsA);
+        if (!warningsB.isEmpty()) planWarnings.addAll(warningsB);
 
         return VehicleRecommendationResponse.builder()
                 .planType("TWO_VEHICLE")
@@ -672,6 +750,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .subTrips(List.of(subTripA, subTripB))
                 .totalScore(sp.pairScore())
                 .explanation(sp.explanation())
+                .warnings(planWarnings.isEmpty() ? null : planWarnings)
                 .build();
     }
 
@@ -718,5 +797,17 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     private BigDecimal sumWeight(List<StopCargo> cargos) {
         return cargos.stream().map(StopCargo::weightKg).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal getSafetyBufferRatio() {
+        return configRepo.findByConfigKey("CAPACITY_SAFETY_BUFFER_RATIO")
+                .map(c -> {
+                    try {
+                        return new BigDecimal(c.getConfigValue());
+                    } catch (Exception e) {
+                        return new BigDecimal("0.90");
+                    }
+                })
+                .orElse(new BigDecimal("0.90"));
     }
 }

@@ -24,6 +24,8 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         boolean existsByDriverIdAndDeliveryDateAndStatusIn(
                         Long driverId, LocalDate deliveryDate, List<TripStatus> statuses);
 
+        List<Trip> findByDriverIdAndStatusIn(Long driverId, List<TripStatus> statuses);
+
         boolean existsByDriverIdAndDeliveryDateAndStatusInAndTripIdNot(
                         Long driverId, LocalDate deliveryDate, List<TripStatus> statuses, Long tripIdNot);
 

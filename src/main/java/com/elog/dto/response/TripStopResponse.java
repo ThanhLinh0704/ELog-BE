@@ -20,6 +20,9 @@ public class TripStopResponse {
     private String status;
     private BigDecimal stopWeightKg;
     private BigDecimal stopVolumeM3;
+    private BigDecimal distanceFromPrevKm;
+    private Integer travelTimeFromPrevMin;
     private String notes;
 }
+
 

@@ -1,6 +1,7 @@
 package com.elog.service.impl;
 
 import com.elog.dto.response.StopEtaResponse;
+import com.elog.dto.response.goong.GoongDirectionsResponse;
 import com.elog.entity.Store;
 import com.elog.entity.TripDraft;
 import com.elog.entity.TripDraftStop;
@@ -10,30 +11,39 @@ import com.elog.repository.SystemConfigRepository;
 import com.elog.repository.TripDraftRepository;
 import com.elog.repository.TripDraftStopRepository;
 import com.elog.service.EtaCalculationService;
+import com.elog.service.GoongMapService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
- * Haversine-based ETA calculator.
- * Computes sequential linear ETA for active stops using GPS coordinates,
- * average speed from SystemConfig, and per-stop service time.
+ * Primary ETA Calculator using Goong.io REST APIs.
+ * Calculates sequential road driving distance and duration between stops,
+ * updating planned_eta, planned_waiting_time_min, violation_code, total_distance_km,
+ * and route_polyline.
+ *
+ * Fallbacks to HaversineEtaCalculator if Goong API is unavailable or returns an error.
  */
 @Service
+@Primary
 @RequiredArgsConstructor
 @Slf4j
-public class HaversineEtaCalculator implements EtaCalculationService {
+public class GoongEtaCalculator implements EtaCalculationService {
 
-    private static final double EARTH_RADIUS_KM = 6371.0;
-
+    private final GoongMapService goongMapService;
+    private final HaversineEtaCalculator haversineEtaCalculator;
     private final SystemConfigRepository configRepo;
     private final TripDraftRepository tripDraftRepo;
     private final TripDraftStopRepository stopRepo;
@@ -41,10 +51,11 @@ public class HaversineEtaCalculator implements EtaCalculationService {
     @Override
     @Transactional
     public List<StopEtaResponse> calculateAndPersist(Long tripDraftId, LocalTime departureTime) {
-        // 1. Load config
-        double avgSpeedKmh = getConfigDouble("AVG_SPEED_KMH");
-        double warehouseLat = getConfigDouble("WAREHOUSE_LAT");
-        double warehouseLng = getConfigDouble("WAREHOUSE_LNG");
+        // 1. Check if Goong is configured; if not, fallback immediately
+        if (!goongMapService.isConfigured()) {
+            log.warn("Goong API is not configured. Falling back to Haversine ETA Calculator for tripDraftId={}", tripDraftId);
+            return haversineEtaCalculator.calculateAndPersist(tripDraftId, departureTime);
+        }
 
         // 2. Load TripDraft
         TripDraft draft = tripDraftRepo.findById(tripDraftId)
@@ -60,7 +71,7 @@ public class HaversineEtaCalculator implements EtaCalculationService {
                     HttpStatus.CONFLICT);
         }
 
-        // 3. Load active stops in order
+        // 3. Load active stops in sequence
         List<TripDraftStop> activeStops = stopRepo
                 .findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);
 
@@ -71,26 +82,73 @@ public class HaversineEtaCalculator implements EtaCalculationService {
                     HttpStatus.BAD_REQUEST);
         }
 
-        // 4. Calculate sequential ETA
-        LocalDate deliveryDate = draft.getDeliveryDate();
-        LocalDateTime currentEta = LocalDateTime.of(deliveryDate, departureTime);
-        double prevLat = warehouseLat;
-        double prevLng = warehouseLng;
-        List<StopEtaResponse> results = new ArrayList<>();
+        // 4. Validate coordinates
+        double warehouseLat = getConfigDouble("WAREHOUSE_LAT");
+        double warehouseLng = getConfigDouble("WAREHOUSE_LNG");
 
-        for (int i = 0; i < activeStops.size(); i++) {
-            TripDraftStop stop = activeStops.get(i);
+        for (TripDraftStop stop : activeStops) {
             Store store = stop.getStore();
-
             if (store.getLatitude() == null || store.getLongitude() == null) {
                 throw new BusinessException(
                         ErrorCode.ETA_MISSING_COORDINATES,
                         "Store " + store.getCode() + " is missing GPS coordinates. Cannot calculate ETA.",
                         HttpStatus.UNPROCESSABLE_ENTITY);
             }
+        }
 
-            double stopLat = store.getLatitude();
-            double stopLng = store.getLongitude();
+        // 5. Construct origin, destination, and waypoints for Goong Directions API
+        String origin = warehouseLat + "," + warehouseLng;
+        String destination = activeStops.get(activeStops.size() - 1).getStore().getLatitude()
+                + "," + activeStops.get(activeStops.size() - 1).getStore().getLongitude();
+
+        String waypoints = null;
+        if (activeStops.size() > 1) {
+            waypoints = activeStops.subList(0, activeStops.size() - 1).stream()
+                    .map(s -> s.getStore().getLatitude() + "," + s.getStore().getLongitude())
+                    .collect(Collectors.joining("|"));
+        }
+
+        // 6. Call Goong Directions API
+        GoongDirectionsResponse directionsResponse = goongMapService.getDirections(origin, destination, waypoints);
+
+        if (directionsResponse == null || directionsResponse.getRoutes() == null || directionsResponse.getRoutes().isEmpty()) {
+            log.warn("Goong Directions API call failed for tripDraftId={}. Falling back to Haversine.", tripDraftId);
+            return haversineEtaCalculator.calculateAndPersist(tripDraftId, departureTime);
+        }
+
+        GoongDirectionsResponse.Route route = directionsResponse.getRoutes().get(0);
+        List<GoongDirectionsResponse.Leg> legs = route.getLegs();
+
+        if (legs == null || legs.size() != activeStops.size()) {
+            log.warn("Goong returned legs count {} mismatching activeStops count {}. Falling back to Haversine.",
+                    legs != null ? legs.size() : 0, activeStops.size());
+            return haversineEtaCalculator.calculateAndPersist(tripDraftId, departureTime);
+        }
+
+        // 7. Calculate sequential ETA using Goong leg travel durations and distances
+        LocalDate deliveryDate = draft.getDeliveryDate();
+        LocalDateTime currentEta = LocalDateTime.of(deliveryDate, departureTime);
+        double totalDistanceMeters = 0;
+
+        List<StopEtaResponse> results = new ArrayList<>();
+
+        for (int i = 0; i < activeStops.size(); i++) {
+            TripDraftStop stop = activeStops.get(i);
+            Store store = stop.getStore();
+            GoongDirectionsResponse.Leg leg = legs.get(i);
+
+            long legMeters = (leg.getDistance() != null && leg.getDistance().getValue() != null)
+                    ? leg.getDistance().getValue() : 0L;
+            long legSeconds = (leg.getDuration() != null && leg.getDuration().getValue() != null)
+                    ? leg.getDuration().getValue() : 0L;
+
+            totalDistanceMeters += legMeters;
+
+            BigDecimal legDistanceKm = BigDecimal.valueOf(legMeters / 1000.0).setScale(2, RoundingMode.HALF_UP);
+            int legTravelMinutes = (int) Math.round(legSeconds / 60.0);
+
+            stop.setDistanceFromPrevKm(legDistanceKm);
+            stop.setTravelTimeFromPrevMin(legTravelMinutes);
 
             // Add service time of PREVIOUS stop (not for the first stop)
             if (i > 0) {
@@ -101,24 +159,14 @@ public class HaversineEtaCalculator implements EtaCalculationService {
                 currentEta = currentEta.plusMinutes(prevServiceMin);
             }
 
-            // Calculate travel time
-            double distanceKm = haversine(prevLat, prevLng, stopLat, stopLng);
-            long travelMinutes = Math.round((distanceKm / avgSpeedKmh) * 60);
-            currentEta = currentEta.plusMinutes(travelMinutes);
-
-            java.math.BigDecimal distKmBd = java.math.BigDecimal.valueOf(distanceKm).setScale(2, java.math.RoundingMode.HALF_UP);
-            int travelMinInt = (int) travelMinutes;
-
-            stop.setDistanceFromPrevKm(distKmBd);
-            stop.setTravelTimeFromPrevMin(travelMinInt);
+            // Add travel time for this leg
+            currentEta = currentEta.plusMinutes(legTravelMinutes);
 
             // Time window calculation & waiting time check
-
             LocalTime twStart = store.getTimeWindowStart();
             LocalTime twEnd = store.getTimeWindowEnd();
 
-            // Fallback: Parse allowedDeliveryHours e.g. "10:00-12:00" if timeWindowStart is null
-            if (twStart == null && store.getAllowedDeliveryHours() != null 
+            if (twStart == null && store.getAllowedDeliveryHours() != null
                     && !store.getAllowedDeliveryHours().equalsIgnoreCase("All")) {
                 try {
                     String[] parts = store.getAllowedDeliveryHours().split("-");
@@ -136,7 +184,6 @@ public class HaversineEtaCalculator implements EtaCalculationService {
                 long waitMin = java.time.temporal.ChronoUnit.MINUTES.between(arrivalTime, twStart);
                 stop.setPlannedWaitingTimeMin((int) waitMin);
                 if (waitMin <= 30) {
-                    // Accept waiting time, adjust departure from stop using twStart
                     currentEta = LocalDateTime.of(currentEta.toLocalDate(), twStart);
                     stop.setViolationCode(null);
                 } else {
@@ -150,7 +197,6 @@ public class HaversineEtaCalculator implements EtaCalculationService {
                 stop.setViolationCode(null);
             }
 
-            // Set planned ETA
             stop.setPlannedEta(currentEta);
 
             results.add(StopEtaResponse.builder()
@@ -158,46 +204,39 @@ public class HaversineEtaCalculator implements EtaCalculationService {
                     .sequenceNo(stop.getSequenceNo())
                     .storeCode(store.getCode())
                     .plannedEta(currentEta)
-                    .distanceFromPrevKm(distKmBd)
-                    .travelTimeFromPrevMin(travelMinInt)
-                    .estimatedDistanceKm(distKmBd)
-                    .estimatedTravelMin(travelMinInt)
+                    .distanceFromPrevKm(legDistanceKm)
+                    .travelTimeFromPrevMin(legTravelMinutes)
+                    .estimatedDistanceKm(legDistanceKm)
+                    .estimatedTravelMin(legTravelMinutes)
                     .build());
 
-
-            prevLat = stopLat;
-            prevLng = stopLng;
         }
 
-        // 5. Persist all at once
-        stopRepo.saveAll(activeStops);
+        // 8. Set total distance and polyline on TripDraft
+        BigDecimal totalKm = BigDecimal.valueOf(totalDistanceMeters / 1000.0).setScale(2, RoundingMode.HALF_UP);
+        draft.setTotalDistanceKm(totalKm);
 
-        // 6. Update departure time on TripDraft
+        if (route.getOverviewPolyline() != null) {
+            draft.setRoutePolyline(route.getOverviewPolyline().getPoints());
+        }
+
         draft.setPlannedDepartureTime(departureTime);
+
+        // 9. Persist all
+        stopRepo.saveAll(activeStops);
         tripDraftRepo.save(draft);
 
-        log.info("US-11: ETA calculated for TripDraft id={}, {} active stops", tripDraftId, results.size());
-        return results;
-    }
+        log.info("GoongEtaCalculator: Calculated ETA for TripDraft id={}, {} stops, totalDistance={} km",
+                tripDraftId, results.size(), totalKm);
 
-    /**
-     * Haversine formula — great-circle distance between two GPS points.
-     */
-    double haversine(double lat1, double lng1, double lat2, double lng2) {
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLng = Math.toRadians(lng2 - lng1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return EARTH_RADIUS_KM * c;
+        return results;
     }
 
     private double getConfigDouble(String key) {
         return configRepo.findByConfigKey(key)
                 .map(config -> Double.parseDouble(config.getConfigValue()))
                 .orElseThrow(() -> {
-                    log.error("Missing config key: {}", key);
+                    log.error("Missing system config key: {}", key);
                     return new BusinessException(
                             ErrorCode.INTERNAL_ERROR,
                             "Missing system config key: " + key,

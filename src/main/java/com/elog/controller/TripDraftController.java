@@ -240,6 +240,8 @@ public class TripDraftController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    private final com.elog.service.PlanningHistoryService planningHistoryService;
+
     // ── Recommendation Engine endpoints ───────────────────────────
 
     @GetMapping("/{id}/recommendations")
@@ -249,5 +251,16 @@ public class TripDraftController {
             @PathVariable Long id) {
         RecommendationResultResponse result = recommendationService.recommendTop3(id);
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @GetMapping("/{id}/history")
+    @Operation(summary = "Get planning history for a specific Trip Draft")
+    @PreAuthorize("hasAuthority('planning-history:read')")
+    public ResponseEntity<ApiResponse<List<com.elog.dto.response.PlanningEventResponse>>> getTripDraftHistory(
+            @PathVariable Long id,
+            @org.springframework.data.web.PageableDefault(size = 20, sort = "occurredAt", direction = org.springframework.data.domain.Sort.Direction.DESC) org.springframework.data.domain.Pageable pageable) {
+        var filter = new com.elog.service.PlanningHistoryService.PlanningHistoryFilter(
+                id, null, null, null, null, null, null, null, null);
+        return ResponseEntity.ok(planningHistoryService.search(filter, pageable));
     }
 }

@@ -465,6 +465,8 @@ public class TripDraftServiceImpl implements TripDraftService {
                 .plannedDepartureTime(draft.getPlannedDepartureTime())
                 .confirmedAt(draft.getConfirmedAt())
                 .confirmedBy(confirmedByDto)
+                .totalDistanceKm(draft.getTotalDistanceKm())
+                .routePolyline(draft.getRoutePolyline())
                 .stops(stops)
                 .build();
     }
@@ -501,8 +503,14 @@ public class TripDraftServiceImpl implements TripDraftService {
                 .routeStopId(routeStopId)
                 .stopVolumeM3(stopVolume)
                 .stopWeightKg(stopWeight)
+                .distanceFromPrevKm(stop.getDistanceFromPrevKm())
+                .travelTimeFromPrevMin(stop.getTravelTimeFromPrevMin())
+                .estimatedDistanceKm(stop.getDistanceFromPrevKm())
+                .estimatedTravelMin(stop.getTravelTimeFromPrevMin())
                 .build();
+
     }
+
 
     @Override
     @Transactional(readOnly = true)

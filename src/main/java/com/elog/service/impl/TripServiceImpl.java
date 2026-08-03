@@ -39,6 +39,8 @@ public class TripServiceImpl implements TripService {
     private final OrderRepository orderRepository;
     private final TripStateMachine tripStateMachine;
     private final TripExecutionRepository tripExecutionRepository;
+    private final com.elog.service.PlanningHistoryService planningHistoryService;
+    private final com.elog.service.TripOutcomeHistoryService tripOutcomeHistoryService;
 
     // ── US-15 TASK-02 ──────────────────────────────────────────────
 
@@ -116,7 +118,7 @@ public class TripServiceImpl implements TripService {
     @Transactional(readOnly = true)
     public List<AvailableDriverResponse> getAvailableDrivers(LocalDate date) {
         List<User> drivers = userRepository.findAll().stream()
-                .filter(u -> u.getIsActive() && u.getRoles().stream()
+                .filter(u -> u.getIsActive() && u.getDriverStatus() == DriverStatus.ACTIVE && u.getRoles().stream()
                         .anyMatch(r -> "DRIVER".equals(r.getName())))
                 .toList();
 
@@ -246,6 +248,25 @@ public class TripServiceImpl implements TripService {
         User dispatcher = findUserByUsernameOrThrow(currentUsername);
         List<TripSplitResponse.TripSummary> summaries = new ArrayList<>();
         List<TripStatus> busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+
+        // BR-PLAN-03: Validate complete, non-duplicate, non-extraneous stop coverage for this trip draft
+        List<TripDraftStop> allActiveStops = tripDraftStopRepository.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);
+        Set<Long> expectedStopIds = allActiveStops.stream().map(TripDraftStop::getId).collect(java.util.stream.Collectors.toSet());
+
+        List<Long> requestedStopIds = request.getAssignments().stream()
+                .flatMap(a -> a.getStopIds().stream())
+                .toList();
+        Set<Long> requestedStopIdSet = new HashSet<>(requestedStopIds);
+
+        if (requestedStopIds.size() != requestedStopIdSet.size()) {
+            throw new BusinessException(ErrorCode.SPLIT_PLAN_STOP_DUPLICATED,
+                    "One or more stops are assigned to more than one vehicle in this split plan.", HttpStatus.BAD_REQUEST);
+        }
+
+        if (!requestedStopIdSet.equals(expectedStopIds)) {
+            throw new BusinessException(ErrorCode.SPLIT_PLAN_STOP_INCOMPLETE,
+                    "Split plan must cover exactly all active stops of the Trip Draft — no stop may be missing or extraneous.", HttpStatus.BAD_REQUEST);
+        }
 
         for (TripSplitAssignRequest.SplitAssignment assignment : request.getAssignments()) {
             Vehicle vehicle = vehicleRepository.findById(assignment.getVehicleId())
@@ -424,6 +445,17 @@ public class TripServiceImpl implements TripService {
             }
 
             tripExecutionRepository.save(execution);
+
+            tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                    execution.getId(), trip.getTripId(),
+                    com.elog.entity.TripOutcomeEventType.TRIP_EXECUTION_CREATED,
+                    com.elog.entity.PlanningActorType.SYSTEM, currentUsername,
+                    null, "ASSIGNED",
+                    null, null, null, null, null, null, null, null,
+                    trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                    trip.getDeliveryDate(),
+                    trip.getDriver() != null ? trip.getDriver().getUsername() : null
+            ));
         }
 
         log.info("Trip {} dispatched by {}", tripId, currentUsername);
@@ -544,6 +576,10 @@ public class TripServiceImpl implements TripService {
             throw new BusinessException(ErrorCode.DRIVER_NOT_FOUND,
                     "User " + driverId + " is not a driver.", HttpStatus.BAD_REQUEST);
         }
+        if (driver.getDriverStatus() == DriverStatus.INACTIVE) {
+            throw new BusinessException(ErrorCode.DRIVER_INACTIVE,
+                    "Driver " + driver.getFullName() + " is currently INACTIVE and cannot be assigned to trips.", HttpStatus.BAD_REQUEST);
+        }
         return driver;
     }
 
@@ -564,6 +600,8 @@ public class TripServiceImpl implements TripService {
                 .status(TripStatus.VALIDATED)
                 .totalWeightKg(totalWeight)
                 .totalVolumeM3(totalVolume)
+                .totalDistanceKm(td.getTotalDistanceKm())
+                .routePolyline(td.getRoutePolyline())
                 .plannedDepartureTime(td.getPlannedDepartureTime())
                 .createdBy(dispatcher)
                 .createdAt(LocalDateTime.now())
@@ -589,6 +627,8 @@ public class TripServiceImpl implements TripService {
                     .tripDraftStop(ds)
                     .sequenceOrder(ds.getSequenceNo())
                     .plannedEta(ds.getPlannedEta())
+                    .distanceFromPrevKm(ds.getDistanceFromPrevKm())
+                    .travelTimeFromPrevMin(ds.getTravelTimeFromPrevMin())
                     .stopWeightKg(stopWeight)
                     .stopVolumeM3(stopVolume)
                     .status(TripStopStatus.PENDING)
@@ -635,6 +675,8 @@ public class TripServiceImpl implements TripService {
                         .build())
                 .totalWeightKg(trip.getTotalWeightKg())
                 .totalVolumeM3(trip.getTotalVolumeM3())
+                .totalDistanceKm(trip.getTotalDistanceKm())
+                .routePolyline(trip.getRoutePolyline())
                 .plannedDepartureTime(trip.getPlannedDepartureTime())
                 .lockedAt(trip.getLockedAt())
                 .lockedBy(trip.getLockedBy() != null
@@ -664,9 +706,12 @@ public class TripServiceImpl implements TripService {
                 .status(ts.getStatus().name())
                 .stopWeightKg(ts.getStopWeightKg())
                 .stopVolumeM3(ts.getStopVolumeM3())
+                .distanceFromPrevKm(ts.getDistanceFromPrevKm())
+                .travelTimeFromPrevMin(ts.getTravelTimeFromPrevMin())
                 .notes(ts.getNotes())
                 .build();
     }
+
 
     @Override
     @Transactional(readOnly = true)
@@ -705,7 +750,11 @@ public class TripServiceImpl implements TripService {
                 .anyMatch(r -> "ROLE_DRIVER".equals(r.getName()) || "DRIVER".equals(r.getName()));
         if (!isDriver) {
             throw new BusinessException(ErrorCode.DRIVER_NOT_FOUND,
-                    "User " + driver.getFullName() + " is not a driver.", HttpStatus.BAD_REQUEST);
+                    "User " + request.getDriverId() + " is not a driver.", HttpStatus.BAD_REQUEST);
+        }
+        if (driver.getDriverStatus() == DriverStatus.INACTIVE) {
+            throw new BusinessException(ErrorCode.DRIVER_INACTIVE,
+                    "Driver " + driver.getFullName() + " is currently INACTIVE and cannot be assigned to trips.", HttpStatus.BAD_REQUEST);
         }
 
         // Guard 2: Capacity check & store weight limit

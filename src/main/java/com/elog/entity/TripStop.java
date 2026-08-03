@@ -67,4 +67,11 @@ public class TripStop {
 
     @Column(name = "violation_code", length = 50)
     private String violationCode;
+
+    @Column(name = "distance_from_prev_km", precision = 10, scale = 2)
+    private BigDecimal distanceFromPrevKm;
+
+    @Column(name = "travel_time_from_prev_min")
+    private Integer travelTimeFromPrevMin;
 }
+

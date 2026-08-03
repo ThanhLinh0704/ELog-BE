@@ -23,6 +23,7 @@ import java.util.List;
 public class TripOutcomeServiceImpl implements TripOutcomeService {
 
     private final TripOutcomeRepository tripOutcomeRepo;
+    private final com.elog.service.TripOutcomeHistoryService tripOutcomeHistoryService;
 
     @Override
     @Transactional(readOnly = true)
@@ -48,10 +49,25 @@ public class TripOutcomeServiceImpl implements TripOutcomeService {
                     HttpStatus.BAD_REQUEST);
         }
 
+        String statusBefore = outcome.getStatus();
         outcome.setStatus("VALIDATED");
         outcome.setValidatedAt(LocalDateTime.now());
         outcome.setValidatedBy(dispatcherUsername);
         tripOutcomeRepo.save(outcome);
+
+        TripExecution exec = outcome.getTripExecution();
+        Trip trip = exec != null ? exec.getTrip() : null;
+
+        tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                exec != null ? exec.getId() : null, trip != null ? trip.getTripId() : null,
+                com.elog.entity.TripOutcomeEventType.OUTCOME_VALIDATED,
+                com.elog.entity.PlanningActorType.USER, dispatcherUsername,
+                statusBefore, "VALIDATED",
+                null, null, null, null, null, null, null, null,
+                trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                trip != null ? trip.getDeliveryDate() : null,
+                exec != null && exec.getDriver() != null ? exec.getDriver().getUsername() : null
+        ));
 
         log.info("Dispatcher {} validated Trip Outcome ID {}", dispatcherUsername, outcomeId);
         return toResponse(outcome);
@@ -72,6 +88,21 @@ public class TripOutcomeServiceImpl implements TripOutcomeService {
                     "Bắt buộc nhập lý do điều chỉnh (amendmentReason)",
                     HttpStatus.BAD_REQUEST);
         }
+
+        String statusBefore = outcome.getStatus();
+        TripExecution exec = outcome.getTripExecution();
+        Trip trip = exec != null ? exec.getTrip() : null;
+
+        tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                exec != null ? exec.getId() : null, trip != null ? trip.getTripId() : null,
+                com.elog.entity.TripOutcomeEventType.OUTCOME_AMENDED,
+                com.elog.entity.PlanningActorType.USER, dispatcherUsername,
+                statusBefore, "NEEDS_CORRECTION",
+                null, null, null, null, null, null, null, amendmentReason,
+                trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                trip != null ? trip.getDeliveryDate() : null,
+                exec != null && exec.getDriver() != null ? exec.getDriver().getUsername() : null
+        ));
 
         outcome.setStatus("NEEDS_CORRECTION");
         outcome.setAmendmentReason(amendmentReason);

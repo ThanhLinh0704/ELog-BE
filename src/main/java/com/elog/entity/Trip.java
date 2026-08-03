@@ -83,4 +83,11 @@ public class Trip {
     @OrderBy("sequenceOrder ASC")
     @Builder.Default
     private List<TripStop> stops = new ArrayList<>();
+
+    @Column(name = "total_distance_km", precision = 10, scale = 2)
+    private BigDecimal totalDistanceKm;
+
+    @Column(name = "route_polyline", columnDefinition = "TEXT")
+    private String routePolyline;
 }
+

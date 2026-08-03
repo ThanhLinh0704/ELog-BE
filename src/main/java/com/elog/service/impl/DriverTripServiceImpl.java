@@ -33,6 +33,7 @@ public class DriverTripServiceImpl implements DriverTripService {
     private final OrderRepository orderRepo;
     private final TripDraftStopRepository tripDraftStopRepo;
     private final UserRepository userRepo;
+    private final com.elog.service.TripOutcomeHistoryService tripOutcomeHistoryService;
 
     @Override
     @Transactional(readOnly = true)
@@ -43,7 +44,7 @@ public class DriverTripServiceImpl implements DriverTripService {
                 .findByDriverUsernameAndStatusIn(driverUsername, List.of("IN_PROGRESS", "ASSIGNED"))
                 .stream()
                 .filter(te -> "IN_PROGRESS".equals(te.getStatus())
-                        || (te.getTrip() != null && te.getTrip().getDeliveryDate() != null && !te.getTrip().getDeliveryDate().isAfter(today)))
+                        || (te.getTrip() != null && today.equals(te.getTrip().getDeliveryDate())))
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.RESOURCE_NOT_FOUND,
@@ -72,9 +73,21 @@ public class DriverTripServiceImpl implements DriverTripService {
                     HttpStatus.BAD_REQUEST);
         }
 
+        String statusBefore = execution.getStatus();
         execution.setStatus("IN_PROGRESS");
         execution.setStartedAt(LocalDateTime.now());
         tripExecutionRepo.save(execution);
+
+        Trip trip = execution.getTrip();
+        tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                executionId, trip != null ? trip.getTripId() : null,
+                com.elog.entity.TripOutcomeEventType.START_TRIP,
+                com.elog.entity.PlanningActorType.USER, driverUsername,
+                statusBefore, "IN_PROGRESS",
+                null, null, null, null, null, null, null, null,
+                trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                trip != null ? trip.getDeliveryDate() : null, driverUsername
+        ));
 
         log.info("Driver {} started trip execution ID {}", driverUsername, executionId);
         return buildDriverTripResponse(execution);
@@ -118,9 +131,61 @@ public class DriverTripServiceImpl implements DriverTripService {
                         "Không tìm thấy đơn hàng ID " + orderId + " trong chuyến xe này",
                         HttpStatus.NOT_FOUND));
 
+        String orderStatusBefore = result.getStatus();
+        TripDraftStop stop = result.getStop();
+        List<DeliveryOrderResult> stopResultsBefore = stop != null
+                ? deliveryOrderResultRepo.findByTripExecutionId(executionId).stream()
+                .filter(r -> r.getStop() != null && r.getStop().getId().equals(stop.getId()))
+                .toList()
+                : List.of();
+        String stopStatusBefore = aggregateStopStatusFromResults(stopResultsBefore);
+
         result.setStatus(newStatus);
+        result.setReasonCode(request.getReasonCode());
+        result.setExceptionText(request.getExceptionText());
         result.setUpdatedAt(LocalDateTime.now());
         deliveryOrderResultRepo.save(result);
+
+        Trip trip = execution.getTrip();
+        Order order = result.getOrder();
+        com.elog.entity.TripOutcomeEventType eventType = "DELIVERED".equals(newStatus)
+                ? com.elog.entity.TripOutcomeEventType.ORDER_DELIVERED
+                : "FAILED".equals(newStatus)
+                ? com.elog.entity.TripOutcomeEventType.ORDER_FAILED
+                : com.elog.entity.TripOutcomeEventType.ORDER_PARTIALLY_DELIVERED;
+
+        tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                executionId, trip != null ? trip.getTripId() : null,
+                eventType, com.elog.entity.PlanningActorType.USER, driverUsername,
+                orderStatusBefore, newStatus,
+                orderId, order != null ? order.getOrderRef() : null,
+                stop != null ? stop.getId() : null,
+                stop != null && stop.getStore() != null ? stop.getStore().getCode() : null,
+                newStatus, request.getReasonCode(), request.getExceptionText(), null,
+                trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                trip != null ? trip.getDeliveryDate() : null, driverUsername
+        ));
+
+        if (stop != null) {
+            List<DeliveryOrderResult> stopResultsAfter = deliveryOrderResultRepo.findByTripExecutionId(executionId).stream()
+                    .filter(r -> r.getStop() != null && r.getStop().getId().equals(stop.getId()))
+                    .toList();
+            String stopStatusAfter = aggregateStopStatusFromResults(stopResultsAfter);
+
+            if (!stopStatusBefore.equals(stopStatusAfter)) {
+                tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                        executionId, trip != null ? trip.getTripId() : null,
+                        com.elog.entity.TripOutcomeEventType.STOP_STATUS_CHANGED,
+                        com.elog.entity.PlanningActorType.SYSTEM, null,
+                        stopStatusBefore, stopStatusAfter,
+                        null, null, stop.getId(),
+                        stop.getStore() != null ? stop.getStore().getCode() : null,
+                        null, null, null, null,
+                        trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                        trip != null ? trip.getDeliveryDate() : null, driverUsername
+                ));
+            }
+        }
 
         // Record log if failed or partial
         if (List.of("FAILED", "PARTIALLY_DELIVERED").contains(newStatus)) {
@@ -167,9 +232,21 @@ public class DriverTripServiceImpl implements DriverTripService {
         boolean hasExceptions = (failedCount > 0 || partialCount > 0);
         String finalExecutionStatus = hasExceptions ? "COMPLETED_WITH_EXCEPTIONS" : "COMPLETED";
 
+        String statusBefore = execution.getStatus();
         execution.setStatus(finalExecutionStatus);
         execution.setCompletedAt(LocalDateTime.now());
         tripExecutionRepo.save(execution);
+
+        Trip trip = execution.getTrip();
+        tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                executionId, trip != null ? trip.getTripId() : null,
+                com.elog.entity.TripOutcomeEventType.COMPLETE_TRIP,
+                com.elog.entity.PlanningActorType.USER, driverUsername,
+                statusBefore, finalExecutionStatus,
+                null, null, null, null, null, null, null, null,
+                trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                trip != null ? trip.getDeliveryDate() : null, driverUsername
+        ));
 
         // Create Submitted Trip Outcome for Dispatcher validation
         TripOutcome outcome = TripOutcome.builder()
@@ -186,7 +263,6 @@ public class DriverTripServiceImpl implements DriverTripService {
 
         log.info("Driver {} completed trip execution ID {} with status {}", driverUsername, executionId, finalExecutionStatus);
 
-        Trip trip = execution.getTrip();
         String tripCodeStr = trip != null ? "TRIP-" + trip.getTripId() : null;
         return TripOutcomeResponse.builder()
                 .id(outcome.getId())
@@ -399,6 +475,17 @@ public class DriverTripServiceImpl implements DriverTripService {
         boolean anyFailed = orders.stream().anyMatch(o -> "FAILED".equals(o.getDeliveryStatus()));
         if (anyFailed) return "FAILED";
         boolean anyPartial = orders.stream().anyMatch(o -> "PARTIALLY_DELIVERED".equals(o.getDeliveryStatus()));
+        if (anyPartial) return "PARTIALLY_DELIVERED";
+        return "PENDING";
+    }
+
+    private String aggregateStopStatusFromResults(List<DeliveryOrderResult> results) {
+        if (results.isEmpty()) return "PENDING";
+        boolean allDelivered = results.stream().allMatch(o -> "DELIVERED".equals(o.getStatus()));
+        if (allDelivered) return "DELIVERED";
+        boolean anyFailed = results.stream().anyMatch(o -> "FAILED".equals(o.getStatus()));
+        if (anyFailed) return "FAILED";
+        boolean anyPartial = results.stream().anyMatch(o -> "PARTIALLY_DELIVERED".equals(o.getStatus()));
         if (anyPartial) return "PARTIALLY_DELIVERED";
         return "PENDING";
     }

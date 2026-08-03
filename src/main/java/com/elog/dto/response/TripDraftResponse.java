@@ -26,5 +26,8 @@ public class TripDraftResponse {
     private LocalTime plannedDepartureTime;
     private LocalDateTime confirmedAt;
     private ConfirmedByDto confirmedBy;
+    private BigDecimal totalDistanceKm;
+    private String routePolyline;
     private List<TripDraftStopResponse> stops;
 }
+

@@ -29,6 +29,20 @@ public class ApiResponse<T> {
                 .message(message)
                 .build();
     }
+
+    public static <T> ApiResponse<T> success(T data, int page, int size, long totalElements) {
+        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
+        return ApiResponse.<T>builder()
+                .success(true)
+                .data(data)
+                .pagination(PaginationInfo.builder()
+                        .page(page)
+                        .size(size)
+                        .totalElements(totalElements)
+                        .totalPages(totalPages)
+                        .build())
+                .build();
+    }
     @Getter
     @Setter
     @Builder

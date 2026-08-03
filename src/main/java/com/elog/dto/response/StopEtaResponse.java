@@ -14,4 +14,10 @@ public class StopEtaResponse {
     private Integer sequenceNo;
     private String storeCode;
     private LocalDateTime plannedEta;
+    private java.math.BigDecimal distanceFromPrevKm;
+    private Integer travelTimeFromPrevMin;
+    private java.math.BigDecimal estimatedDistanceKm;
+    private Integer estimatedTravelMin;
 }
+
+

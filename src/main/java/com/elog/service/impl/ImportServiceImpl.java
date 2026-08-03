@@ -438,8 +438,9 @@ public class ImportServiceImpl implements ImportService {
             if (deliveryDateRaw.isEmpty()) {
                 throw new RowRejectedException("Ngày giao hàng không được để trống", "MISSING_FIELD", "delivery_date");
             } else {
-                throw new RowRejectedException("Ngày giao hàng không đúng định dạng YYYY-MM-DD hoặc DD/MM/YYYY (giá trị: '" + row.deliveryDateRaw + "')", "INVALID_DATE_FORMAT", "delivery_date");
+                throw new RowRejectedException("Ngày giao hàng không đúng định dạng DD/MM/YYYY (ví dụ: 02/08/2026) (giá trị: '" + row.deliveryDateRaw + "')", "INVALID_DATE_FORMAT", "delivery_date");
             }
+
         }
 
         // Reject rows targeting a delivery date whose TripDraft is already locked (status != DRAFT)
@@ -588,6 +589,14 @@ public class ImportServiceImpl implements ImportService {
             case NUMERIC -> {
                 if (DateUtil.isCellDateFormatted(cell)) {
                     try {
+                        org.apache.poi.ss.usermodel.DataFormatter formatter = new org.apache.poi.ss.usermodel.DataFormatter();
+                        String formatted = formatter.formatCellValue(cell);
+                        if (formatted != null && !formatted.isBlank()) {
+                            yield formatted.trim();
+                        }
+                    } catch (Exception ignored) {}
+
+                    try {
                         java.time.LocalDateTime ldt = cell.getLocalDateTimeCellValue();
                         if (ldt != null) {
                             yield ldt.toLocalDate().toString();
@@ -600,6 +609,7 @@ public class ImportServiceImpl implements ImportService {
                 }
                 yield String.valueOf(d);
             }
+
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             case FORMULA -> {
                 try {
@@ -707,25 +717,29 @@ public class ImportServiceImpl implements ImportService {
 
     // ── Inner class for parsed row data ───────────────────────────────────────
 
+    private static final java.time.format.DateTimeFormatter[] IMPORT_DATE_FORMATTERS = new java.time.format.DateTimeFormatter[]{
+            java.time.format.DateTimeFormatter.ofPattern("d/M/yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("d/M/yy"),
+            java.time.format.DateTimeFormatter.ofPattern("d-M-yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("d-M-yy"),
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+            java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd")
+    };
+
     private LocalDate parseRowDate(String dateStr) {
         if (dateStr == null || dateStr.isBlank()) return null;
         dateStr = dateStr.trim();
-        try {
-            return LocalDate.parse(dateStr);
-        } catch (Exception ignored) {}
 
-        try {
-            java.time.format.DateTimeFormatter dmy = java.time.format.DateTimeFormatter.ofPattern("d/M/yyyy");
-            return LocalDate.parse(dateStr, dmy);
-        } catch (Exception ignored) {}
-
-        try {
-            java.time.format.DateTimeFormatter dmy2 = java.time.format.DateTimeFormatter.ofPattern("d-M-yyyy");
-            return LocalDate.parse(dateStr, dmy2);
-        } catch (Exception ignored) {}
+        for (java.time.format.DateTimeFormatter formatter : IMPORT_DATE_FORMATTERS) {
+            try {
+                return LocalDate.parse(dateStr, formatter);
+            } catch (Exception ignored) {}
+        }
 
         return null;
     }
+
+
 
     private static class RowData {
         int rowNumber;
