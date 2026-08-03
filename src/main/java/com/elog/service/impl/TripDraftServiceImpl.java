@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -318,7 +319,7 @@ public class TripDraftServiceImpl implements TripDraftService {
 
         planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
                 tripDraftId, null, com.elog.entity.PlanningEventType.TRIP_DRAFT_UPDATED,
-                com.elog.entity.PlanningActorType.USER, null,
+                com.elog.entity.PlanningActorType.USER, currentUsernameOrNull(),
                 draft.getStatus(), draft.getStatus(), "Cập nhật điểm dừng " + stop.getStore().getCode() + " (isActive=" + request.getIsActive() + ")",
                 null, "Stop ID: " + stop.getId(), null, stop.getStore().getCode(),
                 draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
@@ -470,6 +471,11 @@ public class TripDraftServiceImpl implements TripDraftService {
                         HttpStatus.NOT_FOUND));
     }
 
+    private String currentUsernameOrNull() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null ? auth.getName() : null;
+    }
+
     // ── Mapping helpers ─────────────────────────────────────────
 
     private TripDraftResponse toResponse(TripDraft draft, List<TripDraftStopResponse> stops) {
@@ -595,7 +601,7 @@ public class TripDraftServiceImpl implements TripDraftService {
 
         planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
                 tripDraftId, null, com.elog.entity.PlanningEventType.TRIP_DRAFT_UPDATED,
-                com.elog.entity.PlanningActorType.USER, null,
+                com.elog.entity.PlanningActorType.USER, currentUsernameOrNull(),
                 draft.getStatus(), draft.getStatus(), "Điều chỉnh giờ xuất phát thành " + request.getNewDepartureTime(),
                 null, null, null, null,
                 draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
@@ -690,7 +696,7 @@ public class TripDraftServiceImpl implements TripDraftService {
 
         planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
                 tripDraftId, null, com.elog.entity.PlanningEventType.TRIP_DRAFT_UPDATED,
-                com.elog.entity.PlanningActorType.USER, null,
+                com.elog.entity.PlanningActorType.USER, currentUsernameOrNull(),
                 draft.getStatus(), draft.getStatus(), "Loại trừ đơn hàng " + order.getOrderRef() + " khỏi Trip Draft",
                 null, order.getOrderRef(), null, order.getStore() != null ? order.getStore().getCode() : null,
                 draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
@@ -729,7 +735,7 @@ public class TripDraftServiceImpl implements TripDraftService {
 
         planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
                 tripDraftId, null, com.elog.entity.PlanningEventType.TRIP_DRAFT_UPDATED,
-                com.elog.entity.PlanningActorType.USER, null,
+                com.elog.entity.PlanningActorType.USER, currentUsernameOrNull(),
                 draft.getStatus(), draft.getStatus(), "Thêm lại đơn hàng " + order.getOrderRef() + " vào Trip Draft",
                 null, order.getOrderRef(), null, order.getStore() != null ? order.getStore().getCode() : null,
                 draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));

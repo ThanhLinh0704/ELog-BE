@@ -36,6 +36,8 @@ class TripDraftServiceImplTest {
     private RouteRepository routeRepository;
     @Mock
     private OrderItemRepository orderItemRepository;
+    @Mock
+    private PlanningHistoryService planningHistoryService;
 
     @InjectMocks
     private TripDraftServiceImpl tripDraftService;

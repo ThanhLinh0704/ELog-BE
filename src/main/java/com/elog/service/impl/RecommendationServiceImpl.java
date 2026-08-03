@@ -241,6 +241,8 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         if (validSplitPoints.isEmpty()) {
             log.warn("No valid split points for trip draft {}", draft.getId());
+            outReasons.add("Không thể phân chia đơn hàng cho tối đa 2 xe mà không vi phạm tính toàn vẹn của cửa hàng "
+                    + "(1 cửa hàng phải nằm trọn trong 1 xe).");
             return List.of();
         }
 

@@ -85,6 +85,9 @@ public class DriverTripServiceImpl implements DriverTripService {
             if (trip.getActualDepartureTime() == null) {
                 trip.setActualDepartureTime(execution.getStartedAt());
             }
+            if (trip.getVehicle() != null) {
+                trip.getVehicle().setStatus(VehicleStatus.IN_USE);
+            }
             tripRepo.save(trip);
         }
 
@@ -196,12 +199,12 @@ public class DriverTripServiceImpl implements DriverTripService {
 
                 // Sync to System A TripStop entity if exists
                 tripStopRepo.findByTripDraftStopId(stop.getId()).ifPresent(ts -> {
-                    if ("COMPLETED".equals(stopStatusAfter)) {
+                    if ("DELIVERED".equals(stopStatusAfter)) {
                         ts.setStatus(TripStopStatus.COMPLETED);
                         if (ts.getActualArrivalTime() == null) {
                             ts.setActualArrivalTime(LocalDateTime.now());
                         }
-                    } else if ("EXCEPTION".equals(stopStatusAfter)) {
+                    } else if ("FAILED".equals(stopStatusAfter) || "PARTIALLY_DELIVERED".equals(stopStatusAfter)) {
                         ts.setStatus(TripStopStatus.EXCEPTION);
                     }
                     tripStopRepo.save(ts);
