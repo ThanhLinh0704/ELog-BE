@@ -51,6 +51,10 @@ class TripServiceImplTest {
     private TripStateMachine tripStateMachine;
     @Mock
     private TripExecutionRepository tripExecutionRepository;
+    @Mock
+    private PlanningHistoryService planningHistoryService;
+    @Mock
+    private TripOutcomeHistoryService tripOutcomeHistoryService;
 
     @InjectMocks
     private TripServiceImpl tripService;
