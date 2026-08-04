@@ -125,14 +125,33 @@ public class TripServiceImpl implements TripService {
         List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
 
         return drivers.stream().map(d -> {
-            boolean busy = tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(
+            boolean busyOnDate = tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(
                     d.getId(), date, busyStatuses);
+
+            // Must match DRIVER_CONFLICT condition in validateVehicleAndDriverAvailability():
+            // driver with unreturned TripExecution (returnedToWarehouseAt IS NULL) is NOT available,
+            // regardless of delivery date.
+            List<TripExecution> unreturned = tripExecutionRepository.findUnreturnedByDriverId(d.getId());
+
+            boolean busy = busyOnDate || !unreturned.isEmpty();
+            String busyReason;
+            if (busyOnDate) {
+                busyReason = "Already assigned to an active trip on " + date;
+            } else if (!unreturned.isEmpty()) {
+                TripExecution te = unreturned.get(0);
+                Long conflictTripId = te.getTrip() != null ? te.getTrip().getTripId() : te.getId();
+                busyReason = "Currently active on trip #" + conflictTripId
+                        + " and has not confirmed return to warehouse yet.";
+            } else {
+                busyReason = null;
+            }
+
             return AvailableDriverResponse.builder()
                     .userId(d.getId())
                     .fullName(d.getFullName())
                     .email(d.getEmail())
                     .available(!busy)
-                    .busyReason(busy ? "Already assigned to an active trip on " + date : null)
+                    .busyReason(busyReason)
                     .build();
         }).toList();
     }

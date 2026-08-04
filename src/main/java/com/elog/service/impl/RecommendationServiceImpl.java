@@ -175,6 +175,25 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isTwoVehicleFeasible(Long tripDraftId) {
+        TripDraft draft = tripDraftRepo.findById(tripDraftId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.TRIP_DRAFT_NOT_FOUND,
+                        "Trip Draft not found: " + tripDraftId,
+                        HttpStatus.NOT_FOUND));
+
+        List<TripDraftStop> activeStops = tripDraftStopRepo
+                .findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);
+        if (activeStops.isEmpty()) {
+            return false;
+        }
+
+        List<String> ignoredReasons = new ArrayList<>();
+        return !recommendTwoVehicles(draft, activeStops, ignoredReasons).isEmpty();
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // SINGLE-VEHICLE ENGINE (FT-06)
     // ══════════════════════════════════════════════════════════════════════════

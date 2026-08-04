@@ -39,6 +39,9 @@ class CapacityValidationServiceImplTest {
     @Mock
     private OrderRepository orderRepository;
 
+    @Mock
+    private RecommendationService recommendationService;
+
     @InjectMocks
     private CapacityValidationServiceImpl capacityValidationService;
 
