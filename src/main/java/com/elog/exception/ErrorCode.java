@@ -118,6 +118,10 @@ public enum ErrorCode {
     EXCEPTION_NOT_FOUND("EXCEPTION_NOT_FOUND"),
     EXCEPTION_ALREADY_RESOLVED("ALREADY_RESOLVED"),
 
+    // KPI Dashboard (US-19)
+    INVALID_DATE_RANGE("INVALID_DATE_RANGE"),
+    DATE_RANGE_TOO_WIDE("DATE_RANGE_TOO_WIDE"),
+
     // Validation
     FIELD_REQUIRED("Field cannot be blank"),
     INVALID_FORMAT("Invalid format"),

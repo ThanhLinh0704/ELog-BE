@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -41,4 +42,17 @@ public interface TripStopRepository extends JpaRepository<TripStop, Long> {
            "AND ts.status = :status")
     int countByTripIdAndStatus(@Param("tripId") Long tripId,
                                @Param("status") TripStopStatus status);
+
+    // ── US-19 — KPI Dashboard ─────────────────────────────────────────
+
+    /** K1: processed stops (COMPLETED or EXCEPTION) in date range with ETA data */
+    @Query("SELECT ts FROM TripStop ts " +
+           "JOIN FETCH ts.trip t " +
+           "WHERE t.deliveryDate BETWEEN :startDate AND :endDate " +
+           "AND ts.status IN ('COMPLETED', 'EXCEPTION') " +
+           "AND ts.plannedEta IS NOT NULL " +
+           "AND ts.actualArrivalTime IS NOT NULL")
+    List<TripStop> findProcessedStopsInDateRange(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }

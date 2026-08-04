@@ -73,4 +73,34 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
                         @Param("username") String username,
                         @Param("date") LocalDate date,
                         @Param("statuses") List<TripStatus> statuses);
+
+        // ── US-19 — KPI Dashboard ─────────────────────────────────────────
+
+        /** K4: Trip completion — count trips by status in date range */
+        @Query("SELECT t.status, COUNT(t) FROM Trip t " +
+                        "WHERE t.deliveryDate BETWEEN :startDate AND :endDate " +
+                        "AND t.status IN ('DISPATCHED','IN_PROGRESS','COMPLETED') " +
+                        "GROUP BY t.status")
+        List<Object[]> countTripsByStatusInDateRange(
+                        @Param("startDate") LocalDate startDate,
+                        @Param("endDate") LocalDate endDate);
+
+        /** K2, K3: Fleet utilization — join vehicle for capacity */
+        @Query("SELECT t FROM Trip t " +
+                        "JOIN FETCH t.vehicle " +
+                        "WHERE t.deliveryDate BETWEEN :startDate AND :endDate " +
+                        "AND t.status IN ('DISPATCHED','IN_PROGRESS','COMPLETED')")
+        List<Trip> findTripsWithVehicleInDateRange(
+                        @Param("startDate") LocalDate startDate,
+                        @Param("endDate") LocalDate endDate);
+
+        /** By-route: trips with vehicle + route for route-level KPI */
+        @Query("SELECT t FROM Trip t " +
+                        "JOIN FETCH t.vehicle " +
+                        "JOIN FETCH t.route " +
+                        "WHERE t.deliveryDate BETWEEN :startDate AND :endDate " +
+                        "AND t.status IN ('DISPATCHED','IN_PROGRESS','COMPLETED')")
+        List<Trip> findTripsWithVehicleAndRouteInDateRange(
+                        @Param("startDate") LocalDate startDate,
+                        @Param("endDate") LocalDate endDate);
 }

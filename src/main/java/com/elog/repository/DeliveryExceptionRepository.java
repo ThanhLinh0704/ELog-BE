@@ -44,4 +44,25 @@ public interface DeliveryExceptionRepository extends JpaRepository<DeliveryExcep
             @Param("date") LocalDate date,
             @Param("exceptionType") ExceptionType exceptionType,
             @Param("resolved") Boolean resolved);
+
+    // ── US-19 — KPI Dashboard ─────────────────────────────────────────
+
+    /** K5: batch load exceptions in date range */
+    @Query("SELECT de FROM DeliveryException de " +
+           "JOIN TripStop ts ON ts.tripStopId = de.tripStopId " +
+           "JOIN ts.trip t " +
+           "WHERE t.deliveryDate BETWEEN :startDate AND :endDate")
+    List<DeliveryException> findExceptionsInDateRange(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
+    /** Unresolved exceptions count in date range */
+    @Query("SELECT COUNT(de) FROM DeliveryException de " +
+           "JOIN TripStop ts ON ts.tripStopId = de.tripStopId " +
+           "JOIN ts.trip t " +
+           "WHERE t.deliveryDate BETWEEN :startDate AND :endDate " +
+           "AND de.resolvedAt IS NULL")
+    long countUnresolvedExceptionsInDateRange(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }
