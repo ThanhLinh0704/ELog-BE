@@ -2,6 +2,7 @@ package com.elog.service;
 
 import com.elog.dto.request.TripAssignRequest;
 import com.elog.dto.request.TripAssignmentPatchRequest;
+import com.elog.dto.response.AvailableDriverResponse;
 import com.elog.dto.response.TripResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
@@ -333,5 +334,52 @@ class TripServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VEHICLE_NOT_ELIGIBLE)
                 .hasMessageContaining("violates route constraints");
+    }
+
+    @Test
+    void getAvailableDrivers_marksUnavailable_whenDriverHasUnreturnedTripExecution() {
+        testDriver.setDriverStatus(DriverStatus.ACTIVE);
+        LocalDate date = LocalDate.now().plusDays(1);
+
+        Trip conflictingTrip = Trip.builder().tripId(8L).build();
+        TripExecution unreturnedExecution = TripExecution.builder()
+                .id(50L)
+                .trip(conflictingTrip)
+                .driver(testDriver)
+                .status("COMPLETED")
+                .returnedToWarehouseAt(null)
+                .build();
+
+        when(userRepository.findAll()).thenReturn(List.of(testDriver));
+        when(tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(tripExecutionRepository.findUnreturnedByDriverId(2L))
+                .thenReturn(List.of(unreturnedExecution));
+
+        List<AvailableDriverResponse> result = tripService.getAvailableDrivers(date);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).isAvailable()).isFalse();
+        assertThat(result.get(0).getBusyReason())
+                .contains("trip #8")
+                .contains("has not confirmed return to warehouse");
+    }
+
+    @Test
+    void getAvailableDrivers_marksAvailable_whenNoActiveTripAndNoUnreturnedExecution() {
+        testDriver.setDriverStatus(DriverStatus.ACTIVE);
+        LocalDate date = LocalDate.now().plusDays(1);
+
+        when(userRepository.findAll()).thenReturn(List.of(testDriver));
+        when(tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(tripExecutionRepository.findUnreturnedByDriverId(2L))
+                .thenReturn(List.of());
+
+        List<AvailableDriverResponse> result = tripService.getAvailableDrivers(date);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).isAvailable()).isTrue();
+        assertThat(result.get(0).getBusyReason()).isNull();
     }
 }
