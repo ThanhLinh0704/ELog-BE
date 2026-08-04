@@ -12,6 +12,8 @@ import java.security.Key;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -27,6 +29,8 @@ public class JwtUtils {
     // Lấy config thời gian hết hạn (ví dụ: 900000 ms = 15 phút)
     @Value("${elog.jwt.expiration-ms:900000}")
     private long jwtExpirationMs;
+
+    private final Set<String> blacklistedTokens = ConcurrentHashMap.newKeySet();
 
     // ── Generate Access Token với Custom Claims ─────────────────────────────────
     public String generateAccessToken(User user) {
@@ -53,6 +57,10 @@ public class JwtUtils {
 
     // ── Token validation ──────────────────────────────────────────────────────
     public boolean validateToken(String token) {
+        if (blacklistedTokens.contains(token)) {
+            log.warn("JWT token is blacklisted");
+            return false;
+        }
         try {
             Jwts.parserBuilder().setSigningKey(getSignKey()).build().parseClaimsJws(token);
             return true;
@@ -82,6 +90,10 @@ public class JwtUtils {
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────
+    public void blacklistToken(String token) {
+        blacklistedTokens.add(token);
+    }
+
     private Key getSignKey() {
         byte[] keyBytes = Decoders.BASE64.decode(
                 java.util.Base64.getEncoder()

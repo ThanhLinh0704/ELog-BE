@@ -8,6 +8,9 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 import java.util.Map;
@@ -53,6 +56,21 @@ public class GlobalExceptionHandler {
         return buildError(HttpStatus.BAD_REQUEST,
                 ErrorCode.VALIDATION_FAILED.getCode(),
                 "Validation failed", details);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
+        return buildError(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_FAILED.getCode(), "Malformed request body or missing required body", null);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingParams(MissingServletRequestParameterException ex) {
+        return buildError(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_FAILED.getCode(), "Missing required parameter: " + ex.getParameterName(), null);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNoResourceFound(NoResourceFoundException ex) {
+        return buildError(HttpStatus.NOT_FOUND, ErrorCode.RESOURCE_NOT_FOUND.getCode(), "Endpoint not found: " + ex.getResourcePath(), null);
     }
 
     // ── Security ──────────────────────────────────────────────────────────────

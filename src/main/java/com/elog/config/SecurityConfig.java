@@ -59,6 +59,7 @@ public class SecurityConfig {
                                                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                                 .authorizeHttpRequests(auth -> auth
                                                 .requestMatchers(PUBLIC_URLS).permitAll()
+                                                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/users").hasAuthority("user:write")
                                                 .anyRequest().authenticated())
                                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

@@ -25,7 +25,7 @@ public class DashboardController {
      */
     @GetMapping("/api/dashboard/active-trips")
     @Operation(summary = "Get all active trips for a date (DISPATCHED/IN_PROGRESS/COMPLETED)")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAnyAuthority('trip:coordinate', 'route:read')")
     public ResponseEntity<ApiResponse<ActiveTripsResponse>> getActiveTrips(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 

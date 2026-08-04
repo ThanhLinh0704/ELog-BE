@@ -8,6 +8,7 @@ import com.elog.dto.response.TokenResponse;
 import com.elog.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final com.elog.security.JwtUtils jwtUtils;
 
     @PostMapping("/login")
     @Operation(summary = "Authenticate user and return tokens")
@@ -39,9 +41,21 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Logout user and invalidate refresh token")
-    public ResponseEntity<ApiResponse<Map<String, String>>> logout(@Valid @RequestBody TokenRefreshRequest request) {
-        authService.logout(request.getRefreshToken());
+    @Operation(summary = "Logout user and invalidate refresh/access token")
+    public ResponseEntity<ApiResponse<Map<String, String>>> logout(
+            @RequestBody(required = false) TokenRefreshRequest request,
+            HttpServletRequest httpServletRequest) {
+            
+        if (request != null && request.getRefreshToken() != null) {
+            authService.logout(request.getRefreshToken());
+        }
+
+        String headerAuth = httpServletRequest.getHeader("Authorization");
+        if (headerAuth != null && headerAuth.startsWith("Bearer ")) {
+            String jwt = headerAuth.substring(7);
+            jwtUtils.blacklistToken(jwt);
+        }
+
         Map<String, String> response = new HashMap<>();
         response.put("message", "Logged out successfully");
         return ResponseEntity.ok(ApiResponse.success(response));
