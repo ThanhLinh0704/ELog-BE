@@ -467,27 +467,49 @@ public class TripServiceImpl implements TripService {
                     .build();
 
             if (trip.getTripDraft() != null) {
-                List<TripDraftStop> draftStops = tripDraftStopRepository.findByTripDraftIdOrderBySequenceNoAsc(trip.getTripDraft().getId());
-                Map<Long, TripDraftStop> storeToStopMap = new HashMap<>();
-                for (TripDraftStop s : draftStops) {
-                    if (s.getStore() != null) {
-                        storeToStopMap.putIfAbsent(s.getStore().getId(), s);
-                    }
-                }
+                List<TripStop> myTripStops = tripStopRepository.findByTripTripIdOrderBySequenceOrderAsc(trip.getTripId());
+                List<Order> draftOrders = orderRepository.findByTripDraftId(trip.getTripDraft().getId());
 
-                List<Order> orders = orderRepository.findByTripDraftId(trip.getTripDraft().getId());
-                for (Order order : orders) {
-                    TripDraftStop stop = (order.getStore() != null) ? storeToStopMap.get(order.getStore().getId()) : null;
-                    if (stop == null && !draftStops.isEmpty()) {
-                        stop = draftStops.get(0);
+                if (!myTripStops.isEmpty()) {
+                    Map<Long, TripDraftStop> storeToStopMap = new HashMap<>();
+                    for (TripStop ts : myTripStops) {
+                        TripDraftStop ds = ts.getTripDraftStop();
+                        if (ds != null && ds.getStore() != null) {
+                            storeToStopMap.putIfAbsent(ds.getStore().getId(), ds);
+                        }
                     }
-                    if (stop != null) {
-                        execution.getOrderResults().add(DeliveryOrderResult.builder()
-                                .tripExecution(execution)
-                                .order(order)
-                                .stop(stop)
-                                .status("PENDING")
-                                .build());
+                    for (Order order : draftOrders) {
+                        TripDraftStop stop = (order.getStore() != null) ? storeToStopMap.get(order.getStore().getId()) : null;
+                        if (stop != null) {
+                            execution.getOrderResults().add(DeliveryOrderResult.builder()
+                                    .tripExecution(execution)
+                                    .order(order)
+                                    .stop(stop)
+                                    .status("PENDING")
+                                    .build());
+                        }
+                    }
+                } else {
+                    List<TripDraftStop> draftStops = tripDraftStopRepository.findByTripDraftIdOrderBySequenceNoAsc(trip.getTripDraft().getId());
+                    Map<Long, TripDraftStop> storeToStopMap = new HashMap<>();
+                    for (TripDraftStop s : draftStops) {
+                        if (s.getStore() != null) {
+                            storeToStopMap.putIfAbsent(s.getStore().getId(), s);
+                        }
+                    }
+                    for (Order order : draftOrders) {
+                        TripDraftStop stop = (order.getStore() != null) ? storeToStopMap.get(order.getStore().getId()) : null;
+                        if (stop == null && !draftStops.isEmpty()) {
+                            stop = draftStops.get(0);
+                        }
+                        if (stop != null) {
+                            execution.getOrderResults().add(DeliveryOrderResult.builder()
+                                    .tripExecution(execution)
+                                    .order(order)
+                                    .stop(stop)
+                                    .status("PENDING")
+                                    .build());
+                        }
                     }
                 }
             }

@@ -410,12 +410,32 @@ public class DriverTripServiceImpl implements DriverTripService {
         Trip trip = execution.getTrip();
         Long tripDraftId = trip != null && trip.getTripDraft() != null ? trip.getTripDraft().getId() : null;
 
-        List<TripDraftStop> stops = tripDraftId != null
-                ? tripDraftStopRepo.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId)
+        List<TripStop> myTripStops = trip != null
+                ? tripStopRepo.findByTripTripIdOrderBySequenceOrderAsc(trip.getTripId())
                 : List.of();
 
-        List<Order> orders = tripDraftId != null
-                ? orderRepo.findByTripDraftId(tripDraftId)
+        List<TripDraftStop> stops;
+        if (!myTripStops.isEmpty()) {
+            stops = myTripStops.stream()
+                    .map(TripStop::getTripDraftStop)
+                    .filter(Objects::nonNull)
+                    .filter(ds -> Boolean.TRUE.equals(ds.getIsActive()))
+                    .toList();
+        } else {
+            stops = tripDraftId != null
+                    ? tripDraftStopRepo.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId)
+                    : List.of();
+        }
+
+        Set<Long> myStoreIds = stops.stream()
+                .map(s -> s.getStore() != null ? s.getStore().getId() : null)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        List<Order> orders = (tripDraftId != null && !myStoreIds.isEmpty())
+                ? orderRepo.findByTripDraftId(tripDraftId).stream()
+                        .filter(o -> o.getStore() != null && myStoreIds.contains(o.getStore().getId()))
+                        .toList()
                 : List.of();
 
         List<DeliveryOrderResult> results = deliveryOrderResultRepo.findByTripExecutionId(execution.getId());
