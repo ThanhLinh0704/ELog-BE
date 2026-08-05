@@ -34,6 +34,7 @@ public class DriverTripServiceImpl implements DriverTripService {
     private final TripDraftStopRepository tripDraftStopRepo;
     private final UserRepository userRepo;
     private final TripStopRepository tripStopRepo;
+    private final DeliveryExceptionRepository deliveryExceptionRepo;
     private final com.elog.service.TripOutcomeHistoryService tripOutcomeHistoryService;
 
     @Override
@@ -212,9 +213,30 @@ public class DriverTripServiceImpl implements DriverTripService {
             }
         }
 
-        // Record log if failed or partial
+        // Record log and DeliveryException if failed or partial
         if (List.of("FAILED", "PARTIALLY_DELIVERED").contains(newStatus)) {
             log.warn("Order ID {} updated to exception status {} by driver {}", orderId, newStatus, driverUsername);
+
+            if (!deliveryExceptionRepo.existsByOrderIdAndExceptionTypeAndResolvedAtIsNull(orderId, ExceptionType.DELIVERY_REJECTION)) {
+                User driver = userRepo.findByUsername(driverUsername).orElse(null);
+                Long driverId = driver != null ? driver.getId() : null;
+                String reasonCode = request.getReasonCode() != null ? request.getReasonCode() : newStatus;
+                String userDesc = request.getExceptionText();
+                String fullDesc = (userDesc != null && !userDesc.isBlank())
+                        ? "[" + reasonCode + "] " + userDesc.trim()
+                        : "[" + reasonCode + "]";
+
+                DeliveryException ex = DeliveryException.builder()
+                        .tripExecutionId(executionId)
+                        .orderId(orderId)
+                        .exceptionType(ExceptionType.DELIVERY_REJECTION)
+                        .reportedBy(driverId != null ? driverId : 1L)
+                        .description(fullDesc)
+                        .build();
+                deliveryExceptionRepo.save(ex);
+                log.info("Created DeliveryException id={} for FT-09 executionId={} orderId={}",
+                        ex.getExceptionId(), executionId, orderId);
+            }
         }
 
         log.info("Driver {} updated order ID {} status to {}", driverUsername, orderId, newStatus);

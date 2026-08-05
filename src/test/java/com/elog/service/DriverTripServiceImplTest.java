@@ -41,6 +41,8 @@ class DriverTripServiceImplTest {
     @Mock
     private TripStopRepository tripStopRepo;
     @Mock
+    private DeliveryExceptionRepository deliveryExceptionRepo;
+    @Mock
     private TripOutcomeHistoryService tripOutcomeHistoryService;
 
     @InjectMocks
