@@ -20,7 +20,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/planning-events")
+@RequestMapping("/api/v1/planning-events")
 @RequiredArgsConstructor
 @Tag(name = "Planning History", description = "Audit trail cho Trip Draft / Trip planning lifecycle")
 public class PlanningHistoryController {

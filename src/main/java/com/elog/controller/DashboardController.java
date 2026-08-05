@@ -23,7 +23,7 @@ public class DashboardController {
      * Dashboard chính: danh sách tất cả active trips của ngày
      * Default: ngày hôm nay. Cho phép truyền ?date= để xem ngày khác
      */
-    @GetMapping("/api/dashboard/active-trips")
+    @GetMapping("/api/v1/dashboard/active-trips")
     @Operation(summary = "Get all active trips for a date (DISPATCHED/IN_PROGRESS/COMPLETED)")
     @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<ActiveTripsResponse>> getActiveTrips(
@@ -37,7 +37,7 @@ public class DashboardController {
     /**
      * Chi tiết tiến độ từng stop của 1 trip
      */
-    @GetMapping("/api/trips/{id}/progress")
+    @GetMapping("/api/v1/trips/{id}/progress")
     @Operation(summary = "Get detailed stop-by-stop progress of a trip")
     @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<TripProgressResponse>> getTripProgress(@PathVariable Long id) {

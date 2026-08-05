@@ -123,6 +123,7 @@ public class KpiServiceImpl implements KpiService {
 
         // Index exceptions by tripStopId
         Map<Long, List<DeliveryException>> exceptionsByStopId = exceptions.stream()
+                .filter(de -> de.getTripStopId() != null)
                 .collect(Collectors.groupingBy(DeliveryException::getTripStopId));
 
         // Group trips by route
@@ -254,6 +255,7 @@ public class KpiServiceImpl implements KpiService {
 
         // Group exceptions by stopId to count distinct stops with exceptions
         Map<Long, List<DeliveryException>> byStopId = exceptions.stream()
+                .filter(de -> de.getTripStopId() != null)
                 .collect(Collectors.groupingBy(DeliveryException::getTripStopId));
 
         // Only count stops that are in the processed set

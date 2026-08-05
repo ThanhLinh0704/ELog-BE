@@ -532,7 +532,7 @@ public class TripServiceImpl implements TripService {
 
         TripResponse response = buildTripResponse(trip,
                 "Trip dispatched and locked. Handover slip ready.");
-        response.setHandoverSlipUrl("/api/trips/" + tripId + "/handover-slip");
+        response.setHandoverSlipUrl("/api/v1/trips/" + tripId + "/handover-slip");
         return response;
     }
 

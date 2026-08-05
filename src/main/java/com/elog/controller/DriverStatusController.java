@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/drivers")
+@RequestMapping("/api/v1/drivers")
 @RequiredArgsConstructor
 @Tag(name = "Driver Status", description = "BR-DRV-01..06 Driver Active/Inactive operational status management")
 public class DriverStatusController {

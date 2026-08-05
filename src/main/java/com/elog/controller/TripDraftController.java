@@ -24,7 +24,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/trip-drafts")
+@RequestMapping("/api/v1/trip-drafts")
 @RequiredArgsConstructor
 @Tag(name = "Trip Drafts", description = "US-10 Route Consolidation, US-11 Trip Draft Review, US-12 Capacity Validation & US-13 LIFO Manifest APIs")
 public class TripDraftController {

@@ -57,6 +57,18 @@ public class DriverTripServiceImpl implements DriverTripService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<DriverTripResponse> getPendingReturnTrips(String driverUsername) {
+        User driver = userRepo.findByUsername(driverUsername)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "Không tìm thấy tài xế", HttpStatus.NOT_FOUND));
+
+        return tripExecutionRepo.findUnreturnedByDriverId(driver.getId()).stream()
+                .filter(te -> List.of("COMPLETED", "COMPLETED_WITH_EXCEPTIONS").contains(te.getStatus()))
+                .map(this::buildDriverTripResponse)
+                .toList();
+    }
+
+    @Override
     @Transactional
     public DriverTripResponse startTrip(Long executionId, String driverUsername) {
         TripExecution execution = tripExecutionRepo.findById(executionId)
@@ -555,23 +567,23 @@ public class DriverTripServiceImpl implements DriverTripService {
 
     private String aggregateStopStatus(List<DriverOrderDto> orders) {
         if (orders.isEmpty()) return "PENDING";
+        boolean anyPending = orders.stream().anyMatch(o -> "PENDING".equals(o.getDeliveryStatus()));
+        if (anyPending) return "PENDING";
         boolean allDelivered = orders.stream().allMatch(o -> "DELIVERED".equals(o.getDeliveryStatus()));
         if (allDelivered) return "DELIVERED";
         boolean anyFailed = orders.stream().anyMatch(o -> "FAILED".equals(o.getDeliveryStatus()));
         if (anyFailed) return "FAILED";
-        boolean anyPartial = orders.stream().anyMatch(o -> "PARTIALLY_DELIVERED".equals(o.getDeliveryStatus()));
-        if (anyPartial) return "PARTIALLY_DELIVERED";
-        return "PENDING";
+        return "PARTIALLY_DELIVERED";
     }
 
     private String aggregateStopStatusFromResults(List<DeliveryOrderResult> results) {
         if (results.isEmpty()) return "PENDING";
+        boolean anyPending = results.stream().anyMatch(o -> "PENDING".equals(o.getStatus()));
+        if (anyPending) return "PENDING";
         boolean allDelivered = results.stream().allMatch(o -> "DELIVERED".equals(o.getStatus()));
         if (allDelivered) return "DELIVERED";
         boolean anyFailed = results.stream().anyMatch(o -> "FAILED".equals(o.getStatus()));
         if (anyFailed) return "FAILED";
-        boolean anyPartial = results.stream().anyMatch(o -> "PARTIALLY_DELIVERED".equals(o.getStatus()));
-        if (anyPartial) return "PARTIALLY_DELIVERED";
-        return "PENDING";
+        return "PARTIALLY_DELIVERED";
     }
 }

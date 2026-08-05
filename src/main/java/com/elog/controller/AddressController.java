@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/addresses")
+@RequestMapping("/api/v1/addresses")
 @RequiredArgsConstructor
 @Tag(name = "Address", description = "Vietnamese Administrative Units lookup APIs")
 public class AddressController {

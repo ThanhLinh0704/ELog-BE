@@ -20,9 +20,9 @@ All paths are relative to the server root. Frontend Axios is pre-configured with
 Authorization: Bearer <jwt-token>
 ```
 
-- Token obtained from `POST /api/auth/login`
+- Token obtained from `POST /api/v1/auth/login`
 - Token expiry: 24 hours (`elog.jwt.expiration-ms`)
-- Refresh: implemented with `/api/auth/refresh`
+- Refresh: implemented with `/api/v1/auth/refresh`
 - Missing/invalid token → `401 Unauthorized`
 - Insufficient role → `403 Forbidden`
 

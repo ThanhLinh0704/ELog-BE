@@ -15,7 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/driver/trips")
+@RequestMapping("/api/v1/driver/trips")
 @RequiredArgsConstructor
 @Tag(name = "Driver App Trip Execution", description = "FT-09 Supporting Driver Trip Updates & LIFO Guidance APIs")
 public class DriverTripController {
@@ -28,6 +28,15 @@ public class DriverTripController {
     public ResponseEntity<ApiResponse<DriverTripResponse>> getActiveTrip() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         DriverTripResponse response = driverTripService.getActiveTrip(username);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/pending-return")
+    @Operation(summary = "Lấy các chuyến đã hoàn thành nhưng tài xế chưa xác nhận xe về kho")
+    @PreAuthorize("hasAuthority('trip:read')")
+    public ResponseEntity<ApiResponse<java.util.List<DriverTripResponse>>> getPendingReturnTrips() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        java.util.List<DriverTripResponse> response = driverTripService.getPendingReturnTrips(username);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

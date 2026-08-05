@@ -17,7 +17,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
 @RestController
-@RequestMapping("/api/kpi")
+@RequestMapping("/api/v1/kpi")
 @RequiredArgsConstructor
 @Tag(name = "KPI Dashboard", description = "US-19 KPI reporting APIs")
 public class KpiController {

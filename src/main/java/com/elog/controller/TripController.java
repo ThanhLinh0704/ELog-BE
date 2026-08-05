@@ -27,7 +27,7 @@ public class TripController {
 
     private final TripService tripService;
 
-    @GetMapping("/api/trip-drafts/{id}/eligible-vehicles")
+    @GetMapping("/api/v1/trip-drafts/{id}/eligible-vehicles")
     @Operation(summary = "Get eligible and ineligible vehicles for a validated trip draft")
     @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<EligibleVehiclesResponse>> getEligibleVehicles(
@@ -36,7 +36,7 @@ public class TripController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @GetMapping("/api/drivers/available")
+    @GetMapping("/api/v1/drivers/available")
     @Operation(summary = "Get available drivers for a date")
     @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<List<AvailableDriverResponse>>> getAvailableDrivers(
@@ -45,7 +45,7 @@ public class TripController {
         return ResponseEntity.ok(ApiResponse.success(drivers));
     }
 
-    @PostMapping("/api/trip-drafts/{id}/assign")
+    @PostMapping("/api/v1/trip-drafts/{id}/assign")
     @Operation(summary = "Assign vehicle + driver to trip draft → create Trip")
     @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<TripResponse>> assignVehicleAndDriver(
@@ -57,7 +57,7 @@ public class TripController {
                 .body(ApiResponse.success(response, response.getMessage()));
     }
 
-    @PostMapping("/api/trip-drafts/{id}/assign-split")
+    @PostMapping("/api/v1/trip-drafts/{id}/assign-split")
     @Operation(summary = "Split-assign trip draft into multiple trips (BR-07)")
     @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<TripSplitResponse>> assignSplit(
@@ -69,7 +69,7 @@ public class TripController {
                 .body(ApiResponse.success(response, response.getMessage()));
     }
 
-    @GetMapping("/api/trips")
+    @GetMapping("/api/v1/trips")
     @Operation(summary = "Get trips by trip draft ID")
     @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<List<TripResponse>>> getTripsByTripDraftId(
@@ -78,7 +78,7 @@ public class TripController {
         return ResponseEntity.ok(ApiResponse.success(trips));
     }
 
-    @GetMapping("/api/fleet/capacity-check")
+    @GetMapping("/api/v1/fleet/capacity-check")
     @Operation(summary = "Check fleet capacity for a delivery date (BR-08)")
     @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<FleetCapacityCheckResponse>> checkFleetCapacity(
@@ -87,7 +87,7 @@ public class TripController {
         return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     }
 
-    @PostMapping("/api/trips/{id}/dispatch")
+    @PostMapping("/api/v1/trips/{id}/dispatch")
     @Operation(summary = "Dispatch trip — lock and generate handover slip")
     @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<TripResponse>> dispatchTrip(@PathVariable Long id) {
@@ -96,7 +96,7 @@ public class TripController {
         return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     }
 
-    @GetMapping(value = "/api/trips/{id}/handover-slip", produces = MediaType.TEXT_HTML_VALUE)
+    @GetMapping(value = "/api/v1/trips/{id}/handover-slip", produces = MediaType.TEXT_HTML_VALUE)
     @Operation(summary = "Get handover slip as HTML for printing")
     @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<String> getHandoverSlip(@PathVariable Long id) {
@@ -104,7 +104,7 @@ public class TripController {
         return ResponseEntity.ok(html);
     }
 
-    @GetMapping("/api/trips/{tripId}")
+    @GetMapping("/api/v1/trips/{tripId}")
     @Operation(summary = "Get trip detail by trip ID")
     @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<TripResponse>> getTripById(@PathVariable Long tripId) {
@@ -112,7 +112,7 @@ public class TripController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @PatchMapping("/api/trips/{id}/assignment")
+    @PatchMapping("/api/v1/trips/{id}/assignment")
     @Operation(summary = "Update vehicle and driver assignment for a validated trip before dispatch")
     @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<TripResponse>> updateAssignment(
@@ -123,7 +123,7 @@ public class TripController {
         return ResponseEntity.ok(ApiResponse.success(response, "Assignment updated successfully."));
     }
 
-    @GetMapping("/api/trips/my-trips")
+    @GetMapping("/api/v1/trips/my-trips")
     @Operation(summary = "Driver view: get trips assigned to current driver")
     @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<List<TripResponse>>> getMyTrips(

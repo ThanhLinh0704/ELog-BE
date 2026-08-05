@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/trip-outcomes")
+@RequestMapping("/api/v1/trip-outcomes")
 @RequiredArgsConstructor
 @Tag(name = "Trip Outcome Management", description = "FT-09 Dispatcher Outcome Validation & Audit Correction APIs")
 public class TripOutcomeController {

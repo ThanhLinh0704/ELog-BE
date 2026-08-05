@@ -279,6 +279,10 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .mapToDouble(BigDecimal::doubleValue).max().orElse(1.0);
 
         List<ScoredPair> allPairs = new ArrayList<>();
+        boolean everyPointLacksVehicleForA = true;
+        boolean everyPointLacksVehicleForB = true;
+        boolean foundVehiclePairButNoDriver = false;
+        boolean foundVehiclePairButSameDriverOnly = false;
 
         for (int k : validSplitPoints) {
             List<StopCargo> subA = stopCargos.subList(0, k);
@@ -310,19 +314,28 @@ public class RecommendationServiceImpl implements RecommendationService {
                 }
             }
 
+            if (!candidatesA.isEmpty()) everyPointLacksVehicleForA = false;
+            if (!candidatesB.isEmpty()) everyPointLacksVehicleForB = false;
+
             // Pair up VA != VB, both must have eligible drivers
             for (Vehicle va : candidatesA) {
                 PairedDriverInfo driverInfoA = resolveDriverForVehicle(va, deliveryDate, allDrivers, busyStatuses);
-                if (driverInfoA == null) continue;
 
                 for (Vehicle vb : candidatesB) {
                     if (va.getId().equals(vb.getId())) continue;
 
                     PairedDriverInfo driverInfoB = resolveDriverForVehicle(vb, deliveryDate, allDrivers, busyStatuses);
-                    if (driverInfoB == null) continue;
+
+                    if (driverInfoA == null || driverInfoB == null) {
+                        foundVehiclePairButNoDriver = true;
+                        continue;
+                    }
 
                     // Cannot assign same driver to both sub-trips
-                    if (driverInfoA.driver().getId().equals(driverInfoB.driver().getId())) continue;
+                    if (driverInfoA.driver().getId().equals(driverInfoB.driver().getId())) {
+                        foundVehiclePairButSameDriverOnly = true;
+                        continue;
+                    }
 
                     // Score each sub-trip
                     BigDecimal scoreA = calculateSoftScoreForSub(va, subAVolume, subAWeight, stopsA,
@@ -346,7 +359,16 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         if (allPairs.isEmpty()) {
-            outReasons.add("Có " + validSplitPoints.size() + " cách chia hợp lệ nhưng không tổ hợp 2 xe nào đáp ứng đồng thời tải trọng/thể tích/giới hạn cửa hàng, hoặc không đủ 2 tài xế khác nhau cho cả 2 xe.");
+            if (everyPointLacksVehicleForA || everyPointLacksVehicleForB) {
+                outReasons.add("Không có xe nào đủ tải trọng/thể tích cho ít nhất 1 trong 2 nửa tuyến, ở cả "
+                        + validSplitPoints.size() + " điểm chia thử được — cần xe lớn hơn hoặc tách bớt đơn sang đợt khác.");
+            } else if (foundVehiclePairButSameDriverOnly && !foundVehiclePairButNoDriver) {
+                outReasons.add("Có xe phù hợp cho cả 2 nửa tuyến, nhưng chỉ có 1 tài xế đang rảnh đáp ứng được cả 2 xe — cần thêm ít nhất 1 tài xế khả dụng nữa.");
+            } else if (foundVehiclePairButNoDriver) {
+                outReasons.add("Có cặp xe phù hợp cho cả 2 nửa tuyến nhưng không tìm được tài xế khả dụng tương ứng — kiểm tra lại danh sách tài xế đang rảnh (Active, không bận, đã xác nhận về kho).");
+            } else {
+                outReasons.add("Có " + validSplitPoints.size() + " cách chia hợp lệ nhưng không tổ hợp 2 xe nào đáp ứng đồng thời tất cả ràng buộc.");
+            }
         }
 
         // Sort descending by pairScore, take top-N

@@ -28,7 +28,7 @@ public class TripOutcomeHistoryController {
 
     private final TripOutcomeHistoryService tripOutcomeHistoryService;
 
-    @GetMapping("/api/trip-outcome-events")
+    @GetMapping("/api/v1/trip-outcome-events")
     @Operation(summary = "Search trip outcome history events with filters (default sort ASC)")
     @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<List<TripOutcomeEventResponse>>> search(
@@ -53,7 +53,7 @@ public class TripOutcomeHistoryController {
         return ResponseEntity.ok(tripOutcomeHistoryService.search(filter, pageable, currentUsername, isDriver));
     }
 
-    @GetMapping("/api/trips/{tripId}/outcome-history")
+    @GetMapping("/api/v1/trips/{tripId}/outcome-history")
     @Operation(summary = "Get outcome history for a specific trip (AC-08, default sort ASC)")
     @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<List<TripOutcomeEventResponse>>> getTripOutcomeHistory(
