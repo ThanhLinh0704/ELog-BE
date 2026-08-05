@@ -73,23 +73,13 @@ public class ImportServiceImpl implements ImportService {
         }
 
         // Step 4: Create new batch
-        ImportBatch batch;
-        try {
-            batch = ImportBatch.builder()
-                    .deliveryDate(deliveryDate)
-                    .fileName(file.getOriginalFilename())
-                    .uploadedBy(uploadedBy)
-                    .status("PROCESSING")
-                    .build();
-            batch = batchRepository.save(batch);
-            batchRepository.flush(); // force unique constraint check
-        } catch (DataIntegrityViolationException e) {
-            // Race condition: another request created a batch for this date concurrently
-            log.warn("Concurrent batch creation for date {}: {}", deliveryDate, e.getMessage());
-            throw new BusinessException(ErrorCode.EXCEL_PARSE_ERROR,
-                    "Đã có dữ liệu nhập cho ngày " + deliveryDate + ". Vui lòng thử lại.",
-                    HttpStatus.CONFLICT);
-        }
+        ImportBatch batch = ImportBatch.builder()
+                .deliveryDate(deliveryDate)
+                .fileName(file.getOriginalFilename())
+                .uploadedBy(uploadedBy)
+                .status("PROCESSING")
+                .build();
+        batch = batchRepository.save(batch);
 
         int totalRows = rows.size();
         int acceptedRows = 0;
@@ -518,8 +508,14 @@ public class ImportServiceImpl implements ImportService {
                 existingOrder.setRecipientPhone(row.recipientPhone);
                 existingOrder.setNotes(row.notes);
                 order = orderRepository.save(existingOrder);
-                
-                orderItemRepository.deleteByOrderId(order.getId());
+
+                // Populate existing order items into cache for cross-batch SKU accumulation
+                for (OrderItem existingItem : orderItemRepository.findByOrderId(order.getId())) {
+                    if (existingItem.getProduct() != null) {
+                        String key = order.getId() + "|" + existingItem.getProduct().getId();
+                        orderItemCache.put(key, existingItem);
+                    }
+                }
             } else {
                 Order newOrder = Order.builder()
                         .importBatch(batch)

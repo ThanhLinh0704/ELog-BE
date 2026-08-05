@@ -12,6 +12,7 @@ import com.elog.service.ExceptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -111,6 +112,37 @@ public class ExceptionServiceImpl implements ExceptionService {
         Boolean resolvedFlag = parseResolved(resolved);
 
         List<DeliveryException> exceptions = deliveryExceptionRepo.findByFilters(date, exceptionType, resolvedFlag);
+
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+            boolean isDriver = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_DRIVER".equals(a.getAuthority()) || "trip:execute".equals(a.getAuthority()));
+
+            if (isDriver && currentUsername != null && !"anonymousUser".equals(currentUsername)) {
+                User driverUser = userRepo.findByUsername(currentUsername).orElse(null);
+                Long driverId = driverUser != null ? driverUser.getId() : null;
+
+                exceptions = exceptions.stream().filter(e -> {
+                    if (driverId != null && driverId.equals(e.getReportedBy())) {
+                        return true;
+                    }
+                    if (e.getTripStopId() != null) {
+                        TripStop ts = tripStopRepo.findById(e.getTripStopId()).orElse(null);
+                        if (ts != null && ts.getTrip() != null && ts.getTrip().getDriver() != null) {
+                            return currentUsername.equals(ts.getTrip().getDriver().getUsername());
+                        }
+                    }
+                    if (e.getTripExecutionId() != null) {
+                        TripExecution te = tripExecutionRepo.findById(e.getTripExecutionId()).orElse(null);
+                        if (te != null && te.getDriver() != null) {
+                            return currentUsername.equals(te.getDriver().getUsername());
+                        }
+                    }
+                    return false;
+                }).toList();
+            }
+        }
+
         long unresolvedCount = exceptions.stream().filter(e -> e.getResolvedAt() == null).count();
 
         return ExceptionListResponse.builder()

@@ -23,7 +23,7 @@ public class TripOutcomeController {
 
     @GetMapping
     @Operation(summary = "Lấy danh sách các Trip Outcome đang chờ Dispatcher nghiệm thu (SUBMITTED)")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<List<TripOutcomeResponse>>> getSubmittedOutcomes() {
         List<TripOutcomeResponse> list = tripOutcomeService.getSubmittedOutcomes();
         return ResponseEntity.ok(ApiResponse.success(list));

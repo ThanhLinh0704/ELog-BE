@@ -756,7 +756,7 @@ class ImportServiceImplTest {
         assertThat(response.getRejectedRows()).isEqualTo(0);
 
         verify(orderRepository).save(argThat(o -> o.getId().equals(100L) && o.getImportBatch().getId().equals(2L)));
-        verify(orderItemRepository).deleteByOrderId(100L);
+        verify(orderItemRepository).findByOrderId(100L);
         verify(orderItemRepository).save(any(OrderItem.class));
     }
 
@@ -988,24 +988,11 @@ class ImportServiceImplTest {
         importService.importExcel(file, date, false, 1L);
 
         verify(orderRepository).save(any(Order.class));
-        verify(orderItemRepository).deleteByOrderId(100L);
+        verify(orderItemRepository).findByOrderId(100L);
         verify(orderItemRepository).save(argThat(item -> item.getOrder().getId() == 100L));
     }
 
-    @Test
-    void createBatch_concurrentCreation_throwsConflictException() throws IOException {
-        LocalDate date = LocalDate.now();
-        MultipartFile file = createMockExcelFile("import.xlsx", Collections.emptyList());
 
-        when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of());
-        when(batchRepository.save(any(ImportBatch.class))).thenThrow(new DataIntegrityViolationException("Unique constraint violation"));
-
-        assertThatThrownBy(() -> importService.importExcel(file, date, false, 1L))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Đã có dữ liệu nhập cho ngày")
-                .extracting(e -> ((BusinessException) e).getHttpStatus())
-                .isEqualTo(HttpStatus.CONFLICT);
-    }
 
     @Test
     void getCellStringValue_variousCellTypes() throws Exception {

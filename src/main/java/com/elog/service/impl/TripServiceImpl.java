@@ -13,6 +13,7 @@ import com.elog.service.TripStateMachine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -766,6 +767,20 @@ public class TripServiceImpl implements TripService {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_NOT_FOUND,
                         "Trip not found with id: " + tripId, HttpStatus.NOT_FOUND));
+
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+            boolean isDriver = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_DRIVER".equals(a.getAuthority()) || "trip:execute".equals(a.getAuthority()));
+
+            if (isDriver && currentUsername != null && !"anonymousUser".equals(currentUsername)) {
+                if (trip.getDriver() == null || !currentUsername.equals(trip.getDriver().getUsername())) {
+                    throw new BusinessException(ErrorCode.NOT_YOUR_TRIP,
+                            "Bạn không có quyền xem thông tin chuyến xe của tài xế khác", HttpStatus.FORBIDDEN);
+                }
+            }
+        }
+
         return buildTripResponse(trip, null);
     }
 

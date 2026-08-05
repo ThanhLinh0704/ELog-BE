@@ -533,8 +533,10 @@ public class RecommendationServiceImpl implements RecommendationService {
                             return false;
                         }
                     }
-                    // Schedule check
-                    return !tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(d.getId(), date, busyStatuses);
+                    // Schedule check: not busy on date AND has returned to warehouse from all past executions
+                    boolean busyOnDate = tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(d.getId(), date, busyStatuses);
+                    boolean unreturned = !tripExecutionRepo.findUnreturnedByDriverId(d.getId()).isEmpty();
+                    return !busyOnDate && !unreturned;
                 })
                 .toList();
     }

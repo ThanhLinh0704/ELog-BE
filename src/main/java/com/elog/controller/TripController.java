@@ -71,7 +71,7 @@ public class TripController {
 
     @GetMapping("/api/trips")
     @Operation(summary = "Get trips by trip draft ID")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<List<TripResponse>>> getTripsByTripDraftId(
             @RequestParam Long tripDraftId) {
         List<TripResponse> trips = tripService.getTripsByTripDraftId(tripDraftId);
@@ -80,7 +80,7 @@ public class TripController {
 
     @GetMapping("/api/fleet/capacity-check")
     @Operation(summary = "Check fleet capacity for a delivery date (BR-08)")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<FleetCapacityCheckResponse>> checkFleetCapacity(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         FleetCapacityCheckResponse response = tripService.checkFleetCapacity(date);
@@ -98,7 +98,7 @@ public class TripController {
 
     @GetMapping(value = "/api/trips/{id}/handover-slip", produces = MediaType.TEXT_HTML_VALUE)
     @Operation(summary = "Get handover slip as HTML for printing")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<String> getHandoverSlip(@PathVariable Long id) {
         String html = tripService.getHandoverSlipHtml(id);
         return ResponseEntity.ok(html);
