@@ -33,7 +33,7 @@ public class DriverTripController {
 
     @PostMapping("/{executionId}/start")
     @Operation(summary = "Tài xế bấm Bắt đầu chuyến xe (ASSIGNED -> IN_PROGRESS)")
-    @PreAuthorize("hasAuthority('trip:write')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<DriverTripResponse>> startTrip(
             @PathVariable Long executionId) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -43,7 +43,7 @@ public class DriverTripController {
 
     @PutMapping("/{executionId}/orders/{orderId}/result")
     @Operation(summary = "Cập nhật kết quả giao hàng từng đơn (DELIVERED, PARTIALLY_DELIVERED, FAILED)")
-    @PreAuthorize("hasAuthority('trip:write')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<DriverTripResponse>> updateOrderResult(
             @PathVariable Long executionId,
             @PathVariable Long orderId,
@@ -55,7 +55,7 @@ public class DriverTripController {
 
     @PostMapping("/{executionId}/complete")
     @Operation(summary = "Hoàn tất chuyến xe sau khi tất cả đơn hàng có trạng thái terminal (Tạo TripOutcome SUBMITTED)")
-    @PreAuthorize("hasAuthority('trip:write')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<TripOutcomeResponse>> completeTrip(
             @PathVariable Long executionId) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -65,7 +65,7 @@ public class DriverTripController {
 
     @PostMapping("/{executionId}/return-to-warehouse")
     @Operation(summary = "Tài xế bấm Xác nhận xe đã về tới kho (Giải phóng xe IN_USE -> AVAILABLE)")
-    @PreAuthorize("hasAuthority('trip:write')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<DriverTripResponse>> returnToWarehouse(
             @PathVariable Long executionId) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
