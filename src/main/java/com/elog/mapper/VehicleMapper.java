@@ -69,6 +69,11 @@ public class VehicleMapper {
     }
 
     public VehicleListItemResponse toListItem(Vehicle vehicle) {
+        Long driverId = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getId() : null;
+        String driverName = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getFullName() : null;
+        String driverPhone = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getPhone() : null;
+        LicenseClass driverLicense = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getLicenseClass() : null;
+
         return VehicleListItemResponse.builder()
                 .id(vehicle.getId())
                 .vehicleCode(vehicle.getVehicleCode())
@@ -89,6 +94,10 @@ public class VehicleMapper {
                 .imageUrl(vehicle.getImageUrl())
                 .permitInfo(vehicle.getPermitInfo())
                 .description(vehicle.getDescription())
+                .assignedDriverId(driverId)
+                .assignedDriverName(driverName)
+                .assignedDriverPhone(driverPhone)
+                .assignedDriverLicenseClass(driverLicense)
                 .build();
     }
 

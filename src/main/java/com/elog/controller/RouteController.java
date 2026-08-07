@@ -108,4 +108,13 @@ public class RouteController {
         routeService.removeStop(id, stopId);
         return ResponseEntity.ok(ApiResponse.success(null, "Stop removed successfully"));
     }
+
+    @GetMapping("/{id}/directions")
+    @Operation(summary = "Get route road directions polyline and warehouse location")
+    @PreAuthorize("hasAuthority('route:read')")
+    public ResponseEntity<ApiResponse<RouteDirectionsResponse>> getRouteDirections(
+            @PathVariable Long id) {
+        RouteDirectionsResponse response = routeService.getRouteDirections(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }
