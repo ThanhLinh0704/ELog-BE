@@ -27,7 +27,7 @@ public class ExceptionController {
 
     private final ExceptionService exceptionService;
 
-    @PostMapping("/api/trip-stops/{id}/reject")
+    @PostMapping("/api/v1/trip-stops/{id}/reject")
     @Operation(summary = "Driver ghi nhận cửa hàng từ chối nhận hàng — DELIVERY_REJECTION (BR-10)")
     @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<DeliveryExceptionResponse>> rejectStop(
@@ -39,7 +39,7 @@ public class ExceptionController {
                 .body(ApiResponse.success(response, response.getMessage()));
     }
 
-    @GetMapping("/api/exceptions")
+    @GetMapping("/api/v1/exceptions")
     @Operation(summary = "Danh sách exception — filter theo ngày, loại, trạng thái resolve")
     @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<ExceptionListResponse>> listExceptions(
@@ -51,14 +51,14 @@ public class ExceptionController {
         return ResponseEntity.ok(ApiResponse.success(response, null));
     }
 
-    @GetMapping("/api/exceptions/{id}")
+    @GetMapping("/api/v1/exceptions/{id}")
     @Operation(summary = "Chi tiết 1 exception")
     @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<DeliveryExceptionResponse>> getException(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success(exceptionService.getException(id), null));
     }
 
-    @PatchMapping("/api/exceptions/{id}/resolve")
+    @PatchMapping("/api/v1/exceptions/{id}/resolve")
     @Operation(summary = "Dispatcher/Manager đóng exception")
     @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<DeliveryExceptionResponse>> resolveException(
@@ -69,7 +69,7 @@ public class ExceptionController {
         return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     }
 
-    @GetMapping("/api/exceptions/violations")
+    @GetMapping("/api/v1/exceptions/violations")
     @Operation(summary = "Danh sách tổng hợp các vi phạm Time Window và Tải trọng xe cho Dispatcher Dashboard")
     @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<ExceptionListResponse>> listViolations(

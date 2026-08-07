@@ -9,6 +9,7 @@ import com.elog.service.TripMonitoringService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,8 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
     private final UserRepository userRepo;
     private final SystemConfigRepository systemConfigRepo;
     private final DeliveryExceptionRepository deliveryExceptionRepo;
+    private final com.elog.service.GoongMapService goongMapService;
+
 
     @Override
     public TripStartResponse startTrip(Long tripId, String currentUsername) {
@@ -253,6 +256,19 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_NOT_FOUND,
                         "Trip " + tripId + " not found", HttpStatus.NOT_FOUND));
 
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+            boolean isDriver = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_DRIVER".equals(a.getAuthority()) || "trip:execute".equals(a.getAuthority()));
+
+            if (isDriver && currentUsername != null && !"anonymousUser".equals(currentUsername)) {
+                if (trip.getDriver() == null || !currentUsername.equals(trip.getDriver().getUsername())) {
+                    throw new BusinessException(ErrorCode.NOT_YOUR_TRIP,
+                            "Bạn không có quyền xem tiến độ chuyến xe của tài xế khác", HttpStatus.FORBIDDEN);
+                }
+            }
+        }
+
         List<TripStop> stops = tripStopRepo.findByTripTripIdOrderBySequenceOrderAsc(tripId);
 
         List<Long> stopIds = stops.stream().map(TripStop::getTripStopId).toList();
@@ -264,6 +280,66 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                 .map(stop -> buildStopProgress(stop, exByStop))
                 .toList();
 
+        String routePolyline = trip.getRoutePolyline();
+        java.math.BigDecimal totalDistanceKm = trip.getTotalDistanceKm();
+
+        if (!stopProgresses.isEmpty() && goongMapService != null) {
+            try {
+                double whLat = systemConfigRepo.findByConfigKey("WAREHOUSE_LAT")
+                        .map(c -> Double.parseDouble(c.getConfigValue())).orElse(21.028512);
+                double whLng = systemConfigRepo.findByConfigKey("WAREHOUSE_LNG")
+                        .map(c -> Double.parseDouble(c.getConfigValue())).orElse(105.854211);
+
+                List<TripProgressResponse.StopProgress> validStops = stopProgresses.stream()
+                        .filter(s -> s.getLatitude() != null && s.getLongitude() != null)
+                        .sorted(java.util.Comparator.comparingInt(TripProgressResponse.StopProgress::getSequenceOrder))
+                        .toList();
+
+                if (!validStops.isEmpty()) {
+                    List<String> pointStrs = new java.util.ArrayList<>();
+                    pointStrs.add(whLat + "," + whLng); // Kho
+                    for (var stop : validStops) {
+                        pointStrs.add(stop.getLatitude() + "," + stop.getLongitude());
+                    }
+
+                    List<String> legPolylines = new java.util.ArrayList<>();
+                    long totalMeters = 0;
+
+                    for (int i = 0; i < pointStrs.size() - 1; i++) {
+                        String p1 = pointStrs.get(i);
+                        String p2 = pointStrs.get(i + 1);
+
+                        var resp = goongMapService.getDirections(p1, p2, null);
+                        if (resp != null && resp.getRoutes() != null && !resp.getRoutes().isEmpty()) {
+                            var route = resp.getRoutes().get(0);
+                            if (route.getOverviewPolyline() != null && route.getOverviewPolyline().getPoints() != null) {
+                                legPolylines.add(route.getOverviewPolyline().getPoints());
+                            }
+                            if (route.getLegs() != null) {
+                                for (var leg : route.getLegs()) {
+                                    if (leg.getDistance() != null && leg.getDistance().getValue() != null) {
+                                        totalMeters += leg.getDistance().getValue();
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!legPolylines.isEmpty()) {
+                        routePolyline = String.join(";", legPolylines);
+                        trip.setRoutePolyline(routePolyline);
+                        totalDistanceKm = java.math.BigDecimal.valueOf(totalMeters / 1000.0).setScale(2, java.math.RoundingMode.HALF_UP);
+                        trip.setTotalDistanceKm(totalDistanceKm);
+                        tripRepo.save(trip);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to calculate Goong leg-by-leg route for trip {}: {}", tripId, e.getMessage());
+            }
+        }
+
+
+
         Vehicle v = trip.getVehicle();
         User d = trip.getDriver();
 
@@ -272,6 +348,8 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                 .fixedRouteCode(trip.getRoute().getCode())
                 .deliveryDate(trip.getDeliveryDate().toString())
                 .status(trip.getStatus().name())
+                .totalDistanceKm(totalDistanceKm)
+                .routePolyline(routePolyline)
                 .vehicle(TripProgressResponse.VehicleInfo.builder()
                         .vehicleCode(v.getPlateNumber())
                         .plateNumber(v.getPlateNumber())
@@ -286,6 +364,7 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                 .gpsNote(GPS_NOTE)
                 .build();
     }
+
 
     private void validateDeliveryDate(Trip trip) {
         if (trip != null && trip.getDeliveryDate() != null && trip.getDeliveryDate().isAfter(LocalDate.now())) {

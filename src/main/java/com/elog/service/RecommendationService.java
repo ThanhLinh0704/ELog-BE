@@ -15,4 +15,12 @@ public interface RecommendationService {
      * @return Top-3 recommendations (single or two-vehicle), or NO_PLAN if infeasible
      */
     RecommendationResultResponse recommendTop3(Long tripDraftId);
+
+    /**
+     * Lightweight feasibility check — reuses the two-vehicle algorithm from recommendTop3(),
+     * but does NOT write Planning History and does NOT build full DTOs.
+     * Used by CapacityValidationService to decide whether to promote status to VALIDATED
+     * when no single vehicle can accommodate the load.
+     */
+    boolean isTwoVehicleFeasible(Long tripDraftId);
 }

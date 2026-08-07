@@ -12,6 +12,7 @@ import com.elog.service.ExceptionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,8 @@ public class ExceptionServiceImpl implements ExceptionService {
     private final TripRepository              tripRepo;
     private final UserRepository              userRepo;
     private final DeliveryExceptionRepository deliveryExceptionRepo;
+    private final TripExecutionRepository     tripExecutionRepo;
+    private final DeliveryOrderResultRepository deliveryOrderResultRepo;
 
     @Override
     public DeliveryExceptionResponse rejectStop(Long tripStopId, RejectStopRequest request, String currentUsername) {
@@ -109,6 +112,37 @@ public class ExceptionServiceImpl implements ExceptionService {
         Boolean resolvedFlag = parseResolved(resolved);
 
         List<DeliveryException> exceptions = deliveryExceptionRepo.findByFilters(date, exceptionType, resolvedFlag);
+
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+            boolean isDriver = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_DRIVER".equals(a.getAuthority()) || "trip:execute".equals(a.getAuthority()));
+
+            if (isDriver && currentUsername != null && !"anonymousUser".equals(currentUsername)) {
+                User driverUser = userRepo.findByUsername(currentUsername).orElse(null);
+                Long driverId = driverUser != null ? driverUser.getId() : null;
+
+                exceptions = exceptions.stream().filter(e -> {
+                    if (driverId != null && driverId.equals(e.getReportedBy())) {
+                        return true;
+                    }
+                    if (e.getTripStopId() != null) {
+                        TripStop ts = tripStopRepo.findById(e.getTripStopId()).orElse(null);
+                        if (ts != null && ts.getTrip() != null && ts.getTrip().getDriver() != null) {
+                            return currentUsername.equals(ts.getTrip().getDriver().getUsername());
+                        }
+                    }
+                    if (e.getTripExecutionId() != null) {
+                        TripExecution te = tripExecutionRepo.findById(e.getTripExecutionId()).orElse(null);
+                        if (te != null && te.getDriver() != null) {
+                            return currentUsername.equals(te.getDriver().getUsername());
+                        }
+                    }
+                    return false;
+                }).toList();
+            }
+        }
+
         long unresolvedCount = exceptions.stream().filter(e -> e.getResolvedAt() == null).count();
 
         return ExceptionListResponse.builder()
@@ -123,9 +157,9 @@ public class ExceptionServiceImpl implements ExceptionService {
     @Transactional(readOnly = true)
     public DeliveryExceptionResponse getException(Long exceptionId) {
         DeliveryException ex = findExceptionOrThrow(exceptionId);
-        TripStop stop = tripStopRepo.findById(ex.getTripStopId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_STOP_NOT_FOUND,
-                        "TripStop not found for exception " + exceptionId, HttpStatus.NOT_FOUND));
+        TripStop stop = ex.getTripStopId() != null
+                ? tripStopRepo.findById(ex.getTripStopId()).orElse(null)
+                : null;
         User reporter = resolveUser(ex.getReportedBy());
         User resolver = ex.getResolvedBy() != null ? resolveUser(ex.getResolvedBy()) : null;
         return buildDetailResponse(ex, stop, reporter, resolver, null);
@@ -152,9 +186,9 @@ public class ExceptionServiceImpl implements ExceptionService {
 
         log.info("Exception {} resolved by {} at {}", exceptionId, currentUsername, ex.getResolvedAt().format(DT_FMT));
 
-        TripStop stop = tripStopRepo.findById(ex.getTripStopId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_STOP_NOT_FOUND,
-                        "TripStop not found for exception " + exceptionId, HttpStatus.NOT_FOUND));
+        TripStop stop = ex.getTripStopId() != null
+                ? tripStopRepo.findById(ex.getTripStopId()).orElse(null)
+                : null;
 
         return buildDetailResponse(ex, stop, resolveUser(ex.getReportedBy()), manager, "Exception resolved.");
     }
@@ -245,28 +279,74 @@ public class ExceptionServiceImpl implements ExceptionService {
     }
 
     private Long computeDelayMinutes(TripStop stop) {
-        if (stop.getActualArrivalTime() == null || stop.getPlannedEta() == null) return null;
+        if (stop == null || stop.getActualArrivalTime() == null || stop.getPlannedEta() == null) return null;
         long delay = ChronoUnit.MINUTES.between(stop.getPlannedEta(), stop.getActualArrivalTime());
         return delay > 0 ? delay : null;
     }
 
     private DeliveryExceptionResponse buildDetailResponse(
             DeliveryException ex, TripStop stop, User reporter, User resolver, String message) {
-        Trip trip = stop.getTrip();
+        Long tripId = null;
+        String fixedRouteCode = null;
+        String vehicleCode = null;
+        String storeCode = null;
+        String storeName = null;
+        String tripStopStatus = null;
+        String plannedEta = null;
+        String actualArrivalTime = null;
+        Long delayMinutes = null;
+
+        if (stop != null) {
+            Trip trip = stop.getTrip();
+            if (trip != null) {
+                tripId = trip.getTripId();
+                if (trip.getRoute() != null) fixedRouteCode = trip.getRoute().getCode();
+                if (trip.getVehicle() != null) vehicleCode = trip.getVehicle().getPlateNumber();
+            }
+            storeCode = getStoreCode(stop);
+            storeName = getStoreName(stop);
+            if (stop.getStatus() != null) tripStopStatus = stop.getStatus().name();
+            if (stop.getPlannedEta() != null) plannedEta = stop.getPlannedEta().format(DT_FMT);
+            if (stop.getActualArrivalTime() != null) actualArrivalTime = stop.getActualArrivalTime().format(DT_FMT);
+            delayMinutes = computeDelayMinutes(stop);
+        } else if (ex.getTripExecutionId() != null) {
+            TripExecution te = tripExecutionRepo.findById(ex.getTripExecutionId()).orElse(null);
+            if (te != null && te.getTrip() != null) {
+                Trip trip = te.getTrip();
+                tripId = trip.getTripId();
+                if (trip.getRoute() != null) fixedRouteCode = trip.getRoute().getCode();
+                if (trip.getVehicle() != null) vehicleCode = trip.getVehicle().getPlateNumber();
+            }
+            if (ex.getOrderId() != null) {
+                DeliveryOrderResult res = deliveryOrderResultRepo
+                        .findByTripExecutionIdAndOrderId(ex.getTripExecutionId(), ex.getOrderId()).orElse(null);
+                if (res != null && res.getStop() != null) {
+                    TripDraftStop tds = res.getStop();
+                    if (tds.getStore() != null) {
+                        storeCode = tds.getStore().getCode();
+                        storeName = tds.getStore().getName();
+                    }
+                    if (tds.getPlannedEta() != null) {
+                        plannedEta = tds.getPlannedEta().format(DT_FMT);
+                    }
+                }
+            }
+        }
+
         return DeliveryExceptionResponse.builder()
                 .exceptionId(ex.getExceptionId())
                 .exceptionType(ex.getExceptionType().name())
                 .rejectionType(parseRejectionType(ex))
-                .tripStopId(stop.getTripStopId())
-                .storeCode(getStoreCode(stop))
-                .storeName(getStoreName(stop))
-                .tripStopStatus(stop.getStatus().name())
-                .tripId(trip.getTripId())
-                .fixedRouteCode(trip.getRoute().getCode())
-                .vehicleCode(trip.getVehicle().getPlateNumber())
-                .plannedEta(stop.getPlannedEta() != null ? stop.getPlannedEta().format(DT_FMT) : null)
-                .actualArrivalTime(stop.getActualArrivalTime() != null ? stop.getActualArrivalTime().format(DT_FMT) : null)
-                .delayMinutes(computeDelayMinutes(stop))
+                .tripStopId(stop != null ? stop.getTripStopId() : null)
+                .storeCode(storeCode)
+                .storeName(storeName)
+                .tripStopStatus(tripStopStatus)
+                .tripId(tripId)
+                .fixedRouteCode(fixedRouteCode)
+                .vehicleCode(vehicleCode)
+                .plannedEta(plannedEta)
+                .actualArrivalTime(actualArrivalTime)
+                .delayMinutes(delayMinutes)
                 .description(cleanDescription(ex))
                 .reportedBy(buildReporterInfo(reporter))
                 .createdAt(ex.getCreatedAt().format(DT_FMT))
@@ -278,18 +358,62 @@ public class ExceptionServiceImpl implements ExceptionService {
     }
 
     private ExceptionListResponse.ExceptionItem buildListItem(DeliveryException ex) {
-        TripStop stop = tripStopRepo.findById(ex.getTripStopId()).orElse(null);
-        if (stop == null) {
-            return ExceptionListResponse.ExceptionItem.builder()
-                    .exceptionId(ex.getExceptionId())
-                    .exceptionType(ex.getExceptionType().name())
-                    .description(ex.getDescription())
-                    .createdAt(ex.getCreatedAt().format(DT_FMT))
-                    .resolvedAt(ex.getResolvedAt() != null ? ex.getResolvedAt().format(DT_FMT) : null)
-                    .build();
+        TripStop stop = ex.getTripStopId() != null ? tripStopRepo.findById(ex.getTripStopId()).orElse(null) : null;
+
+        Long tripId = null;
+        String fixedRouteCode = null;
+        String vehicleCode = null;
+        String driverName = null;
+        Long tripStopId = null;
+        String storeCode = null;
+        String storeName = null;
+        String plannedEta = null;
+        String actualArrivalTime = null;
+        Long delayMinutes = null;
+
+        if (stop != null) {
+            Trip trip = stop.getTrip();
+            if (trip != null) {
+                tripId = trip.getTripId();
+                if (trip.getRoute() != null) fixedRouteCode = trip.getRoute().getCode();
+                if (trip.getVehicle() != null) vehicleCode = trip.getVehicle().getPlateNumber();
+                if (trip.getDriver() != null) driverName = trip.getDriver().getFullName();
+            }
+            tripStopId = stop.getTripStopId();
+            storeCode = getStoreCode(stop);
+            storeName = getStoreName(stop);
+            if (stop.getPlannedEta() != null) plannedEta = stop.getPlannedEta().format(DT_FMT);
+            if (stop.getActualArrivalTime() != null) actualArrivalTime = stop.getActualArrivalTime().format(DT_FMT);
+            delayMinutes = computeDelayMinutes(stop);
+        } else if (ex.getTripExecutionId() != null) {
+            TripExecution te = tripExecutionRepo.findById(ex.getTripExecutionId()).orElse(null);
+            if (te != null) {
+                if (te.getTrip() != null) {
+                    Trip trip = te.getTrip();
+                    tripId = trip.getTripId();
+                    if (trip.getRoute() != null) fixedRouteCode = trip.getRoute().getCode();
+                    if (trip.getVehicle() != null) vehicleCode = trip.getVehicle().getPlateNumber();
+                    if (trip.getDriver() != null) driverName = trip.getDriver().getFullName();
+                } else if (te.getDriver() != null) {
+                    driverName = te.getDriver().getFullName();
+                }
+            }
+            if (ex.getOrderId() != null) {
+                DeliveryOrderResult res = deliveryOrderResultRepo
+                        .findByTripExecutionIdAndOrderId(ex.getTripExecutionId(), ex.getOrderId()).orElse(null);
+                if (res != null && res.getStop() != null) {
+                    TripDraftStop tds = res.getStop();
+                    if (tds.getStore() != null) {
+                        storeCode = tds.getStore().getCode();
+                        storeName = tds.getStore().getName();
+                    }
+                    if (tds.getPlannedEta() != null) {
+                        plannedEta = tds.getPlannedEta().format(DT_FMT);
+                    }
+                }
+            }
         }
 
-        Trip trip = stop.getTrip();
         String reporterName = SYSTEM_USER_ID.equals(ex.getReportedBy())
                 ? SYSTEM_USER_NAME
                 : (resolveUser(ex.getReportedBy()) != null ? resolveUser(ex.getReportedBy()).getFullName() : "Unknown");
@@ -301,16 +425,16 @@ public class ExceptionServiceImpl implements ExceptionService {
                 .exceptionId(ex.getExceptionId())
                 .exceptionType(ex.getExceptionType().name())
                 .rejectionType(parseRejectionType(ex))
-                .tripId(trip.getTripId())
-                .fixedRouteCode(trip.getRoute().getCode())
-                .vehicleCode(trip.getVehicle().getPlateNumber())
-                .driverName(trip.getDriver().getFullName())
-                .tripStopId(stop.getTripStopId())
-                .storeCode(getStoreCode(stop))
-                .storeName(getStoreName(stop))
-                .plannedEta(stop.getPlannedEta() != null ? stop.getPlannedEta().format(DT_FMT) : null)
-                .actualArrivalTime(stop.getActualArrivalTime() != null ? stop.getActualArrivalTime().format(DT_FMT) : null)
-                .delayMinutes(computeDelayMinutes(stop))
+                .tripId(tripId)
+                .fixedRouteCode(fixedRouteCode)
+                .vehicleCode(vehicleCode)
+                .driverName(driverName)
+                .tripStopId(tripStopId)
+                .storeCode(storeCode)
+                .storeName(storeName)
+                .plannedEta(plannedEta)
+                .actualArrivalTime(actualArrivalTime)
+                .delayMinutes(delayMinutes)
                 .description(cleanDescription(ex))
                 .reportedBy(reporterName)
                 .createdAt(ex.getCreatedAt().format(DT_FMT))

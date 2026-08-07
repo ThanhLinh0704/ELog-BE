@@ -18,6 +18,8 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long>, JpaSpec
 
     List<Vehicle> findByIsActiveTrue();
 
+    List<Vehicle> findByAssignedDriverId(Long driverId);
+
     @Query("select sum(v.payloadKg) from Vehicle v where v.isActive = true")
     BigDecimal sumActiveMaxWeightKg();
 

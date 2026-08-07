@@ -38,9 +38,8 @@ public class SecurityConfig {
 
         /** Endpoints that do NOT require authentication. */
         private static final String[] PUBLIC_URLS = {
-                        "/api/auth/**",
-                        // "/api/users/**",
-                        "/api/health",
+                        "/api/v1/auth/**",
+                        "/api/v1/health",
                         "/swagger-ui/**",
                         "/swagger-ui/index.html",
                         "/api-docs/**",

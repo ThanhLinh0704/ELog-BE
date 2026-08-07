@@ -106,7 +106,14 @@ public class HaversineEtaCalculator implements EtaCalculationService {
             long travelMinutes = Math.round((distanceKm / avgSpeedKmh) * 60);
             currentEta = currentEta.plusMinutes(travelMinutes);
 
+            java.math.BigDecimal distKmBd = java.math.BigDecimal.valueOf(distanceKm).setScale(2, java.math.RoundingMode.HALF_UP);
+            int travelMinInt = (int) travelMinutes;
+
+            stop.setDistanceFromPrevKm(distKmBd);
+            stop.setTravelTimeFromPrevMin(travelMinInt);
+
             // Time window calculation & waiting time check
+
             LocalTime twStart = store.getTimeWindowStart();
             LocalTime twEnd = store.getTimeWindowEnd();
 
@@ -151,7 +158,12 @@ public class HaversineEtaCalculator implements EtaCalculationService {
                     .sequenceNo(stop.getSequenceNo())
                     .storeCode(store.getCode())
                     .plannedEta(currentEta)
+                    .distanceFromPrevKm(distKmBd)
+                    .travelTimeFromPrevMin(travelMinInt)
+                    .estimatedDistanceKm(distKmBd)
+                    .estimatedTravelMin(travelMinInt)
                     .build());
+
 
             prevLat = stopLat;
             prevLng = stopLng;

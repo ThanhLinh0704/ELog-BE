@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/trip-outcomes")
+@RequestMapping("/api/v1/trip-outcomes")
 @RequiredArgsConstructor
 @Tag(name = "Trip Outcome Management", description = "FT-09 Dispatcher Outcome Validation & Audit Correction APIs")
 public class TripOutcomeController {
@@ -23,7 +23,7 @@ public class TripOutcomeController {
 
     @GetMapping
     @Operation(summary = "Lấy danh sách các Trip Outcome đang chờ Dispatcher nghiệm thu (SUBMITTED)")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<List<TripOutcomeResponse>>> getSubmittedOutcomes() {
         List<TripOutcomeResponse> list = tripOutcomeService.getSubmittedOutcomes();
         return ResponseEntity.ok(ApiResponse.success(list));

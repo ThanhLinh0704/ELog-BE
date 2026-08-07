@@ -34,6 +34,7 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
     private final VehicleRepository vehicleRepo;
     private final UserRepository userRepo;
     private final OrderRepository orderRepository;
+    private final com.elog.service.RecommendationService recommendationService;
 
     @Override
     @Transactional
@@ -207,17 +208,29 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
 
             overallVolume = anyVolumeOk ? ConstraintResult.PASS : ConstraintResult.FAIL;
             overallWeight = anyWeightOk ? ConstraintResult.PASS : ConstraintResult.FAIL;
-            newStatus = "PLANNED";
 
-            if (overallVolume == ConstraintResult.FAIL && overallWeight == ConstraintResult.PASS) {
-                bindingConstraint = "VOLUME";
-            } else if (overallVolume == ConstraintResult.PASS && overallWeight == ConstraintResult.FAIL) {
-                bindingConstraint = "WEIGHT";
+            // ELOG-139: no single vehicle fits — ask Recommendation Engine if a two-vehicle
+            // split is feasible (BR-07) before giving up.
+            boolean twoVehicleFeasible = recommendationService.isTwoVehicleFeasible(tripDraftId);
+
+            if (twoVehicleFeasible) {
+                newStatus = "VALIDATED";
+                suggestion = "No single vehicle can accommodate this load, but a two-vehicle split is feasible. "
+                        + "Proceed to Vehicle Assignment (Split) to assign 2 vehicles (BR-07).";
             } else {
-                bindingConstraint = "BOTH";
-            }
+                newStatus = "PLANNED";
 
-            suggestion = "No single vehicle can accommodate this load. Consider trip splitting in Vehicle Assignment (BR-07) or checking route weight/ETA limits.";
+                if (overallVolume == ConstraintResult.FAIL && overallWeight == ConstraintResult.PASS) {
+                    bindingConstraint = "VOLUME";
+                } else if (overallVolume == ConstraintResult.PASS && overallWeight == ConstraintResult.FAIL) {
+                    bindingConstraint = "WEIGHT";
+                } else {
+                    bindingConstraint = "BOTH";
+                }
+
+                suggestion = "No single vehicle can accommodate this load, and no two-vehicle split is feasible either. "
+                        + "Consider checking route weight/ETA limits or fleet availability.";
+            }
         }
 
         draft.setVolumeCheckResult(overallVolume);
@@ -234,9 +247,15 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                 .fullName(validator.getFullName())
                 .build();
 
-        String message = "VALIDATED".equals(newStatus)
-                ? "Capacity validation passed. " + eligibleVehicles.size() + " eligible vehicles available. Proceed to Vehicle Assignment."
-                : "Capacity validation failed. Total volume " + draft.getTotalVolumeM3() + " m³ exceeds all available vehicle capacities or violates route limits.";
+        String message;
+        if ("VALIDATED".equals(newStatus)) {
+            message = eligibleVehicles.isEmpty()
+                    ? "Capacity validation passed via two-vehicle split. Proceed to Vehicle Assignment (Split) — BR-07."
+                    : "Capacity validation passed. " + eligibleVehicles.size() + " eligible vehicles available. Proceed to Vehicle Assignment.";
+        } else {
+            message = "Capacity validation failed. Total volume " + draft.getTotalVolumeM3()
+                    + " m³ exceeds all available vehicle capacities or violates route limits, and no two-vehicle split is feasible either.";
+        }
 
         return CapacityValidationResultResponse.builder()
                 .tripDraftId(draft.getId())
@@ -245,7 +264,7 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                 .newStatus(newStatus)
                 .totalVolumeM3(draft.getTotalVolumeM3())
                 .totalWeightKg(draft.getTotalWeightKg())
-                .validationPassed(!eligibleVehicles.isEmpty())
+                .validationPassed("VALIDATED".equals(newStatus))
                 .volumeCheckResult(overallVolume)
                 .weightCheckResult(overallWeight)
                 .eligibleVehicles(eligibleVehicles)

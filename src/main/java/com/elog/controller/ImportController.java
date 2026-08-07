@@ -25,7 +25,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/imports")
+@RequestMapping("/api/v1/imports")
 @RequiredArgsConstructor
 @Tag(name = "Import", description = "Excel import APIs for order management")
 public class ImportController {

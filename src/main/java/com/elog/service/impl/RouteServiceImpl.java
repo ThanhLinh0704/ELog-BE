@@ -32,6 +32,11 @@ public class RouteServiceImpl implements RouteService {
     private final RouteStopRepository routeStopRepository;
     private final StoreRepository storeRepository;
     private final RouteMapper routeMapper;
+    private final com.elog.repository.TripStopRepository tripStopRepository;
+    private final com.elog.repository.TripDraftStopRepository tripDraftStopRepository;
+    private final com.elog.repository.ManifestLineRepository manifestLineRepository;
+    private final com.elog.repository.DeliveryOrderResultRepository deliveryOrderResultRepository;
+    private final com.elog.service.GoongMapService goongMapService;
 
     // ── Route CRUD ──────────────────────────────────────────────
 
@@ -218,6 +223,14 @@ public class RouteServiceImpl implements RouteService {
                     HttpStatus.NOT_FOUND);
         }
 
+        // 1. Clean up references prior to deleting RouteStop so admin can remove any store
+        tripStopRepository.nullifyRouteStopId(stopId);
+        tripStopRepository.nullifyTripDraftStopIdByRouteStopId(stopId);
+        deliveryOrderResultRepository.deleteByRouteStopId(stopId);
+        manifestLineRepository.deleteByRouteStopId(stopId);
+        tripDraftStopRepository.deleteByRouteStopId(stopId);
+
+        // 2. Delete the route stop
         routeStopRepository.delete(stop);
 
         // Renumber remaining stops
@@ -227,6 +240,64 @@ public class RouteServiceImpl implements RouteService {
             rs.setSequenceOrder(seq++);
             routeStopRepository.save(rs);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RouteDirectionsResponse getRouteDirections(Long routeId) {
+        Route route = findRouteOrThrow(routeId);
+        List<RouteStop> stops = routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(routeId);
+
+        double warehouseLat = 21.032612;
+        double warehouseLng = 105.868367;
+
+        RouteDirectionsResponse.RouteDirectionsResponseBuilder builder = RouteDirectionsResponse.builder()
+                .routeId(route.getId())
+                .routeCode(route.getCode())
+                .routeName(route.getName())
+                .warehouseLat(warehouseLat)
+                .warehouseLng(warehouseLng);
+
+        List<RouteStop> validStops = stops.stream()
+                .filter(s -> s.getStore() != null && s.getStore().getLatitude() != null && s.getStore().getLongitude() != null)
+                .collect(Collectors.toList());
+
+        if (validStops.isEmpty()) {
+            return builder.totalDistanceKm(0.0).totalDurationMin(0).build();
+        }
+
+        String origin = warehouseLat + "," + warehouseLng;
+        String destination = validStops.get(validStops.size() - 1).getStore().getLatitude() + "," +
+                validStops.get(validStops.size() - 1).getStore().getLongitude();
+
+        String waypoints = null;
+        if (validStops.size() > 1) {
+            waypoints = validStops.subList(0, validStops.size() - 1).stream()
+                    .map(s -> s.getStore().getLatitude() + "," + s.getStore().getLongitude())
+                    .collect(Collectors.joining("|"));
+        }
+
+        if (goongMapService != null && goongMapService.isConfigured()) {
+            try {
+                var goongRes = goongMapService.getDirections(origin, destination, waypoints);
+                if (goongRes != null && goongRes.getRoutes() != null && !goongRes.getRoutes().isEmpty()) {
+                    var r = goongRes.getRoutes().get(0);
+                    if (r.getOverviewPolyline() != null) {
+                        builder.routePolyline(r.getOverviewPolyline().getPoints());
+                    }
+                    if (r.getLegs() != null) {
+                        long totalMeters = r.getLegs().stream().mapToLong(leg -> leg.getDistance() != null && leg.getDistance().getValue() != null ? leg.getDistance().getValue() : 0).sum();
+                        long totalSecs = r.getLegs().stream().mapToLong(leg -> leg.getDuration() != null && leg.getDuration().getValue() != null ? leg.getDuration().getValue() : 0).sum();
+                        builder.totalDistanceKm(totalMeters / 1000.0);
+                        builder.totalDurationMin((int) (totalSecs / 60));
+                    }
+                }
+            } catch (Exception e) {
+                // Ignore and return builder with null polyline
+            }
+        }
+
+        return builder.build();
     }
 
     // ── helpers ──────────────────────────────────────────────

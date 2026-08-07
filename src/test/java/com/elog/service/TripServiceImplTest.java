@@ -2,6 +2,7 @@ package com.elog.service;
 
 import com.elog.dto.request.TripAssignRequest;
 import com.elog.dto.request.TripAssignmentPatchRequest;
+import com.elog.dto.response.AvailableDriverResponse;
 import com.elog.dto.response.TripResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
@@ -51,6 +52,10 @@ class TripServiceImplTest {
     private TripStateMachine tripStateMachine;
     @Mock
     private TripExecutionRepository tripExecutionRepository;
+    @Mock
+    private PlanningHistoryService planningHistoryService;
+    @Mock
+    private TripOutcomeHistoryService tripOutcomeHistoryService;
 
     @InjectMocks
     private TripServiceImpl tripService;
@@ -239,5 +244,167 @@ class TripServiceImplTest {
                 te.getDriver().getId().equals(testDriver.getId()) &&
                 te.getOrderResults().size() == 1
         ));
+    }
+
+    @Test
+    void getEligibleVehicles_whenVehicleExceedsStoreWeightLimit_marksAsIneligible() {
+        Store store = Store.builder()
+                .id(1L)
+                .code("ST-007")
+                .maxAllowedVehicleWeight(BigDecimal.valueOf(2000.0)) // limit 2000 kg, vehicle is 3000 kg
+                .build();
+        TripDraftStop stop = TripDraftStop.builder()
+                .id(10L)
+                .store(store)
+                .isActive(true)
+                .build();
+        testDraft.setStops(List.of(stop));
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepository.findByIsActiveTrue()).thenReturn(List.of(testVehicle));
+
+        var response = tripService.getEligibleVehicles(1L);
+
+        assertThat(response.getEligibleVehicles()).isEmpty();
+        assertThat(response.getIneligibleVehicles()).hasSize(1);
+        assertThat(response.getIneligibleVehicles().get(0).getFailureReason())
+                .contains("exceeds store ST-007 limit");
+    }
+
+    @Test
+    void assignVehicleAndDriver_whenVehicleExceedsStoreWeightLimit_throwsException() {
+        Store store = Store.builder()
+                .id(1L)
+                .code("ST-007")
+                .maxAllowedVehicleWeight(BigDecimal.valueOf(2000.0))
+                .build();
+        TripDraftStop stop = TripDraftStop.builder()
+                .id(10L)
+                .store(store)
+                .isActive(true)
+                .build();
+        testDraft.setStops(List.of(stop));
+
+        TripAssignRequest request = new TripAssignRequest();
+        request.setVehicleId(1L);
+        request.setDriverId(2L);
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(testVehicle));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(testDriver));
+        when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
+
+        assertThatThrownBy(() -> tripService.assignVehicleAndDriver(1L, request, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VEHICLE_NOT_ELIGIBLE)
+                .hasMessageContaining("violates route constraints");
+    }
+
+    @Test
+    void updateAssignment_whenVehicleExceedsStoreWeightLimit_throwsException() {
+        Store store = Store.builder()
+                .id(1L)
+                .code("ST-007")
+                .maxAllowedVehicleWeight(BigDecimal.valueOf(2000.0))
+                .build();
+        TripDraftStop stop = TripDraftStop.builder()
+                .id(10L)
+                .store(store)
+                .isActive(true)
+                .build();
+        testDraft.setStops(List.of(stop));
+
+        Trip trip = Trip.builder()
+                .tripId(100L)
+                .tripDraft(testDraft)
+                .status(TripStatus.VALIDATED)
+                .totalVolumeM3(BigDecimal.valueOf(5.0))
+                .totalWeightKg(BigDecimal.valueOf(1000.0))
+                .build();
+
+        TripAssignmentPatchRequest request = new TripAssignmentPatchRequest();
+        request.setVehicleId(1L);
+        request.setDriverId(2L);
+
+        when(tripRepository.findById(100L)).thenReturn(Optional.of(trip));
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(testVehicle));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(testDriver));
+
+        assertThatThrownBy(() -> tripService.updateAssignment(100L, request, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VEHICLE_NOT_ELIGIBLE)
+                .hasMessageContaining("violates route constraints");
+    }
+
+    @Test
+    void getAvailableDrivers_marksUnavailable_whenDriverHasUnreturnedTripExecution() {
+        testDriver.setDriverStatus(DriverStatus.ACTIVE);
+        LocalDate date = LocalDate.now().plusDays(1);
+
+        Trip conflictingTrip = Trip.builder().tripId(8L).build();
+        TripExecution unreturnedExecution = TripExecution.builder()
+                .id(50L)
+                .trip(conflictingTrip)
+                .driver(testDriver)
+                .status("COMPLETED")
+                .returnedToWarehouseAt(null)
+                .build();
+
+        when(userRepository.findAll()).thenReturn(List.of(testDriver));
+        when(tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(tripExecutionRepository.findUnreturnedByDriverId(2L))
+                .thenReturn(List.of(unreturnedExecution));
+
+        List<AvailableDriverResponse> result = tripService.getAvailableDrivers(date);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).isAvailable()).isFalse();
+        assertThat(result.get(0).getBusyReason())
+                .contains("trip #8")
+                .contains("has not confirmed return to warehouse");
+    }
+
+    @Test
+    void getAvailableDrivers_marksAvailable_whenNoActiveTripAndNoUnreturnedExecution() {
+        testDriver.setDriverStatus(DriverStatus.ACTIVE);
+        LocalDate date = LocalDate.now().plusDays(1);
+
+        when(userRepository.findAll()).thenReturn(List.of(testDriver));
+        when(tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(any(), any(), any()))
+                .thenReturn(false);
+        when(tripExecutionRepository.findUnreturnedByDriverId(2L))
+                .thenReturn(List.of());
+
+        List<AvailableDriverResponse> result = tripService.getAvailableDrivers(date);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).isAvailable()).isTrue();
+        assertThat(result.get(0).getBusyReason()).isNull();
+    }
+
+    @Test
+    void getDriverTripCalendar_returnsCorrectDaySummaries() {
+        testDriver.setDriverStatus(DriverStatus.ACTIVE);
+        when(userRepository.findByUsername("driver1")).thenReturn(Optional.of(testDriver));
+
+        LocalDate day1 = LocalDate.of(2026, 8, 4);
+        LocalDate day2 = LocalDate.of(2026, 8, 6);
+
+        Trip trip1Completed = Trip.builder().tripId(1L).deliveryDate(day1).status(TripStatus.COMPLETED).driver(testDriver).build();
+        Trip trip2Dispatched = Trip.builder().tripId(2L).deliveryDate(day1).status(TripStatus.DISPATCHED).driver(testDriver).build();
+        Trip trip3Completed = Trip.builder().tripId(3L).deliveryDate(day2).status(TripStatus.COMPLETED).driver(testDriver).build();
+
+        when(tripRepository.findByDriverIdAndDeliveryDateBetween(eq(2L), any(), any()))
+                .thenReturn(List.of(trip1Completed, trip2Dispatched, trip3Completed));
+
+        List<com.elog.dto.response.DriverTripCalendarDayResponse> result =
+                tripService.getDriverTripCalendar("driver1", java.time.YearMonth.of(2026, 8));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getDate()).isEqualTo(day1);
+        assertThat(result.get(0).isAllCompleted()).isFalse();
+        assertThat(result.get(1).getDate()).isEqualTo(day2);
+        assertThat(result.get(1).isAllCompleted()).isTrue();
     }
 }

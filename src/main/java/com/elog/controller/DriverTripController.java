@@ -15,7 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/driver/trips")
+@RequestMapping("/api/v1/driver/trips")
 @RequiredArgsConstructor
 @Tag(name = "Driver App Trip Execution", description = "FT-09 Supporting Driver Trip Updates & LIFO Guidance APIs")
 public class DriverTripController {
@@ -31,9 +31,18 @@ public class DriverTripController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @GetMapping("/pending-return")
+    @Operation(summary = "Lấy các chuyến đã hoàn thành nhưng tài xế chưa xác nhận xe về kho")
+    @PreAuthorize("hasAuthority('trip:read')")
+    public ResponseEntity<ApiResponse<java.util.List<DriverTripResponse>>> getPendingReturnTrips() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        java.util.List<DriverTripResponse> response = driverTripService.getPendingReturnTrips(username);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @PostMapping("/{executionId}/start")
     @Operation(summary = "Tài xế bấm Bắt đầu chuyến xe (ASSIGNED -> IN_PROGRESS)")
-    @PreAuthorize("hasAuthority('trip:write')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<DriverTripResponse>> startTrip(
             @PathVariable Long executionId) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -43,7 +52,7 @@ public class DriverTripController {
 
     @PutMapping("/{executionId}/orders/{orderId}/result")
     @Operation(summary = "Cập nhật kết quả giao hàng từng đơn (DELIVERED, PARTIALLY_DELIVERED, FAILED)")
-    @PreAuthorize("hasAuthority('trip:write')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<DriverTripResponse>> updateOrderResult(
             @PathVariable Long executionId,
             @PathVariable Long orderId,
@@ -55,7 +64,7 @@ public class DriverTripController {
 
     @PostMapping("/{executionId}/complete")
     @Operation(summary = "Hoàn tất chuyến xe sau khi tất cả đơn hàng có trạng thái terminal (Tạo TripOutcome SUBMITTED)")
-    @PreAuthorize("hasAuthority('trip:write')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<TripOutcomeResponse>> completeTrip(
             @PathVariable Long executionId) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -65,7 +74,7 @@ public class DriverTripController {
 
     @PostMapping("/{executionId}/return-to-warehouse")
     @Operation(summary = "Tài xế bấm Xác nhận xe đã về tới kho (Giải phóng xe IN_USE -> AVAILABLE)")
-    @PreAuthorize("hasAuthority('trip:write')")
+    @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<DriverTripResponse>> returnToWarehouse(
             @PathVariable Long executionId) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();

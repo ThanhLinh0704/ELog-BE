@@ -42,3 +42,10 @@ elog:
     expiration-ms: 86400000       # 24 hours
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
+  goong:
+    api-key: ${GOONG_API_KEY:66VHUZVYkINm140kfOtXvdNVlO9UzZByASkqMh5q}
+    maptiles-key: ${GOONG_MAPTILES_KEY:guupij6M2CP187auekESO0H69QrLGFMVNF1Yi8eF}
+    base-url: https://rsapi.goong.io
+    vehicle: truck
+
+

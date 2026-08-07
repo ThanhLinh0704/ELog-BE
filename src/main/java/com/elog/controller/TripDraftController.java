@@ -24,7 +24,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/trip-drafts")
+@RequestMapping("/api/v1/trip-drafts")
 @RequiredArgsConstructor
 @Tag(name = "Trip Drafts", description = "US-10 Route Consolidation, US-11 Trip Draft Review, US-12 Capacity Validation & US-13 LIFO Manifest APIs")
 public class TripDraftController {
@@ -48,7 +48,7 @@ public class TripDraftController {
 
     @GetMapping
     @Operation(summary = "Get trip drafts by delivery date (paginated)")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<List<TripDraftResponse>>> getTripDrafts(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -58,7 +58,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get trip draft detail with active/skipped stop list")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<TripDraftResponse>> getTripDraftById(
             @PathVariable Long id) {
         TripDraftResponse response = tripDraftService.getTripDraftById(id);
@@ -69,7 +69,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}/stops")
     @Operation(summary = "Get all stops (active + skipped) for trip draft review")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<TripDraftResponse>> getStopsForReview(
             @PathVariable Long id) {
         TripDraftResponse response = tripDraftService.getStopsForReview(id);
@@ -90,7 +90,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}/stops/{stopId}/order-items")
     @Operation(summary = "Get order items detail for a specific trip draft stop")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<List<StopOrderItemResponse>>> getStopOrderItems(
             @PathVariable Long id,
             @PathVariable Long stopId) {
@@ -142,7 +142,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}/validation-result")
     @Operation(summary = "Get stored capacity validation result")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<CapacityValidationResultResponse>> getValidationResult(
             @PathVariable Long id) {
         CapacityValidationResultResponse response = capacityValidationService.getValidationResult(id);
@@ -164,7 +164,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}/manifest")
     @Operation(summary = "Get LIFO manifest flat list for a trip draft")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<ManifestResponse>> getManifest(
             @PathVariable Long id) {
         ManifestResponse response = manifestService.getManifest(id);
@@ -173,7 +173,7 @@ public class TripDraftController {
 
     @GetMapping("/{id}/manifest/by-stop")
     @Operation(summary = "Get LIFO manifest grouped by stop (for Warehouse Staff)")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<ManifestByStopResponse>> getManifestByStop(
             @PathVariable Long id) {
         ManifestByStopResponse response = manifestService.getManifestByStop(id);
@@ -233,21 +233,34 @@ public class TripDraftController {
 
     @GetMapping("/{id}/excluded-orders")
     @Operation(summary = "Lấy danh sách các đơn hàng bị tách (UNASSIGNED) thuộc tuyến của đợt gom")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<List<StopOrderItemResponse>>> getExcludedOrders(
             @PathVariable Long id) {
         List<StopOrderItemResponse> response = tripDraftService.getExcludedOrders(id);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    private final com.elog.service.PlanningHistoryService planningHistoryService;
+
     // ── Recommendation Engine endpoints ───────────────────────────
 
     @GetMapping("/{id}/recommendations")
     @Operation(summary = "Get Top-3 vehicle recommendations for a Trip Draft (FT-06/FT-07)")
-    @PreAuthorize("hasAuthority('trip:read')")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
     public ResponseEntity<ApiResponse<RecommendationResultResponse>> getRecommendations(
             @PathVariable Long id) {
         RecommendationResultResponse result = recommendationService.recommendTop3(id);
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @GetMapping("/{id}/history")
+    @Operation(summary = "Get planning history for a specific Trip Draft")
+    @PreAuthorize("hasAuthority('planning-history:read')")
+    public ResponseEntity<ApiResponse<List<com.elog.dto.response.PlanningEventResponse>>> getTripDraftHistory(
+            @PathVariable Long id,
+            @org.springframework.data.web.PageableDefault(size = 20, sort = "occurredAt", direction = org.springframework.data.domain.Sort.Direction.DESC) org.springframework.data.domain.Pageable pageable) {
+        var filter = new com.elog.service.PlanningHistoryService.PlanningHistoryFilter(
+                id, null, null, null, null, null, null, null, null);
+        return ResponseEntity.ok(planningHistoryService.search(filter, pageable));
     }
 }

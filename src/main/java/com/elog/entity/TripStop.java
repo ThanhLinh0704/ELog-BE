@@ -29,11 +29,11 @@ public class TripStop {
     private Trip trip;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "route_stop_id", nullable = false)
+    @JoinColumn(name = "route_stop_id", nullable = true)
     private RouteStop routeStop;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "trip_draft_stop_id", nullable = false)
+    @JoinColumn(name = "trip_draft_stop_id", nullable = true)
     private TripDraftStop tripDraftStop;
 
     @Column(name = "sequence_order", nullable = false)
@@ -67,4 +67,11 @@ public class TripStop {
 
     @Column(name = "violation_code", length = 50)
     private String violationCode;
+
+    @Column(name = "distance_from_prev_km", precision = 10, scale = 2)
+    private BigDecimal distanceFromPrevKm;
+
+    @Column(name = "travel_time_from_prev_min")
+    private Integer travelTimeFromPrevMin;
 }
+

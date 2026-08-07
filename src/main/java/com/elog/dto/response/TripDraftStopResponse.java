@@ -23,4 +23,10 @@ public class TripDraftStopResponse {
     private Long routeStopId;
     private BigDecimal stopVolumeM3;
     private BigDecimal stopWeightKg;
+    private BigDecimal distanceFromPrevKm;
+    private Integer travelTimeFromPrevMin;
+    private BigDecimal estimatedDistanceKm;
+    private Integer estimatedTravelMin;
 }
+
+

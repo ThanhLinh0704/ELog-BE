@@ -32,4 +32,9 @@ public interface DriverTripService {
      * Driver confirms returning to warehouse. Releases vehicle back to AVAILABLE.
      */
     DriverTripResponse returnToWarehouse(Long executionId, String driverUsername);
+
+    /**
+     * Get completed trips for driver that are waiting for return to warehouse confirmation.
+     */
+    java.util.List<DriverTripResponse> getPendingReturnTrips(String driverUsername);
 }

@@ -73,23 +73,13 @@ public class ImportServiceImpl implements ImportService {
         }
 
         // Step 4: Create new batch
-        ImportBatch batch;
-        try {
-            batch = ImportBatch.builder()
-                    .deliveryDate(deliveryDate)
-                    .fileName(file.getOriginalFilename())
-                    .uploadedBy(uploadedBy)
-                    .status("PROCESSING")
-                    .build();
-            batch = batchRepository.save(batch);
-            batchRepository.flush(); // force unique constraint check
-        } catch (DataIntegrityViolationException e) {
-            // Race condition: another request created a batch for this date concurrently
-            log.warn("Concurrent batch creation for date {}: {}", deliveryDate, e.getMessage());
-            throw new BusinessException(ErrorCode.EXCEL_PARSE_ERROR,
-                    "Đã có dữ liệu nhập cho ngày " + deliveryDate + ". Vui lòng thử lại.",
-                    HttpStatus.CONFLICT);
-        }
+        ImportBatch batch = ImportBatch.builder()
+                .deliveryDate(deliveryDate)
+                .fileName(file.getOriginalFilename())
+                .uploadedBy(uploadedBy)
+                .status("PROCESSING")
+                .build();
+        batch = batchRepository.save(batch);
 
         int totalRows = rows.size();
         int acceptedRows = 0;
@@ -438,8 +428,9 @@ public class ImportServiceImpl implements ImportService {
             if (deliveryDateRaw.isEmpty()) {
                 throw new RowRejectedException("Ngày giao hàng không được để trống", "MISSING_FIELD", "delivery_date");
             } else {
-                throw new RowRejectedException("Ngày giao hàng không đúng định dạng YYYY-MM-DD hoặc DD/MM/YYYY (giá trị: '" + row.deliveryDateRaw + "')", "INVALID_DATE_FORMAT", "delivery_date");
+                throw new RowRejectedException("Ngày giao hàng không đúng định dạng DD/MM/YYYY (ví dụ: 02/08/2026) (giá trị: '" + row.deliveryDateRaw + "')", "INVALID_DATE_FORMAT", "delivery_date");
             }
+
         }
 
         // Reject rows targeting a delivery date whose TripDraft is already locked (status != DRAFT)
@@ -517,8 +508,14 @@ public class ImportServiceImpl implements ImportService {
                 existingOrder.setRecipientPhone(row.recipientPhone);
                 existingOrder.setNotes(row.notes);
                 order = orderRepository.save(existingOrder);
-                
-                orderItemRepository.deleteByOrderId(order.getId());
+
+                // Populate existing order items into cache for cross-batch SKU accumulation
+                for (OrderItem existingItem : orderItemRepository.findByOrderId(order.getId())) {
+                    if (existingItem.getProduct() != null) {
+                        String key = order.getId() + "|" + existingItem.getProduct().getId();
+                        orderItemCache.put(key, existingItem);
+                    }
+                }
             } else {
                 Order newOrder = Order.builder()
                         .importBatch(batch)
@@ -588,6 +585,14 @@ public class ImportServiceImpl implements ImportService {
             case NUMERIC -> {
                 if (DateUtil.isCellDateFormatted(cell)) {
                     try {
+                        org.apache.poi.ss.usermodel.DataFormatter formatter = new org.apache.poi.ss.usermodel.DataFormatter();
+                        String formatted = formatter.formatCellValue(cell);
+                        if (formatted != null && !formatted.isBlank()) {
+                            yield formatted.trim();
+                        }
+                    } catch (Exception ignored) {}
+
+                    try {
                         java.time.LocalDateTime ldt = cell.getLocalDateTimeCellValue();
                         if (ldt != null) {
                             yield ldt.toLocalDate().toString();
@@ -600,6 +605,7 @@ public class ImportServiceImpl implements ImportService {
                 }
                 yield String.valueOf(d);
             }
+
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             case FORMULA -> {
                 try {
@@ -707,25 +713,29 @@ public class ImportServiceImpl implements ImportService {
 
     // ── Inner class for parsed row data ───────────────────────────────────────
 
+    private static final java.time.format.DateTimeFormatter[] IMPORT_DATE_FORMATTERS = new java.time.format.DateTimeFormatter[]{
+            java.time.format.DateTimeFormatter.ofPattern("d/M/yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("d/M/yy"),
+            java.time.format.DateTimeFormatter.ofPattern("d-M-yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("d-M-yy"),
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+            java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd")
+    };
+
     private LocalDate parseRowDate(String dateStr) {
         if (dateStr == null || dateStr.isBlank()) return null;
         dateStr = dateStr.trim();
-        try {
-            return LocalDate.parse(dateStr);
-        } catch (Exception ignored) {}
 
-        try {
-            java.time.format.DateTimeFormatter dmy = java.time.format.DateTimeFormatter.ofPattern("d/M/yyyy");
-            return LocalDate.parse(dateStr, dmy);
-        } catch (Exception ignored) {}
-
-        try {
-            java.time.format.DateTimeFormatter dmy2 = java.time.format.DateTimeFormatter.ofPattern("d-M-yyyy");
-            return LocalDate.parse(dateStr, dmy2);
-        } catch (Exception ignored) {}
+        for (java.time.format.DateTimeFormatter formatter : IMPORT_DATE_FORMATTERS) {
+            try {
+                return LocalDate.parse(dateStr, formatter);
+            } catch (Exception ignored) {}
+        }
 
         return null;
     }
+
+
 
     private static class RowData {
         int rowNumber;

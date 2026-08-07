@@ -28,8 +28,14 @@ public class DeliveryException {
     @Column(name = "exception_id")
     private Long exceptionId;
 
-    @Column(name = "trip_stop_id", nullable = false)
+    @Column(name = "trip_stop_id")
     private Long tripStopId;
+
+    @Column(name = "trip_execution_id")
+    private Long tripExecutionId;
+
+    @Column(name = "order_id")
+    private Long orderId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "exception_type", nullable = false, length = 30)
