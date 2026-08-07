@@ -407,4 +407,34 @@ class TripServiceImplTest {
         assertThat(result.get(1).getDate()).isEqualTo(day2);
         assertThat(result.get(1).isAllCompleted()).isTrue();
     }
+
+    @Test
+    void getHandoverSlipHtml_rendersCorrectHtmlFormat() {
+        Trip trip = Trip.builder()
+                .tripId(10L)
+                .deliveryDate(LocalDate.of(2026, 8, 8))
+                .status(TripStatus.DISPATCHED)
+                .route(Route.builder().code("RT-001").build())
+                .vehicle(Vehicle.builder().plateNumber("29A-12345").vehicleType("Xe 5 tấn").build())
+                .driver(testDriver)
+                .totalWeightKg(BigDecimal.valueOf(500))
+                .totalVolumeM3(BigDecimal.valueOf(10))
+                .lockedAt(java.time.LocalDateTime.of(2026, 8, 8, 8, 0))
+                .build();
+
+        Store store = Store.builder().name("Kho Hà Nội").build();
+        RouteStop routeStop = RouteStop.builder().store(store).sequenceOrder(1).build();
+        TripStop stop = TripStop.builder().sequenceOrder(1).routeStop(routeStop).build();
+
+        when(tripRepository.findById(10L)).thenReturn(Optional.of(trip));
+        when(tripStopRepository.findByTripTripIdOrderBySequenceOrderAsc(10L)).thenReturn(List.of(stop));
+
+        String html = tripService.getHandoverSlipHtml(10L);
+
+        assertThat(html).contains("<b>Điều phối lúc:</b>");
+        assertThat(html).contains("<th>#</th><th>Điểm giao</th>");
+        assertThat(html).doesNotContain("<th>ETA</th>");
+        assertThat(html).doesNotContain("<th>Trạng thái</th>");
+        assertThat(html).doesNotContain("Dispatch lúc:");
+    }
 }

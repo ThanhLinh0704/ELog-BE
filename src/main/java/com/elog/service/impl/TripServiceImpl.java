@@ -581,18 +581,15 @@ public class TripServiceImpl implements TripService {
                 .append(trip.getPlannedDepartureTime() != null
                         ? trip.getPlannedDepartureTime().format(timeFmt) : "N/A")
                 .append("</td>");
-        html.append("<td><b>Dispatch lúc:</b> ")
+        html.append("<td><b>Điều phối lúc:</b> ")
                 .append(trip.getLockedAt() != null ? trip.getLockedAt().format(dtTimeFmt) : "N/A")
                 .append("</td></tr></table>");
 
         html.append("<h3>DANH SÁCH ĐIỂM GIAO (theo thứ tự tuyến)</h3>");
-        html.append("<table><tr><th>#</th><th>Điểm giao</th><th>ETA</th><th>Trạng thái</th></tr>");
+        html.append("<table><tr><th>#</th><th>Điểm giao</th></tr>");
         for (TripStop stop : stops) {
             html.append("<tr><td>").append(stop.getSequenceOrder()).append("</td>");
-            html.append("<td>").append(stop.getRouteStop().getStore().getName()).append("</td>");
-            html.append("<td>").append(stop.getPlannedEta() != null
-                    ? stop.getPlannedEta().format(timeFmt) : "N/A").append("</td>");
-            html.append("<td>").append(stop.getStatus()).append("</td></tr>");
+            html.append("<td>").append(stop.getRouteStop().getStore().getName()).append("</td></tr>");
         }
         html.append("</table>");
 
