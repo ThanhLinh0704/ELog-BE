@@ -32,6 +32,10 @@ public class RouteServiceImpl implements RouteService {
     private final RouteStopRepository routeStopRepository;
     private final StoreRepository storeRepository;
     private final RouteMapper routeMapper;
+    private final com.elog.repository.TripStopRepository tripStopRepository;
+    private final com.elog.repository.TripDraftStopRepository tripDraftStopRepository;
+    private final com.elog.repository.ManifestLineRepository manifestLineRepository;
+    private final com.elog.repository.DeliveryOrderResultRepository deliveryOrderResultRepository;
 
     // ── Route CRUD ──────────────────────────────────────────────
 
@@ -218,6 +222,14 @@ public class RouteServiceImpl implements RouteService {
                     HttpStatus.NOT_FOUND);
         }
 
+        // 1. Clean up references prior to deleting RouteStop so admin can remove any store
+        tripStopRepository.nullifyRouteStopId(stopId);
+        tripStopRepository.nullifyTripDraftStopIdByRouteStopId(stopId);
+        deliveryOrderResultRepository.deleteByRouteStopId(stopId);
+        manifestLineRepository.deleteByRouteStopId(stopId);
+        tripDraftStopRepository.deleteByRouteStopId(stopId);
+
+        // 2. Delete the route stop
         routeStopRepository.delete(stop);
 
         // Renumber remaining stops

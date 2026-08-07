@@ -15,4 +15,6 @@ public class RouteStopStoreDto {
     private String contactName;
     private String contactPhone;
     private Boolean hasCoordinates;
+    private Double latitude;
+    private Double longitude;
 }

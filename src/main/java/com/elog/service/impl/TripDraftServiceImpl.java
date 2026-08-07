@@ -156,7 +156,7 @@ public class TripDraftServiceImpl implements TripDraftService {
             }
             int skippedCount = routeStops.size() - activeCount;
 
-            // 5e. Upsert TripDraft
+            // 5e. Upsert TripDraft & refresh stops (idempotent via orphanRemoval)
             TripDraft draft = (existing != null) ? existing : new TripDraft();
             draft.setRoute(route);
             draft.setDeliveryDate(deliveryDate);
@@ -165,11 +165,13 @@ public class TripDraftServiceImpl implements TripDraftService {
             draft.setActiveStopCount(activeCount);
             draft.setSkippedStopCount(skippedCount);
             draft.setStatus("DRAFT");
-            tripDraftRepository.save(draft);
 
-            // 5f. Refresh TripDraftStops (delete old, recreate — idempotent)
-            tripDraftStopRepository.deleteByTripDraftId(draft.getId());
-            tripDraftRepository.flush();
+            if (draft.getStops() != null) {
+                draft.getStops().clear();
+            } else {
+                draft.setStops(new ArrayList<>());
+            }
+            draft = tripDraftRepository.saveAndFlush(draft);
 
             for (RouteStop rs : routeStops) {
                 boolean isActive = storeIdsWithOrder.contains(rs.getStore().getId());
@@ -185,8 +187,9 @@ public class TripDraftServiceImpl implements TripDraftService {
                         .isActive(isActive)
                         .orderCount(orderCountAtStop)
                         .build();
-                tripDraftStopRepository.save(stop);
+                draft.getStops().add(stop);
             }
+            draft = tripDraftRepository.save(draft);
 
             // 5g. Link orders back to this TripDraft
             List<Long> orderIds = routeOrders.stream().map(Order::getId).toList();

@@ -133,4 +133,14 @@ public class TripController {
         List<TripResponse> trips = tripService.getDriverTrips(username, date, status);
         return ResponseEntity.ok(ApiResponse.success(trips));
     }
+
+    @GetMapping("/api/v1/trips/my-trips/calendar")
+    @Operation(summary = "Driver view: tổng hợp trạng thái chuyến theo tháng, phục vụ chấm đỏ/xanh trên lịch")
+    @PreAuthorize("hasAuthority('trip:execute')")
+    public ResponseEntity<ApiResponse<List<DriverTripCalendarDayResponse>>> getMyTripsCalendar(
+            @RequestParam @DateTimeFormat(pattern = "yyyy-MM") java.time.YearMonth month) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        List<DriverTripCalendarDayResponse> response = tripService.getDriverTripCalendar(username, month);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }

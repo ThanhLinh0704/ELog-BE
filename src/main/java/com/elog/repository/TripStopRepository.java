@@ -16,6 +16,16 @@ public interface TripStopRepository extends JpaRepository<TripStop, Long> {
 
     java.util.Optional<TripStop> findByTripDraftStopId(Long tripDraftStopId);
 
+    boolean existsByRouteStopId(Long routeStopId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE TripStop ts SET ts.routeStop = null WHERE ts.routeStop.id = :routeStopId")
+    void nullifyRouteStopId(@Param("routeStopId") Long routeStopId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE TripStop ts SET ts.tripDraftStop = null WHERE ts.tripDraftStop.id IN (SELECT tds.id FROM TripDraftStop tds WHERE tds.routeStop.id = :routeStopId)")
+    void nullifyTripDraftStopIdByRouteStopId(@Param("routeStopId") Long routeStopId);
+
     /** PENDING stops của IN_PROGRESS trips mà ETA đã qua cutoff — dùng bởi TimeExceptionDetectionJob */
     @Query("SELECT ts FROM TripStop ts " +
            "JOIN ts.trip t " +

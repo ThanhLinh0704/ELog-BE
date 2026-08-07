@@ -29,11 +29,11 @@ public class TripStop {
     private Trip trip;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "route_stop_id", nullable = false)
+    @JoinColumn(name = "route_stop_id", nullable = true)
     private RouteStop routeStop;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "trip_draft_stop_id", nullable = false)
+    @JoinColumn(name = "trip_draft_stop_id", nullable = true)
     private TripDraftStop tripDraftStop;
 
     @Column(name = "sequence_order", nullable = false)

@@ -64,6 +64,8 @@ public class RouteMapper {
                         .contactName(store.getContactName())
                         .contactPhone(store.getContactPhone())
                         .hasCoordinates(hasCoords)
+                        .latitude(store.getLatitude())
+                        .longitude(store.getLongitude())
                         .build())
                 .coordinatesWarning(coordinatesWarning)
                 .build();

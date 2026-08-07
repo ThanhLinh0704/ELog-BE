@@ -382,4 +382,29 @@ class TripServiceImplTest {
         assertThat(result.get(0).isAvailable()).isTrue();
         assertThat(result.get(0).getBusyReason()).isNull();
     }
+
+    @Test
+    void getDriverTripCalendar_returnsCorrectDaySummaries() {
+        testDriver.setDriverStatus(DriverStatus.ACTIVE);
+        when(userRepository.findByUsername("driver1")).thenReturn(Optional.of(testDriver));
+
+        LocalDate day1 = LocalDate.of(2026, 8, 4);
+        LocalDate day2 = LocalDate.of(2026, 8, 6);
+
+        Trip trip1Completed = Trip.builder().tripId(1L).deliveryDate(day1).status(TripStatus.COMPLETED).driver(testDriver).build();
+        Trip trip2Dispatched = Trip.builder().tripId(2L).deliveryDate(day1).status(TripStatus.DISPATCHED).driver(testDriver).build();
+        Trip trip3Completed = Trip.builder().tripId(3L).deliveryDate(day2).status(TripStatus.COMPLETED).driver(testDriver).build();
+
+        when(tripRepository.findByDriverIdAndDeliveryDateBetween(eq(2L), any(), any()))
+                .thenReturn(List.of(trip1Completed, trip2Dispatched, trip3Completed));
+
+        List<com.elog.dto.response.DriverTripCalendarDayResponse> result =
+                tripService.getDriverTripCalendar("driver1", java.time.YearMonth.of(2026, 8));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).getDate()).isEqualTo(day1);
+        assertThat(result.get(0).isAllCompleted()).isFalse();
+        assertThat(result.get(1).getDate()).isEqualTo(day2);
+        assertThat(result.get(1).isAllCompleted()).isTrue();
+    }
 }

@@ -65,6 +65,8 @@ public class StoreMapper {
                 .address(formatFullAddress(store))
                 .isActive(store.getIsActive())
                 .hasCoordinates(store.getLatitude() != null && store.getLongitude() != null)
+                .latitude(store.getLatitude())
+                .longitude(store.getLongitude())
                 .assignedRoute(assignedRoute)
                 .assignedRoutes(assignedRoutes)
                 .allowedDeliveryHours(store.getAllowedDeliveryHours())

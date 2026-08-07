@@ -39,6 +39,9 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         List<Trip> findByDriverIdAndDeliveryDateAndStatus(
                         Long driverId, LocalDate deliveryDate, TripStatus status);
 
+        List<Trip> findByDriverIdAndDeliveryDateBetween(
+                        Long driverId, LocalDate startDate, LocalDate endDate);
+
         List<Trip> findByDeliveryDateAndStatus(LocalDate deliveryDate, TripStatus status);
 
         // ── US-17 — Dashboard Monitoring ─────────────────────────────────────────

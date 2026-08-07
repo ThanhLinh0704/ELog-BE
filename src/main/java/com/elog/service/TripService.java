@@ -36,5 +36,7 @@ public interface TripService {
     TripResponse getTripById(Long tripId);
 
     TripResponse updateAssignment(Long tripId, TripAssignmentPatchRequest request, String currentUsername);
+
+    List<DriverTripCalendarDayResponse> getDriverTripCalendar(String username, java.time.YearMonth month);
 }
 

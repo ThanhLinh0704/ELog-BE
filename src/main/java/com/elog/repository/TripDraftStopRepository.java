@@ -16,4 +16,10 @@ public interface TripDraftStopRepository extends JpaRepository<TripDraftStop, Lo
     int countByTripDraftIdAndIsActiveTrue(Long tripDraftId);
 
     int countByTripDraftIdAndIsActiveTrueAndPlannedEtaIsNull(Long tripDraftId);
+
+    boolean existsByRouteStopId(Long routeStopId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM TripDraftStop tds WHERE tds.routeStop.id = :routeStopId")
+    void deleteByRouteStopId(@org.springframework.data.repository.query.Param("routeStopId") Long routeStopId);
 }

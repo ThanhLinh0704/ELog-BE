@@ -21,8 +21,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -625,6 +627,25 @@ public class TripServiceImpl implements TripService {
                     .toList();
         }
         return trips.stream().map(t -> buildTripResponse(t, null)).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DriverTripCalendarDayResponse> getDriverTripCalendar(String username, YearMonth month) {
+        User driver = findUserByUsernameOrThrow(username);
+        LocalDate start = month.atDay(1);
+        LocalDate end = month.atEndOfMonth();
+
+        List<Trip> trips = tripRepository.findByDriverIdAndDeliveryDateBetween(driver.getId(), start, end);
+
+        return trips.stream()
+                .collect(Collectors.groupingBy(Trip::getDeliveryDate))
+                .entrySet().stream()
+                .map(e -> new DriverTripCalendarDayResponse(
+                        e.getKey(),
+                        e.getValue().stream().allMatch(t -> t.getStatus() == TripStatus.COMPLETED)))
+                .sorted(Comparator.comparing(DriverTripCalendarDayResponse::getDate))
+                .toList();
     }
 
 
