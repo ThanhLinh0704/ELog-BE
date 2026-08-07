@@ -37,6 +37,7 @@ public class VehicleMapper {
     public VehicleResponse toResponse(Vehicle vehicle) {
         Long driverId = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getId() : null;
         String driverName = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getFullName() : null;
+        String driverPhone = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getPhoneNumber() : null;
         LicenseClass driverLicense = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getLicenseClass()
                 : null;
 
@@ -62,6 +63,7 @@ public class VehicleMapper {
                 .description(vehicle.getDescription())
                 .assignedDriverId(driverId)
                 .assignedDriverName(driverName)
+                .assignedDriverPhone(driverPhone)
                 .assignedDriverLicenseClass(driverLicense)
                 .createdAt(vehicle.getCreatedAt())
                 .updatedAt(vehicle.getUpdatedAt())
@@ -71,7 +73,7 @@ public class VehicleMapper {
     public VehicleListItemResponse toListItem(Vehicle vehicle) {
         Long driverId = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getId() : null;
         String driverName = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getFullName() : null;
-        String driverPhone = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getPhone() : null;
+        String driverPhone = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getPhoneNumber() : null;
         LicenseClass driverLicense = vehicle.getAssignedDriver() != null ? vehicle.getAssignedDriver().getLicenseClass() : null;
 
         return VehicleListItemResponse.builder()
