@@ -397,7 +397,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             return fails;
         }
 
-        if (!tripExecutionRepo.findUnreturnedByVehicleId(v.getId()).isEmpty()) {
+        if (hasUnreturnedVehicleConflict(v.getId(), deliveryDate)) {
             fails.add("Vehicle is IN_USE and has not confirmed return to warehouse yet");
             return fails;
         }
@@ -447,7 +447,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                                                  LocalDate deliveryDate, List<TripStatus> busyStatuses) {
         if (v.getStatus() != VehicleStatus.AVAILABLE) return false;
         if (tripRepo.existsByVehicleIdAndDeliveryDateAndStatusIn(v.getId(), deliveryDate, busyStatuses)) return false;
-        if (!tripExecutionRepo.findUnreturnedByVehicleId(v.getId()).isEmpty()) return false;
+        if (hasUnreturnedVehicleConflict(v.getId(), deliveryDate)) return false;
 
         BigDecimal safetyBuffer = getSafetyBufferRatio();
         BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(safetyBuffer);
@@ -557,7 +557,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                     }
                     // Schedule check: not busy on date AND has returned to warehouse from all past executions
                     boolean busyOnDate = tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(d.getId(), date, busyStatuses);
-                    boolean unreturned = !tripExecutionRepo.findUnreturnedByDriverId(d.getId()).isEmpty();
+                    boolean unreturned = hasUnreturnedDriverConflict(d.getId(), date);
                     return !busyOnDate && !unreturned;
                 })
                 .toList();
@@ -694,7 +694,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             boolean licenseOk = (v.getRequiredLicense() == null) ||
                     (assigned.getLicenseClass() != null && assigned.getLicenseClass().ordinal() >= v.getRequiredLicense().ordinal());
             boolean busy = tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(assigned.getId(), date, busyStatuses)
-                    || !tripExecutionRepo.findUnreturnedByDriverId(assigned.getId()).isEmpty();
+                    || hasUnreturnedDriverConflict(assigned.getId(), date);
 
             if (licenseOk && !busy) {
                 return new PairedDriverInfo(assigned, false);
@@ -708,6 +708,16 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         return null;
+    }
+
+    private boolean hasUnreturnedVehicleConflict(Long vehicleId, LocalDate targetDate) {
+        List<TripExecution> unreturned = tripExecutionRepo.findUnreturnedByVehicleId(vehicleId);
+        return unreturned.stream().anyMatch(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(targetDate));
+    }
+
+    private boolean hasUnreturnedDriverConflict(Long driverId, LocalDate targetDate) {
+        List<TripExecution> unreturned = tripExecutionRepo.findUnreturnedByDriverId(driverId);
+        return unreturned.stream().anyMatch(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(targetDate));
     }
 
     // ══════════════════════════════════════════════════════════════════════════

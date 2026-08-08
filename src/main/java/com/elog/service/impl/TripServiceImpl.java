@@ -132,9 +132,10 @@ public class TripServiceImpl implements TripService {
                     d.getId(), date, busyStatuses);
 
             // Must match DRIVER_CONFLICT condition in validateVehicleAndDriverAvailability():
-            // driver with unreturned TripExecution (returnedToWarehouseAt IS NULL) is NOT available,
-            // regardless of delivery date.
-            List<TripExecution> unreturned = tripExecutionRepository.findUnreturnedByDriverId(d.getId());
+            // driver with unreturned TripExecution (returnedToWarehouseAt IS NULL) whose trip deliveryDate <= target date is NOT available.
+            List<TripExecution> unreturned = tripExecutionRepository.findUnreturnedByDriverId(d.getId()).stream()
+                    .filter(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(date))
+                    .toList();
 
             boolean busy = busyOnDate || !unreturned.isEmpty();
             String busyReason;
@@ -963,6 +964,9 @@ public class TripServiceImpl implements TripService {
             if (excludeTripId != null && te.getTrip() != null && te.getTrip().getTripId().equals(excludeTripId)) {
                 continue;
             }
+            if (te.getTrip() != null && te.getTrip().getDeliveryDate() != null && te.getTrip().getDeliveryDate().isAfter(deliveryDate)) {
+                continue;
+            }
             throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,
                     "Vehicle " + vehicle.getPlateNumber() + " is currently IN_USE on trip #" 
                             + (te.getTrip() != null ? te.getTrip().getTripId() : te.getId()) 
@@ -974,6 +978,9 @@ public class TripServiceImpl implements TripService {
         List<TripExecution> unreturnedDrivers = tripExecutionRepository.findUnreturnedByDriverId(driver.getId());
         for (TripExecution te : unreturnedDrivers) {
             if (excludeTripId != null && te.getTrip() != null && te.getTrip().getTripId().equals(excludeTripId)) {
+                continue;
+            }
+            if (te.getTrip() != null && te.getTrip().getDeliveryDate() != null && te.getTrip().getDeliveryDate().isAfter(deliveryDate)) {
                 continue;
             }
             throw new BusinessException(ErrorCode.DRIVER_CONFLICT,

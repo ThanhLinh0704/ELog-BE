@@ -437,4 +437,36 @@ class TripServiceImplTest {
         assertThat(html).doesNotContain("<th>Trạng thái</th>");
         assertThat(html).doesNotContain("Dispatch lúc:");
     }
+
+    @Test
+    void getAvailableDrivers_driverHasFutureDispatchedTrip_shouldBeAvailableForEarlierDate() {
+        testDriver.setDriverStatus(DriverStatus.ACTIVE);
+        LocalDate targetDate = LocalDate.of(2026, 8, 8);
+        LocalDate futureTripDate = LocalDate.of(2026, 8, 10);
+
+        Trip futureTrip = Trip.builder()
+                .tripId(99L)
+                .deliveryDate(futureTripDate)
+                .status(TripStatus.DISPATCHED)
+                .build();
+
+        TripExecution futureExecution = TripExecution.builder()
+                .id(50L)
+                .trip(futureTrip)
+                .driver(testDriver)
+                .returnedToWarehouseAt(null)
+                .build();
+
+        when(userRepository.findAll()).thenReturn(List.of(testDriver));
+        when(tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(eq(2L), eq(targetDate), any()))
+                .thenReturn(false);
+        when(tripExecutionRepository.findUnreturnedByDriverId(2L))
+                .thenReturn(List.of(futureExecution));
+
+        List<AvailableDriverResponse> result = tripService.getAvailableDrivers(targetDate);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).isAvailable()).isTrue();
+        assertThat(result.get(0).getBusyReason()).isNull();
+    }
 }
