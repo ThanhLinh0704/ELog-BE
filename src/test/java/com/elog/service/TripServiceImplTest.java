@@ -3,6 +3,7 @@ package com.elog.service;
 import com.elog.dto.request.TripAssignRequest;
 import com.elog.dto.request.TripAssignmentPatchRequest;
 import com.elog.dto.response.AvailableDriverResponse;
+import com.elog.dto.response.EligibleVehiclesResponse;
 import com.elog.dto.response.TripResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
@@ -468,5 +469,22 @@ class TripServiceImplTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).isAvailable()).isTrue();
         assertThat(result.get(0).getBusyReason()).isNull();
+    }
+
+    @Test
+    void getEligibleVehiclesForStops_success() {
+        TripDraftStop stop1 = TripDraftStop.builder().id(10L).store(Store.builder().id(1L).build()).build();
+        testDraft.setStops(List.of(stop1));
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(orderItemRepository.findByStopForManifest(1L, 1L)).thenReturn(List.of(
+                OrderItem.builder().lineVolumeM3(BigDecimal.valueOf(1.0)).lineWeightKg(BigDecimal.valueOf(100)).build()
+        ));
+        when(vehicleRepository.findByIsActiveTrue()).thenReturn(List.of(testVehicle));
+
+        EligibleVehiclesResponse response = tripService.getEligibleVehiclesForStops(1L, List.of(10L));
+
+        assertThat(response).isNotNull();
+        assertThat(response.getEligibleVehicles()).hasSize(1);
     }
 }

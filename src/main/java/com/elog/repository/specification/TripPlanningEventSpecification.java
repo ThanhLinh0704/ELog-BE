@@ -21,7 +21,7 @@ public class TripPlanningEventSpecification {
 
     public static Specification<TripPlanningEvent> hasRouteCode(String routeCode) {
         return (root, query, cb) -> (routeCode == null || routeCode.isBlank()) ? null
-                : cb.equal(root.get("routeCode"), routeCode);
+                : cb.like(cb.lower(root.get("routeCode")), "%" + routeCode.toLowerCase().trim() + "%");
     }
 
     public static Specification<TripPlanningEvent> hasDeliveryDate(LocalDate date) {
@@ -34,7 +34,7 @@ public class TripPlanningEventSpecification {
 
     public static Specification<TripPlanningEvent> hasActor(String username) {
         return (root, query, cb) -> (username == null || username.isBlank()) ? null
-                : cb.equal(root.get("actorUsername"), username);
+                : cb.like(cb.lower(root.get("actorUsername")), "%" + username.toLowerCase().trim() + "%");
     }
 
     public static Specification<TripPlanningEvent> occurredBetween(LocalDateTime from, LocalDateTime to) {

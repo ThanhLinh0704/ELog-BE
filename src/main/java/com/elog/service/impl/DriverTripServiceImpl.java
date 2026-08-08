@@ -120,6 +120,65 @@ public class DriverTripServiceImpl implements DriverTripService {
 
     @Override
     @Transactional
+    public DriverTripResponse arriveAtStop(Long executionId, Long stopId, String driverUsername) {
+        TripExecution execution = tripExecutionRepo.findById(executionId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "Không tìm thấy chuyến xe với ID: " + executionId,
+                        HttpStatus.NOT_FOUND));
+
+        verifyDriverAccess(execution, driverUsername);
+        validateDeliveryDate(execution);
+
+        if (!"IN_PROGRESS".equals(execution.getStatus())) {
+            throw new BusinessException(
+                    ErrorCode.VALIDATION_FAILED,
+                    "Chỉ có thể bấm 'Đã đến điểm giao' khi chuyến xe ở trạng thái IN_PROGRESS",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        Trip trip = execution.getTrip();
+        if (trip == null) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+                    "Không tìm thấy Trip liên quan đến chuyến xe này", HttpStatus.NOT_FOUND);
+        }
+
+        List<TripStop> remainingStops = tripStopRepo.findRemainingStopsOrdered(trip.getTripId());
+        if (remainingStops.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,
+                    "Tất cả các điểm dừng của chuyến xe này đã hoàn thành.", HttpStatus.BAD_REQUEST);
+        }
+
+        TripStop targetStop = tripStopRepo.findByTripDraftStopId(stopId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+                        "Không tìm thấy điểm dừng với ID: " + stopId, HttpStatus.NOT_FOUND));
+
+        if (!targetStop.getTrip().getTripId().equals(trip.getTripId())) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,
+                    "Điểm dừng không thuộc về chuyến xe này.", HttpStatus.BAD_REQUEST);
+        }
+
+        TripStop firstRemaining = remainingStops.get(0);
+        if (!firstRemaining.getTripStopId().equals(targetStop.getTripStopId())) {
+            throw new BusinessException(ErrorCode.PREVIOUS_STOP_NOT_DONE,
+                    "Phải xử lý xong điểm dừng trước (thứ tự " + firstRemaining.getSequenceOrder() + ") mới được điểm tiếp theo.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        if (targetStop.getStatus() != TripStopStatus.PENDING) {
+            throw new BusinessException(ErrorCode.STOP_NOT_PENDING,
+                    "Điểm dừng này đã ở trạng thái " + targetStop.getStatus(), HttpStatus.BAD_REQUEST);
+        }
+
+        targetStop.setStatus(TripStopStatus.IN_PROGRESS);
+        targetStop.setActualArrivalTime(LocalDateTime.now());
+        tripStopRepo.save(targetStop);
+
+        return buildDriverTripResponse(execution);
+    }
+
+    @Override
+    @Transactional
     public DriverTripResponse updateOrderResult(Long executionId, Long orderId,
                                                 UpdateOrderResultRequest request,
                                                 String driverUsername) {
@@ -212,11 +271,14 @@ public class DriverTripServiceImpl implements DriverTripService {
 
                 // Sync to System A TripStop entity if exists
                 tripStopRepo.findByTripDraftStopId(stop.getId()).ifPresent(ts -> {
+                    LocalDateTime now = LocalDateTime.now();
+                    if (ts.getActualArrivalTime() == null) {
+                        ts.setActualArrivalTime(now);
+                    }
+                    ts.setActualDepartureTime(now);
+
                     if ("DELIVERED".equals(stopStatusAfter)) {
                         ts.setStatus(TripStopStatus.COMPLETED);
-                        if (ts.getActualArrivalTime() == null) {
-                            ts.setActualArrivalTime(LocalDateTime.now());
-                        }
                     } else if ("FAILED".equals(stopStatusAfter) || "PARTIALLY_DELIVERED".equals(stopStatusAfter)) {
                         ts.setStatus(TripStopStatus.EXCEPTION);
                     }
@@ -465,6 +527,11 @@ public class DriverTripServiceImpl implements DriverTripService {
         int completedCount = 0;
         int pendingCount = 0;
 
+        Map<Long, TripStop> tripStopMap = (trip != null)
+                ? tripStopRepo.findByTripTripIdOrderBySequenceOrderAsc(trip.getTripId()).stream()
+                        .collect(Collectors.toMap(ts -> ts.getTripDraftStop().getId(), ts -> ts, (a, b) -> a))
+                : Map.of();
+
         // Build Stop DTOs in forward delivery sequence
         for (TripDraftStop stop : stops) {
             Long storeId = stop.getStore().getId();
@@ -503,6 +570,10 @@ public class DriverTripServiceImpl implements DriverTripService {
             // Aggregate stop status
             String stopStatus = aggregateStopStatus(orderDtos);
 
+            TripStop ts = tripStopMap.get(stop.getId());
+            String arrivalStatus = (ts != null && ts.getStatus() != TripStopStatus.PENDING) ? "ARRIVED" : "PENDING";
+            LocalDateTime actualArrivalTime = ts != null ? ts.getActualArrivalTime() : null;
+
             stopDtos.add(DriverStopDto.builder()
                     .stopId(stop.getId())
                     .sequenceNo(stop.getSequenceNo())
@@ -512,6 +583,8 @@ public class DriverTripServiceImpl implements DriverTripService {
                     .plannedEta(stop.getPlannedEta() != null ? stop.getPlannedEta().toLocalTime() : null)
                     .closingTime(stop.getStore().getTimeWindowEnd())
                     .aggregatedStatus(stopStatus)
+                    .arrivalStatus(arrivalStatus)
+                    .actualArrivalTime(actualArrivalTime)
                     .orders(orderDtos)
                     .build());
         }

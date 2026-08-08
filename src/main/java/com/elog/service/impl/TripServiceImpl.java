@@ -56,6 +56,52 @@ public class TripServiceImpl implements TripService {
                     "Trip Draft must be VALIDATED before assignment.", HttpStatus.BAD_REQUEST);
         }
 
+        return evaluateVehiclesForVolumeAndWeight(td.getTotalVolumeM3(), td.getTotalWeightKg(), td.getStops());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EligibleVehiclesResponse getEligibleVehiclesForStops(Long tripDraftId, List<Long> stopIds) {
+        TripDraft td = findTripDraftOrThrow(tripDraftId);
+        if (!"VALIDATED".equals(td.getStatus())) {
+            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
+                    "Trip Draft must be VALIDATED before assignment.", HttpStatus.BAD_REQUEST);
+        }
+
+        if (stopIds == null || stopIds.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,
+                    "stopIds không được để trống.", HttpStatus.BAD_REQUEST);
+        }
+
+        List<TripDraftStop> selectedStops = td.getStops().stream()
+                .filter(s -> stopIds.contains(s.getId()))
+                .toList();
+
+        if (selectedStops.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,
+                    "stopIds không hợp lệ hoặc không thuộc Trip Draft này.", HttpStatus.BAD_REQUEST);
+        }
+
+        BigDecimal groupVolume = BigDecimal.ZERO;
+        BigDecimal groupWeight = BigDecimal.ZERO;
+        for (TripDraftStop stop : selectedStops) {
+            List<OrderItem> items = orderItemRepository.findByStopForManifest(
+                    stop.getStore().getId(), tripDraftId);
+            BigDecimal stopVolume = items.stream()
+                    .map(OrderItem::getLineVolumeM3)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal stopWeight = items.stream()
+                    .map(OrderItem::getLineWeightKg)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            groupVolume = groupVolume.add(stopVolume);
+            groupWeight = groupWeight.add(stopWeight);
+        }
+
+        return evaluateVehiclesForVolumeAndWeight(groupVolume, groupWeight, selectedStops);
+    }
+
+    private EligibleVehiclesResponse evaluateVehiclesForVolumeAndWeight(
+            BigDecimal totalVolume, BigDecimal totalWeight, List<TripDraftStop> stops) {
         List<Vehicle> activeVehicles = vehicleRepository.findByIsActiveTrue();
         List<EligibleVehicleDto> eligibleVehicles = new ArrayList<>();
         List<IneligibleVehicleDto> ineligibleVehicles = new ArrayList<>();
@@ -65,9 +111,9 @@ public class TripServiceImpl implements TripService {
                 continue;
             }
 
-            boolean volumeOk = v.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) >= 0;
-            boolean weightOk = v.getPayloadKg().compareTo(td.getTotalWeightKg()) >= 0;
-            String storeWeightViolationReason = validateVehicleStoreWeight(v, td.getStops());
+            boolean volumeOk = v.getMaxVolumeM3().compareTo(totalVolume) >= 0;
+            boolean weightOk = v.getPayloadKg().compareTo(totalWeight) >= 0;
+            String storeWeightViolationReason = validateVehicleStoreWeight(v, stops);
             boolean routeWeightOk = (storeWeightViolationReason == null);
 
             if (volumeOk && weightOk && routeWeightOk) {
@@ -77,19 +123,19 @@ public class TripServiceImpl implements TripService {
                         .vehicleType(v.getVehicleType())
                         .maxVolumeM3(v.getMaxVolumeM3())
                         .maxWeightKg(v.getPayloadKg())
-                        .remainingVolumeM3(v.getMaxVolumeM3().subtract(td.getTotalVolumeM3()))
-                        .remainingWeightKg(v.getPayloadKg().subtract(td.getTotalWeightKg()))
+                        .remainingVolumeM3(v.getMaxVolumeM3().subtract(totalVolume))
+                        .remainingWeightKg(v.getPayloadKg().subtract(totalWeight))
                         .build());
             } else {
                 StringBuilder reason = new StringBuilder();
                 if (!volumeOk) {
                     reason.append("Volume exceeds capacity (")
-                          .append(td.getTotalVolumeM3()).append(" m³ > ").append(v.getMaxVolumeM3()).append(" m³)");
+                          .append(totalVolume).append(" m³ > ").append(v.getMaxVolumeM3()).append(" m³)");
                 }
                 if (!weightOk) {
                     if (reason.length() > 0) reason.append(" and ");
                     reason.append("Weight exceeds capacity (")
-                          .append(td.getTotalWeightKg()).append(" kg > ").append(v.getPayloadKg()).append(" kg)");
+                          .append(totalWeight).append(" kg > ").append(v.getPayloadKg()).append(" kg)");
                 }
                 if (!routeWeightOk) {
                     if (reason.length() > 0) reason.append(" and ");

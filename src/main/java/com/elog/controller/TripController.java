@@ -36,6 +36,16 @@ public class TripController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @GetMapping("/api/v1/trip-drafts/{id}/eligible-vehicles-for-stops")
+    @Operation(summary = "Tính xe đủ tải theo 1 nhóm điểm dừng con — dùng khi Dispatcher tự tách chuyến thủ công (BR-07)")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
+    public ResponseEntity<ApiResponse<EligibleVehiclesResponse>> getEligibleVehiclesForStops(
+            @PathVariable Long id,
+            @RequestParam List<Long> stopIds) {
+        EligibleVehiclesResponse response = tripService.getEligibleVehiclesForStops(id, stopIds);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @GetMapping("/api/v1/drivers/available")
     @Operation(summary = "Get available drivers for a date")
     @PreAuthorize("hasAuthority('trip:coordinate')")

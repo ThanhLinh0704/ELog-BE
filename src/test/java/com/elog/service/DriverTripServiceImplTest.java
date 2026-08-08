@@ -231,4 +231,28 @@ class DriverTripServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Không tìm thấy chuyến xe đang phân công");
     }
+
+    @Test
+    @DisplayName("arriveAtStop cập nhật status IN_PROGRESS và actualArrivalTime thành công")
+    void arriveAtStop_success() {
+        execution.setStatus("IN_PROGRESS");
+        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+
+        TripStop stop1 = TripStop.builder()
+                .tripStopId(101L)
+                .trip(trip)
+                .sequenceOrder(1)
+                .status(TripStopStatus.PENDING)
+                .build();
+
+        when(tripStopRepo.findRemainingStopsOrdered(100L)).thenReturn(java.util.List.of(stop1));
+        when(tripStopRepo.findByTripDraftStopId(1L)).thenReturn(Optional.of(stop1));
+
+        DriverTripResponse response = driverTripService.arriveAtStop(50L, 1L, "driver1");
+
+        assertThat(response).isNotNull();
+        assertThat(stop1.getStatus()).isEqualTo(TripStopStatus.IN_PROGRESS);
+        assertThat(stop1.getActualArrivalTime()).isNotNull();
+        verify(tripStopRepo).save(stop1);
+    }
 }

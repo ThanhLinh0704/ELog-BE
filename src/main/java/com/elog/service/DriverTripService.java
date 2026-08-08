@@ -17,6 +17,11 @@ public interface DriverTripService {
     DriverTripResponse startTrip(Long executionId, String driverUsername);
 
     /**
+     * Driver arrives at a delivery stop.
+     */
+    DriverTripResponse arriveAtStop(Long executionId, Long stopId, String driverUsername);
+
+    /**
      * Update order delivery result at a stop (PENDING -> DELIVERED / FAILED / PARTIAL).
      * Enforces mandatory reason for FAILED and PARTIALLY_DELIVERED.
      */
