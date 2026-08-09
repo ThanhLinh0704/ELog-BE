@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,6 +58,8 @@ class TripServiceImplTest {
     private PlanningHistoryService planningHistoryService;
     @Mock
     private TripOutcomeHistoryService tripOutcomeHistoryService;
+    @org.mockito.Spy
+    private ConstraintValidationService constraintValidationService = new com.elog.service.impl.ConstraintValidationServiceImpl();
 
     @InjectMocks
     private TripServiceImpl tripService;
@@ -270,6 +273,54 @@ class TripServiceImplTest {
         assertThat(response.getIneligibleVehicles()).hasSize(1);
         assertThat(response.getIneligibleVehicles().get(0).getFailureReason())
                 .contains("exceeds store ST-007 limit");
+    }
+
+    @Test
+    void getEligibleVehicles_whenVolumeExceedsSafetyBuffer_marksAsIneligible() {
+        testDraft.setTotalVolumeM3(BigDecimal.valueOf(9.5));
+        testDraft.setTotalWeightKg(BigDecimal.valueOf(1000.0));
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepository.findByIsActiveTrue()).thenReturn(List.of(testVehicle));
+
+        var response = tripService.getEligibleVehicles(1L);
+
+        assertThat(response.getEligibleVehicles()).isEmpty();
+        assertThat(response.getIneligibleVehicles()).hasSize(1);
+        assertThat(response.getIneligibleVehicles().get(0).getFailureReason())
+                .contains("Volume exceeds safety limit");
+    }
+
+    @Test
+    void getEligibleVehicles_whenOrderTimeWindowViolated_marksAsIneligible() {
+        Store store = Store.builder().id(1L).code("ST-999").build();
+        TripDraftStop stop = TripDraftStop.builder()
+                .id(10L)
+                .tripDraft(testDraft)
+                .store(store)
+                .plannedEta(LocalDateTime.of(LocalDate.now(), java.time.LocalTime.of(8, 39)))
+                .isActive(true)
+                .build();
+        testDraft.setStops(List.of(stop));
+
+        Order order = Order.builder()
+                .id(100L)
+                .orderRef("DH-20260808-146A")
+                .store(store)
+                .deliveryTimeWindow("13:00 - 17:00")
+                .isDeliveryTimeOverridden(false)
+                .build();
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepository.findByIsActiveTrue()).thenReturn(List.of(testVehicle));
+        when(orderRepository.findByTripDraftId(1L)).thenReturn(List.of(order));
+
+        var response = tripService.getEligibleVehicles(1L);
+
+        assertThat(response.getEligibleVehicles()).isEmpty();
+        assertThat(response.getIneligibleVehicles()).hasSize(1);
+        assertThat(response.getIneligibleVehicles().get(0).getFailureReason())
+                .contains("violates delivery window (13:00 - 17:00) for order DH-20260808-146A");
     }
 
     @Test

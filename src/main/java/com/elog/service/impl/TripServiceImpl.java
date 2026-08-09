@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -30,6 +31,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class TripServiceImpl implements TripService {
+
+    private static final BigDecimal SAFETY_BUFFER = BigDecimal.valueOf(0.90);
 
     private final TripRepository tripRepository;
     private final TripStopRepository tripStopRepository;
@@ -44,6 +47,7 @@ public class TripServiceImpl implements TripService {
     private final TripExecutionRepository tripExecutionRepository;
     private final com.elog.service.PlanningHistoryService planningHistoryService;
     private final com.elog.service.TripOutcomeHistoryService tripOutcomeHistoryService;
+    private final com.elog.service.ConstraintValidationService constraintValidationService;
 
     // ── US-15 TASK-02 ──────────────────────────────────────────────
 
@@ -106,17 +110,41 @@ public class TripServiceImpl implements TripService {
         List<EligibleVehicleDto> eligibleVehicles = new ArrayList<>();
         List<IneligibleVehicleDto> ineligibleVehicles = new ArrayList<>();
 
+        List<Order> draftOrders = Collections.emptyList();
+        if (stops != null && !stops.isEmpty()) {
+            Long draftId = stops.get(0).getTripDraft() != null ? stops.get(0).getTripDraft().getId() : null;
+            if (draftId != null) {
+                draftOrders = orderRepository.findByTripDraftId(draftId);
+            }
+        }
+
         for (Vehicle v : activeVehicles) {
             if (v.getMaxVolumeM3() == null || v.getPayloadKg() == null) {
                 continue;
             }
 
-            boolean volumeOk = v.getMaxVolumeM3().compareTo(totalVolume) >= 0;
-            boolean weightOk = v.getPayloadKg().compareTo(totalWeight) >= 0;
+            BigDecimal effectiveMaxVolume = v.getMaxVolumeM3().multiply(SAFETY_BUFFER);
+            BigDecimal effectiveMaxWeight = v.getPayloadKg().multiply(SAFETY_BUFFER);
+
+            boolean volumeOk = totalVolume.compareTo(effectiveMaxVolume) <= 0;
+            boolean weightOk = totalWeight.compareTo(effectiveMaxWeight) <= 0;
             String storeWeightViolationReason = validateVehicleStoreWeight(v, stops);
             boolean routeWeightOk = (storeWeightViolationReason == null);
 
-            if (volumeOk && weightOk && routeWeightOk) {
+            boolean etaAllowed = true;
+            String etaViolationReason = null;
+            if (stops != null) {
+                for (TripDraftStop stop : stops) {
+                    String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+                    if (violation != null) {
+                        etaAllowed = false;
+                        etaViolationReason = violation;
+                        break;
+                    }
+                }
+            }
+
+            if (volumeOk && weightOk && routeWeightOk && etaAllowed) {
                 eligibleVehicles.add(EligibleVehicleDto.builder()
                         .vehicleId(v.getId())
                         .plateNumber(v.getPlateNumber())
@@ -129,17 +157,23 @@ public class TripServiceImpl implements TripService {
             } else {
                 StringBuilder reason = new StringBuilder();
                 if (!volumeOk) {
-                    reason.append("Volume exceeds capacity (")
-                          .append(totalVolume).append(" m³ > ").append(v.getMaxVolumeM3()).append(" m³)");
+                    reason.append("Volume exceeds safety limit (")
+                          .append(totalVolume).append(" m³ > ")
+                          .append(effectiveMaxVolume.setScale(3, RoundingMode.HALF_UP)).append(" m³)");
                 }
                 if (!weightOk) {
                     if (reason.length() > 0) reason.append(" and ");
-                    reason.append("Weight exceeds capacity (")
-                          .append(totalWeight).append(" kg > ").append(v.getPayloadKg()).append(" kg)");
+                    reason.append("Weight exceeds safety limit (")
+                          .append(totalWeight).append(" kg > ")
+                          .append(effectiveMaxWeight.setScale(2, RoundingMode.HALF_UP)).append(" kg)");
                 }
                 if (!routeWeightOk) {
                     if (reason.length() > 0) reason.append(" and ");
                     reason.append(storeWeightViolationReason);
+                }
+                if (!etaAllowed) {
+                    if (reason.length() > 0) reason.append(" and ");
+                    reason.append(etaViolationReason);
                 }
 
                 ineligibleVehicles.add(IneligibleVehicleDto.builder()
@@ -149,7 +183,7 @@ public class TripServiceImpl implements TripService {
                         .maxVolumeM3(v.getMaxVolumeM3())
                         .maxWeightKg(v.getPayloadKg())
                         .volumeCheckResult(volumeOk ? ConstraintResult.PASS : ConstraintResult.FAIL)
-                        .weightCheckResult((weightOk && routeWeightOk) ? ConstraintResult.PASS : ConstraintResult.FAIL)
+                        .weightCheckResult((weightOk && routeWeightOk && etaAllowed) ? ConstraintResult.PASS : ConstraintResult.FAIL)
                         .failureReason(reason.toString())
                         .build());
             }
