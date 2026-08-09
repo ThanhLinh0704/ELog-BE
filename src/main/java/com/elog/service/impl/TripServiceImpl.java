@@ -502,7 +502,7 @@ public class TripServiceImpl implements TripService {
             planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
                     tripDraftId, trip.getTripId(), com.elog.entity.PlanningEventType.OPTION_SELECTED,
                     com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
-                    td.getStatus(), td.getStatus(), "Phân công 2 xe: Xe " + vehicle.getPlateNumber() + " cho sub-trip " + trip.getTripId(),
+                    td.getStatus(), td.getStatus(), "Phân công " + request.getAssignments().size() + " xe: Xe " + vehicle.getPlateNumber() + " cho sub-trip " + trip.getTripId(),
                     vehicle.getPlateNumber(), null, null, null,
                     td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
 
