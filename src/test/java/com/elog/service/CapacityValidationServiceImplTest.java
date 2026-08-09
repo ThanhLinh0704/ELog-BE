@@ -42,6 +42,9 @@ class CapacityValidationServiceImplTest {
     @Mock
     private RecommendationService recommendationService;
 
+    @org.mockito.Spy
+    private ConstraintValidationService constraintValidationService = new com.elog.service.impl.ConstraintValidationServiceImpl();
+
     @InjectMocks
     private CapacityValidationServiceImpl capacityValidationService;
 

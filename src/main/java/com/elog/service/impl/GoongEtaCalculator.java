@@ -96,33 +96,35 @@ public class GoongEtaCalculator implements EtaCalculationService {
             }
         }
 
-        // 5. Construct origin, destination, and waypoints for Goong Directions API
-        String origin = warehouseLat + "," + warehouseLng;
-        String destination = activeStops.get(activeStops.size() - 1).getStore().getLatitude()
-                + "," + activeStops.get(activeStops.size() - 1).getStore().getLongitude();
-
-        String waypoints = null;
-        if (activeStops.size() > 1) {
-            waypoints = activeStops.subList(0, activeStops.size() - 1).stream()
-                    .map(s -> s.getStore().getLatitude() + "," + s.getStore().getLongitude())
-                    .collect(Collectors.joining("|"));
+        // 5. Construct list of coordinates (warehouse -> stop1 -> stop2 -> ... -> stopN)
+        List<double[]> coords = new ArrayList<>();
+        coords.add(new double[]{warehouseLat, warehouseLng});
+        for (TripDraftStop stop : activeStops) {
+            coords.add(new double[]{stop.getStore().getLatitude(), stop.getStore().getLongitude()});
         }
 
-        // 6. Call Goong Directions API
-        GoongDirectionsResponse directionsResponse = goongMapService.getDirections(origin, destination, waypoints);
+        // 6. Call Goong Directions API sequentially leg-by-leg
+        List<GoongDirectionsResponse.Leg> legs = new ArrayList<>();
+        List<String> legPolylines = new ArrayList<>();
 
-        if (directionsResponse == null || directionsResponse.getRoutes() == null || directionsResponse.getRoutes().isEmpty()) {
-            log.warn("Goong Directions API call failed for tripDraftId={}. Falling back to Haversine.", tripDraftId);
-            return haversineEtaCalculator.calculateAndPersist(tripDraftId, departureTime);
-        }
+        for (int i = 0; i < coords.size() - 1; i++) {
+            String legOrigin = coords.get(i)[0] + "," + coords.get(i)[1];
+            String legDestination = coords.get(i + 1)[0] + "," + coords.get(i + 1)[1];
 
-        GoongDirectionsResponse.Route route = directionsResponse.getRoutes().get(0);
-        List<GoongDirectionsResponse.Leg> legs = route.getLegs();
+            GoongDirectionsResponse legResponse = goongMapService.getDirections(legOrigin, legDestination, null);
+            if (legResponse == null || legResponse.getRoutes() == null || legResponse.getRoutes().isEmpty()
+                    || legResponse.getRoutes().get(0).getLegs() == null || legResponse.getRoutes().get(0).getLegs().isEmpty()) {
+                log.warn("Goong leg call failed ({} -> {}) for tripDraftId={}. Falling back to Haversine.",
+                        legOrigin, legDestination, tripDraftId);
+                return haversineEtaCalculator.calculateAndPersist(tripDraftId, departureTime);
+            }
 
-        if (legs == null || legs.size() != activeStops.size()) {
-            log.warn("Goong returned legs count {} mismatching activeStops count {}. Falling back to Haversine.",
-                    legs != null ? legs.size() : 0, activeStops.size());
-            return haversineEtaCalculator.calculateAndPersist(tripDraftId, departureTime);
+            GoongDirectionsResponse.Route route = legResponse.getRoutes().get(0);
+            legs.add(route.getLegs().get(0));
+
+            if (route.getOverviewPolyline() != null && route.getOverviewPolyline().getPoints() != null) {
+                legPolylines.add(route.getOverviewPolyline().getPoints());
+            }
         }
 
         // 7. Calculate sequential ETA using Goong leg travel durations and distances
@@ -216,8 +218,8 @@ public class GoongEtaCalculator implements EtaCalculationService {
         BigDecimal totalKm = BigDecimal.valueOf(totalDistanceMeters / 1000.0).setScale(2, RoundingMode.HALF_UP);
         draft.setTotalDistanceKm(totalKm);
 
-        if (route.getOverviewPolyline() != null) {
-            draft.setRoutePolyline(route.getOverviewPolyline().getPoints());
+        if (!legPolylines.isEmpty()) {
+            draft.setRoutePolyline(String.join(";", legPolylines));
         }
 
         draft.setPlannedDepartureTime(departureTime);

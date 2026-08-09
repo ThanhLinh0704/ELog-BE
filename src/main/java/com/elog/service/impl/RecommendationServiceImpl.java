@@ -269,6 +269,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         LocalDate deliveryDate = draft.getDeliveryDate();
         List<User> allDrivers = findActiveDrivers();
         List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+        List<Order> draftOrders = orderRepo.findByTripDraftId(draft.getId());
 
         // Normalization params
         double maxCostPerKm = allVehicles.stream()
@@ -301,7 +302,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             // Find vehicles that pass hard constraints for subA
             List<Vehicle> candidatesA = new ArrayList<>();
             for (Vehicle v : allVehicles) {
-                if (passesHardConstraintsForSub(v, subAVolume, subAWeight, stopsA, storesA, deliveryDate, busyStatuses)) {
+                if (passesHardConstraintsForSub(v, subAVolume, subAWeight, stopsA, storesA, draftOrders, deliveryDate, busyStatuses)) {
                     candidatesA.add(v);
                 }
             }
@@ -309,7 +310,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             // Find vehicles that pass hard constraints for subB
             List<Vehicle> candidatesB = new ArrayList<>();
             for (Vehicle v : allVehicles) {
-                if (passesHardConstraintsForSub(v, subBVolume, subBWeight, stopsB, storesB, deliveryDate, busyStatuses)) {
+                if (passesHardConstraintsForSub(v, subBVolume, subBWeight, stopsB, storesB, draftOrders, deliveryDate, busyStatuses)) {
                     candidatesB.add(v);
                 }
             }
@@ -424,15 +425,12 @@ public class RecommendationServiceImpl implements RecommendationService {
             return fails;
         }
 
-        // HC-5: Time window check (ETA_i <= store_i.closingTime)
+        // HC-5: Time window & order delivery time window check
+        List<Order> draftOrders = orderRepo.findByTripDraftId(draft.getId());
         for (TripDraftStop stop : stops) {
-            if (stop.getPlannedEta() != null && stop.getStore().getTimeWindowEnd() != null) {
-                LocalTime eta = stop.getPlannedEta().toLocalTime();
-                LocalTime closing = stop.getStore().getTimeWindowEnd();
-                if (eta.isAfter(closing)) {
-                    fails.add("ETA " + eta + " exceeds closing time " + closing
-                            + " at store " + stop.getStore().getCode());
-                }
+            String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+            if (violation != null) {
+                fails.add(violation);
             }
         }
 
@@ -444,6 +442,7 @@ public class RecommendationServiceImpl implements RecommendationService {
      */
     private boolean passesHardConstraintsForSub(Vehicle v, BigDecimal subVolume, BigDecimal subWeight,
                                                  List<TripDraftStop> subStops, List<Store> subStores,
+                                                 List<Order> draftOrders,
                                                  LocalDate deliveryDate, List<TripStatus> busyStatuses) {
         if (v.getStatus() != VehicleStatus.AVAILABLE) return false;
         if (tripRepo.existsByVehicleIdAndDeliveryDateAndStatusIn(v.getId(), deliveryDate, busyStatuses)) return false;
@@ -458,12 +457,11 @@ public class RecommendationServiceImpl implements RecommendationService {
         List<String> storeViolations = constraintValidationService.validateTripVehicleStops(subStores, v);
         if (!storeViolations.isEmpty()) return false;
 
-        // Time window check for sub-stops
+        // Time window check for sub-stops (store allowed hours, store closing time, and order delivery windows)
         for (TripDraftStop stop : subStops) {
-            if (stop.getPlannedEta() != null && stop.getStore().getTimeWindowEnd() != null) {
-                if (stop.getPlannedEta().toLocalTime().isAfter(stop.getStore().getTimeWindowEnd())) {
-                    return false;
-                }
+            String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+            if (violation != null) {
+                return false;
             }
         }
 
