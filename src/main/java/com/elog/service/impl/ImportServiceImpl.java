@@ -62,9 +62,12 @@ public class ImportServiceImpl implements ImportService {
         List<ImportBatch> existingActiveBatches = batchRepository.findAllActiveByDate(deliveryDate);
         if (!existingActiveBatches.isEmpty()) {
             log.info("Found {} existing active batch(es) for date {}", existingActiveBatches.size(), deliveryDate);
-        }
-
-        if (confirmReplace) {
+            if (!confirmReplace) {
+                throw new BusinessException(
+                        ErrorCode.DUPLICATE_DELIVERY_DATE,
+                        "An active import batch already exists for delivery date " + deliveryDate + ". Confirm to replace it.",
+                        HttpStatus.CONFLICT);
+            }
             for (ImportBatch oldBatch : existingActiveBatches) {
                 oldBatch.setIsActive(false);
                 batchRepository.save(oldBatch);

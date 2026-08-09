@@ -147,24 +147,17 @@ class ImportServiceImplTest {
 
     // ── L1-IBS-02 ──────────────────────────────────────────
     @Test
-    void createBatch_activeBatchExists_confirmReplaceFalse_success() throws IOException {
+    void createBatch_activeBatchExists_confirmReplaceFalse_throwsConflict() throws IOException {
         LocalDate date = LocalDate.now();
         MultipartFile file = createMockExcelFile("import.xlsx", Collections.emptyList());
         ImportBatch existing = ImportBatch.builder().id(8L).deliveryDate(date).isActive(true).build();
 
         when(batchRepository.findAllActiveByDate(date)).thenReturn(List.of(existing));
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(9L);
-            return b;
-        });
 
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getBatchId()).isEqualTo(9L);
-        assertThat(existing.getIsActive()).isTrue(); // verify old remains active
-        verify(batchRepository, times(2)).save(any(ImportBatch.class));
+        assertThatThrownBy(() -> importService.importExcel(file, date, false, 1L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode", "httpStatus")
+                .containsExactly(ErrorCode.DUPLICATE_DELIVERY_DATE, HttpStatus.CONFLICT);
     }
 
     // ── L1-IBS-03 ──────────────────────────────────────────
