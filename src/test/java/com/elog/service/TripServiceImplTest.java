@@ -538,4 +538,79 @@ class TripServiceImplTest {
         assertThat(response).isNotNull();
         assertThat(response.getEligibleVehicles()).hasSize(1);
     }
+
+    @Test
+    void getEligibleVehicles_whenPlannedAndVolumeChecked_success() {
+        testDraft.setStatus("PLANNED");
+        testDraft.setVolumeCheckResult(ConstraintResult.FAIL);
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(vehicleRepository.findByIsActiveTrue()).thenReturn(List.of(testVehicle));
+
+        EligibleVehiclesResponse response = tripService.getEligibleVehicles(1L);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getEligibleVehicles()).hasSize(1);
+    }
+
+    @Test
+    void getEligibleVehicles_whenPlannedAndNotChecked_throwsException() {
+        testDraft.setStatus("PLANNED");
+        testDraft.setVolumeCheckResult(ConstraintResult.NOT_CHECKED);
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+
+        assertThatThrownBy(() -> tripService.getEligibleVehicles(1L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.TRIP_DRAFT_NOT_VALIDATED);
+    }
+
+    @Test
+    void assignVehicleAndDriver_whenPlannedAndVolumeChecked_transitionsToValidatedAndCreatesTrip() {
+        testDraft.setStatus("PLANNED");
+        testDraft.setVolumeCheckResult(ConstraintResult.FAIL);
+
+        TripAssignRequest req = new TripAssignRequest();
+        req.setVehicleId(1L);
+        req.setDriverId(2L);
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(testVehicle));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(testDriver));
+        when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
+        when(tripRepository.save(any(Trip.class))).thenAnswer(i -> {
+            Trip t = i.getArgument(0);
+            t.setTripId(100L);
+            return t;
+        });
+
+        TripResponse response = tripService.assignVehicleAndDriver(1L, req, "dispatcher01");
+
+        assertThat(response).isNotNull();
+        assertThat(testDraft.getStatus()).isEqualTo("VALIDATED");
+        assertThat(testDraft.getValidatedBy()).isEqualTo(testDispatcher);
+        verify(tripDraftRepository).save(testDraft);
+    }
+
+    @Test
+    void assignVehicleAndDriver_whenExceedsSafetyBuffer_throwsVehicleNotEligible() {
+        testDraft.setTotalVolumeM3(BigDecimal.valueOf(9.5)); // Exceeds 90% of maxVolume (10.0 * 0.9 = 9.0)
+
+        TripAssignRequest req = new TripAssignRequest();
+        req.setVehicleId(1L);
+        req.setDriverId(2L);
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(vehicleRepository.findById(1L)).thenReturn(Optional.of(testVehicle));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(testDriver));
+        when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
+
+        assertThatThrownBy(() -> tripService.assignVehicleAndDriver(1L, req, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VEHICLE_NOT_ELIGIBLE)
+                .hasMessageContaining("90% safety buffer");
+    }
 }

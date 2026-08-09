@@ -233,6 +233,38 @@ class DriverTripServiceImplTest {
     }
 
     @Test
+    @DisplayName("getActiveTrip nhận dạng chuyến xe ASSIGNED ở ngày quá khứ (chưa bấm bắt đầu)")
+    void getActiveTrip_assignedPastDate_returnsTrip() {
+        trip.setDeliveryDate(LocalDate.now().minusDays(1));
+        execution.setStatus("ASSIGNED");
+        when(tripExecutionRepo.findByDriverUsernameAndStatusIn("driver1", java.util.List.of("IN_PROGRESS", "ASSIGNED")))
+                .thenReturn(java.util.List.of(execution));
+
+        DriverTripResponse response = driverTripService.getActiveTrip("driver1");
+
+        assertThat(response).isNotNull();
+        assertThat(response.getExecutionId()).isEqualTo(50L);
+    }
+
+    @Test
+    @DisplayName("getActiveTrip ưu tiên chuyến xe ASSIGNED có deliveryDate cũ nhất")
+    void getActiveTrip_multipleAssignedTrips_returnsOldestFirst() {
+        Trip tripYesterday = Trip.builder().tripId(101L).deliveryDate(LocalDate.now().minusDays(1)).build();
+        TripExecution execYesterday = TripExecution.builder().id(51L).trip(tripYesterday).status("ASSIGNED").driver(driver).build();
+
+        Trip tripTwoDaysAgo = Trip.builder().tripId(102L).deliveryDate(LocalDate.now().minusDays(2)).build();
+        TripExecution execTwoDaysAgo = TripExecution.builder().id(52L).trip(tripTwoDaysAgo).status("ASSIGNED").driver(driver).build();
+
+        when(tripExecutionRepo.findByDriverUsernameAndStatusIn("driver1", java.util.List.of("IN_PROGRESS", "ASSIGNED")))
+                .thenReturn(java.util.List.of(execYesterday, execTwoDaysAgo));
+
+        DriverTripResponse response = driverTripService.getActiveTrip("driver1");
+
+        assertThat(response).isNotNull();
+        assertThat(response.getExecutionId()).isEqualTo(52L);
+    }
+
+    @Test
     @DisplayName("arriveAtStop cập nhật status IN_PROGRESS và actualArrivalTime thành công")
     void arriveAtStop_success() {
         execution.setStatus("IN_PROGRESS");

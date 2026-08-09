@@ -58,22 +58,6 @@ public class ImportServiceImpl implements ImportService {
         // Step 2: Parse Excel rows (so size check throws BEFORE creating db batch)
         List<RowData> rows = parseExcelFile(file);
 
-        // Step 3: Handle existing active batches for this delivery date if replacing
-        List<ImportBatch> existingActiveBatches = batchRepository.findAllActiveByDate(deliveryDate);
-        if (!existingActiveBatches.isEmpty()) {
-            log.info("Found {} existing active batch(es) for date {}", existingActiveBatches.size(), deliveryDate);
-            if (!confirmReplace) {
-                throw new BusinessException(
-                        ErrorCode.DUPLICATE_DELIVERY_DATE,
-                        "An active import batch already exists for delivery date " + deliveryDate + ". Confirm to replace it.",
-                        HttpStatus.CONFLICT);
-            }
-            for (ImportBatch oldBatch : existingActiveBatches) {
-                oldBatch.setIsActive(false);
-                batchRepository.save(oldBatch);
-            }
-            batchRepository.flush(); // Force update to DB before inserting new active batch to prevent UNIQUE constraint violation
-        }
 
         // Step 4: Create new batch
         ImportBatch batch = ImportBatch.builder()

@@ -51,14 +51,23 @@ public class TripServiceImpl implements TripService {
 
     // ── US-15 TASK-02 ──────────────────────────────────────────────
 
+    private void validateAssignmentEligibility(TripDraft td) {
+        boolean isValidated = "VALIDATED".equals(td.getStatus());
+        boolean isPlannedAndChecked = "PLANNED".equals(td.getStatus())
+                && td.getVolumeCheckResult() != ConstraintResult.NOT_CHECKED
+                && !tripRepository.existsByTripDraftId(td.getId());
+
+        if (!isValidated && !isPlannedAndChecked) {
+            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
+                    "Trip Draft must be VALIDATED or PLANNED (with volume check completed) before assignment.", HttpStatus.BAD_REQUEST);
+        }
+    }
+
     @Override
     @Transactional(readOnly = true)
     public EligibleVehiclesResponse getEligibleVehicles(Long tripDraftId) {
         TripDraft td = findTripDraftOrThrow(tripDraftId);
-        if (!"VALIDATED".equals(td.getStatus())) {
-            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
-                    "Trip Draft must be VALIDATED before assignment.", HttpStatus.BAD_REQUEST);
-        }
+        validateAssignmentEligibility(td);
 
         return evaluateVehiclesForVolumeAndWeight(td.getTotalVolumeM3(), td.getTotalWeightKg(), td.getStops());
     }
@@ -67,10 +76,7 @@ public class TripServiceImpl implements TripService {
     @Transactional(readOnly = true)
     public EligibleVehiclesResponse getEligibleVehiclesForStops(Long tripDraftId, List<Long> stopIds) {
         TripDraft td = findTripDraftOrThrow(tripDraftId);
-        if (!"VALIDATED".equals(td.getStatus())) {
-            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
-                    "Trip Draft must be VALIDATED before assignment.", HttpStatus.BAD_REQUEST);
-        }
+        validateAssignmentEligibility(td);
 
         if (stopIds == null || stopIds.isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED,
@@ -251,11 +257,8 @@ public class TripServiceImpl implements TripService {
                     "Trip Draft has already been assigned.", HttpStatus.CONFLICT);
         }
 
-        // Guard 1: TripDraft must be VALIDATED
-        if (!"VALIDATED".equals(td.getStatus())) {
-            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
-                    "Trip Draft must be VALIDATED before assignment.", HttpStatus.BAD_REQUEST);
-        }
+        // Guard 1: TripDraft must be VALIDATED or PLANNED (with volume check completed)
+        validateAssignmentEligibility(td);
 
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.VEHICLE_NOT_FOUND,
@@ -274,12 +277,28 @@ public class TripServiceImpl implements TripService {
         User driver = findDriverOrThrow(driverId);
         User dispatcher = findUserByUsernameOrThrow(currentUsername);
 
-        // Guard 2: Vehicle must be eligible (dual-constraint & route weight limit)
-        if (vehicle.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) < 0
-                || vehicle.getPayloadKg().compareTo(td.getTotalWeightKg()) < 0) {
+        if ("PLANNED".equals(td.getStatus())) {
+            td.setStatus("VALIDATED");
+            td.setValidatedAt(LocalDateTime.now());
+            td.setValidatedBy(dispatcher);
+            tripDraftRepository.save(td);
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, null, com.elog.entity.PlanningEventType.OPTION_SELECTED,
+                    com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                    "PLANNED", "VALIDATED", "Dispatcher xác nhận tải trọng thủ công (auto 1-xe/2-xe không khả thi) và phân xe cho tuyến",
+                    null, null, null, null,
+                    td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
+        }
+
+        // Guard 2: Vehicle must be eligible (dual-constraint with 90% safety buffer, route weight limit, & stop ETA)
+        BigDecimal effectiveMaxVolume = vehicle.getMaxVolumeM3().multiply(SAFETY_BUFFER);
+        BigDecimal effectiveMaxWeight = vehicle.getPayloadKg().multiply(SAFETY_BUFFER);
+        if (effectiveMaxVolume.compareTo(td.getTotalVolumeM3()) < 0
+                || effectiveMaxWeight.compareTo(td.getTotalWeightKg()) < 0) {
             throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
                     "Vehicle " + vehicle.getPlateNumber()
-                            + " does not meet dual-constraint requirements for this trip.",
+                            + " does not meet dual-constraint requirements (90% safety buffer) for this trip.",
                     HttpStatus.BAD_REQUEST);
         }
         String storeWeightViolation = validateVehicleStoreWeight(vehicle, td.getStops());
@@ -287,6 +306,17 @@ public class TripServiceImpl implements TripService {
             throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
                     "Vehicle " + vehicle.getPlateNumber() + " violates route constraints: " + storeWeightViolation,
                     HttpStatus.BAD_REQUEST);
+        }
+        List<Order> draftOrders = orderRepository.findByTripDraftId(tripDraftId);
+        if (td.getStops() != null) {
+            for (TripDraftStop stop : td.getStops()) {
+                String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+                if (violation != null) {
+                    throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
+                            "Vehicle " + vehicle.getPlateNumber() + " violates time window constraint: " + violation,
+                            HttpStatus.BAD_REQUEST);
+                }
+            }
         }
 
         // Guard 2.5: Driver license class must be compatible with vehicle's required license
@@ -357,12 +387,24 @@ public class TripServiceImpl implements TripService {
                     "Trip Draft has already been assigned.", HttpStatus.CONFLICT);
         }
 
-        if (!"VALIDATED".equals(td.getStatus())) {
-            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
-                    "Trip Draft must be VALIDATED before assignment.", HttpStatus.BAD_REQUEST);
-        }
+        validateAssignmentEligibility(td);
 
         User dispatcher = findUserByUsernameOrThrow(currentUsername);
+
+        if ("PLANNED".equals(td.getStatus())) {
+            td.setStatus("VALIDATED");
+            td.setValidatedAt(LocalDateTime.now());
+            td.setValidatedBy(dispatcher);
+            tripDraftRepository.save(td);
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, null, com.elog.entity.PlanningEventType.OPTION_SELECTED,
+                    com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                    "PLANNED", "VALIDATED", "Dispatcher xác nhận tải trọng thủ công (auto 1-xe/2-xe không khả thi) và phân N xe cho tuyến",
+                    null, null, null, null,
+                    td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
+        }
+
         List<TripSplitResponse.TripSummary> summaries = new ArrayList<>();
         List<TripStatus> busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
 
@@ -414,14 +456,33 @@ public class TripServiceImpl implements TripService {
                 }
             }
 
-            // Validate vehicle capacity for this group
-            if (vehicle.getMaxVolumeM3().compareTo(groupVolume) < 0
-                    || vehicle.getPayloadKg().compareTo(groupWeight) < 0) {
+            // Validate vehicle capacity for this group (dual-constraint with 90% safety buffer, store weight limit & stop ETA)
+            BigDecimal effectiveMaxVolume = vehicle.getMaxVolumeM3().multiply(SAFETY_BUFFER);
+            BigDecimal effectiveMaxWeight = vehicle.getPayloadKg().multiply(SAFETY_BUFFER);
+            if (effectiveMaxVolume.compareTo(groupVolume) < 0
+                    || effectiveMaxWeight.compareTo(groupWeight) < 0) {
                 throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
                         "Vehicle " + vehicle.getPlateNumber()
-                                + " cannot carry the assigned stops (volume: " + groupVolume
+                                + " cannot carry the assigned stops under 90% safety buffer (volume: " + groupVolume
                                 + " m³, weight: " + groupWeight + " kg).",
                         HttpStatus.BAD_REQUEST);
+            }
+
+            String storeWeightViolation = validateVehicleStoreWeight(vehicle, groupStops);
+            if (storeWeightViolation != null) {
+                throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
+                        "Vehicle " + vehicle.getPlateNumber() + " violates route constraints for group stops: " + storeWeightViolation,
+                        HttpStatus.BAD_REQUEST);
+            }
+
+            List<Order> draftOrders = orderRepository.findByTripDraftId(tripDraftId);
+            for (TripDraftStop stop : groupStops) {
+                String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+                if (violation != null) {
+                    throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
+                            "Vehicle " + vehicle.getPlateNumber() + " violates time window constraint: " + violation,
+                            HttpStatus.BAD_REQUEST);
+                }
             }
 
             // Driver license class compatibility check

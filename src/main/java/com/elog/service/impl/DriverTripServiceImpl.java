@@ -46,7 +46,12 @@ public class DriverTripServiceImpl implements DriverTripService {
                 .findByDriverUsernameAndStatusIn(driverUsername, List.of("IN_PROGRESS", "ASSIGNED"))
                 .stream()
                 .filter(te -> "IN_PROGRESS".equals(te.getStatus())
-                        || (te.getTrip() != null && today.equals(te.getTrip().getDeliveryDate())))
+                        || (te.getTrip() != null && te.getTrip().getDeliveryDate() != null
+                            && !te.getTrip().getDeliveryDate().isAfter(today)))
+                .sorted(Comparator.comparing(te ->
+                        te.getTrip() != null && te.getTrip().getDeliveryDate() != null
+                                ? te.getTrip().getDeliveryDate()
+                                : LocalDate.MAX))
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.RESOURCE_NOT_FOUND,
