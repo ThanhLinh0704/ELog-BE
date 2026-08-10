@@ -33,7 +33,6 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
 
     private final TripRepository tripRepo;
     private final TripStopRepository tripStopRepo;
-    private final UserRepository userRepo;
     private final SystemConfigRepository systemConfigRepo;
     private final DeliveryExceptionRepository deliveryExceptionRepo;
     private final com.elog.service.GoongMapService goongMapService;
