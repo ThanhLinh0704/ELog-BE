@@ -42,4 +42,9 @@ public interface DriverTripService {
      * Get completed trips for driver that are waiting for return to warehouse confirmation.
      */
     java.util.List<DriverTripResponse> getPendingReturnTrips(String driverUsername);
+
+    /**
+     * Admin / Dispatcher override for a trip execution (FORCE_RETURN or FORCE_COMPLETE_AND_RETURN).
+     */
+    DriverTripResponse adminOverrideTripExecution(Long executionId, com.elog.dto.request.AdminTripOverrideRequest request, String adminUsername);
 }

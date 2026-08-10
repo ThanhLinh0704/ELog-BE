@@ -43,6 +43,8 @@ class DriverTripServiceImplTest {
     @Mock
     private DeliveryExceptionRepository deliveryExceptionRepo;
     @Mock
+    private VehicleRepository vehicleRepo;
+    @Mock
     private TripOutcomeHistoryService tripOutcomeHistoryService;
 
     @InjectMocks
@@ -286,5 +288,51 @@ class DriverTripServiceImplTest {
         assertThat(stop1.getStatus()).isEqualTo(TripStopStatus.IN_PROGRESS);
         assertThat(stop1.getActualArrivalTime()).isNotNull();
         verify(tripStopRepo).save(stop1);
+    }
+
+    @Test
+    @DisplayName("adminOverrideTripExecution FORCE_RETURN giải phóng xe về AVAILABLE thành công")
+    void adminOverride_forceReturn_success() {
+        execution.setStatus("COMPLETED");
+        trip.setVehicle(vehicle);
+        vehicle.setStatus(VehicleStatus.IN_USE);
+
+        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+
+        com.elog.dto.request.AdminTripOverrideRequest request = com.elog.dto.request.AdminTripOverrideRequest.builder()
+                .action("FORCE_RETURN")
+                .reason("Driver lost phone, confirmed vehicle returned")
+                .build();
+
+        DriverTripResponse response = driverTripService.adminOverrideTripExecution(50L, request, "dispatcher01");
+
+        assertThat(response).isNotNull();
+        assertThat(execution.getReturnedToWarehouseAt()).isNotNull();
+        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
+        verify(vehicleRepo).save(vehicle);
+    }
+
+    @Test
+    @DisplayName("adminOverrideTripExecution FORCE_COMPLETE_AND_RETURN hoàn tất chuyến và giải phóng xe")
+    void adminOverride_forceCompleteAndReturn_success() {
+        execution.setStatus("IN_PROGRESS");
+        trip.setVehicle(vehicle);
+        vehicle.setStatus(VehicleStatus.IN_USE);
+
+        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+
+        com.elog.dto.request.AdminTripOverrideRequest request = com.elog.dto.request.AdminTripOverrideRequest.builder()
+                .action("FORCE_COMPLETE_AND_RETURN")
+                .reason("Driver sick, admin force complete")
+                .defaultPendingOrderStatus("DELIVERED")
+                .build();
+
+        DriverTripResponse response = driverTripService.adminOverrideTripExecution(50L, request, "dispatcher01");
+
+        assertThat(response).isNotNull();
+        assertThat(execution.getStatus()).isEqualTo("COMPLETED");
+        assertThat(execution.getReturnedToWarehouseAt()).isNotNull();
+        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
+        verify(vehicleRepo).save(vehicle);
     }
 }

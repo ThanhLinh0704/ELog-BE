@@ -35,6 +35,7 @@ public class DriverTripServiceImpl implements DriverTripService {
     private final UserRepository userRepo;
     private final TripStopRepository tripStopRepo;
     private final DeliveryExceptionRepository deliveryExceptionRepo;
+    private final VehicleRepository vehicleRepo;
     private final com.elog.service.TripOutcomeHistoryService tripOutcomeHistoryService;
 
     @Override
@@ -663,5 +664,154 @@ public class DriverTripServiceImpl implements DriverTripService {
         boolean anyFailed = results.stream().anyMatch(o -> "FAILED".equals(o.getStatus()));
         if (anyFailed) return "FAILED";
         return "PARTIALLY_DELIVERED";
+    }
+
+    @Override
+    @Transactional
+    public DriverTripResponse adminOverrideTripExecution(Long executionId, com.elog.dto.request.AdminTripOverrideRequest request, String adminUsername) {
+        TripExecution execution = tripExecutionRepo.findById(executionId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        "Không tìm thấy chuyến xe với ID: " + executionId,
+                        HttpStatus.NOT_FOUND));
+
+        String action = request.getAction().toUpperCase();
+        String reason = request.getReason().trim();
+
+        if ("FORCE_RETURN".equals(action)) {
+            if (!List.of("COMPLETED", "COMPLETED_WITH_EXCEPTIONS").contains(execution.getStatus())) {
+                throw new BusinessException(
+                        ErrorCode.VALIDATION_FAILED,
+                        "Chỉ có thể Force Return khi chuyến xe đã ở trạng thái hoàn thành (COMPLETED hoặc COMPLETED_WITH_EXCEPTIONS). Trạng thái hiện tại: " + execution.getStatus(),
+                        HttpStatus.BAD_REQUEST);
+            }
+            if (execution.getReturnedToWarehouseAt() != null) {
+                throw new BusinessException(
+                        ErrorCode.VALIDATION_FAILED,
+                        "Chuyến xe đã được xác nhận về kho trước đó lúc: " + execution.getReturnedToWarehouseAt(),
+                        HttpStatus.BAD_REQUEST);
+            }
+
+            execution.setReturnedToWarehouseAt(LocalDateTime.now());
+            tripExecutionRepo.save(execution);
+
+            Trip trip = execution.getTrip();
+            if (trip != null && trip.getVehicle() != null) {
+                trip.getVehicle().setStatus(VehicleStatus.AVAILABLE);
+                vehicleRepo.save(trip.getVehicle());
+            }
+
+            tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                    executionId, trip != null ? trip.getTripId() : null,
+                    TripOutcomeEventType.ADMIN_OVERRIDE_FORCE_RETURN,
+                    com.elog.entity.PlanningActorType.USER, adminUsername,
+                    execution.getStatus(), execution.getStatus(),
+                    null, null, null, null, null, reason, null, null,
+                    trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                    trip != null ? trip.getDeliveryDate() : null,
+                    execution.getDriver() != null ? execution.getDriver().getUsername() : null
+            ));
+
+            log.info("Admin {} performed FORCE_RETURN on trip execution ID {}. Reason: {}", adminUsername, executionId, reason);
+            return buildDriverTripResponse(execution);
+
+        } else if ("FORCE_COMPLETE_AND_RETURN".equals(action)) {
+            if (List.of("COMPLETED", "COMPLETED_WITH_EXCEPTIONS").contains(execution.getStatus()) && execution.getReturnedToWarehouseAt() != null) {
+                throw new BusinessException(
+                        ErrorCode.VALIDATION_FAILED,
+                        "Chuyến xe đã hoàn tất và đã về kho từ trước.",
+                        HttpStatus.BAD_REQUEST);
+            }
+
+            // Update remaining PENDING orders
+            String defaultOrderStatus = (request.getDefaultPendingOrderStatus() != null && !request.getDefaultPendingOrderStatus().isBlank())
+                    ? request.getDefaultPendingOrderStatus().toUpperCase()
+                    : "DELIVERED";
+
+            List<DeliveryOrderResult> pendingResults = deliveryOrderResultRepo.findByTripExecutionId(executionId).stream()
+                    .filter(r -> "PENDING".equals(r.getStatus()))
+                    .toList();
+
+            for (DeliveryOrderResult r : pendingResults) {
+                r.setStatus(defaultOrderStatus);
+                r.setReasonCode(reason);
+                r.setExceptionText("[ADMIN_OVERRIDE] " + reason);
+                r.setUpdatedAt(LocalDateTime.now());
+                deliveryOrderResultRepo.save(r);
+            }
+
+            long totalCount = deliveryOrderResultRepo.countByTripExecutionId(executionId);
+            long deliveredCount = deliveryOrderResultRepo.countByTripExecutionIdAndStatus(executionId, "DELIVERED");
+            long failedCount = deliveryOrderResultRepo.countByTripExecutionIdAndStatus(executionId, "FAILED");
+            long partialCount = deliveryOrderResultRepo.countByTripExecutionIdAndStatus(executionId, "PARTIALLY_DELIVERED");
+
+            boolean hasExceptions = (failedCount > 0 || partialCount > 0);
+            String finalExecutionStatus = hasExceptions ? "COMPLETED_WITH_EXCEPTIONS" : "COMPLETED";
+
+            String statusBefore = execution.getStatus();
+            execution.setStatus(finalExecutionStatus);
+            if (execution.getStartedAt() == null) {
+                execution.setStartedAt(LocalDateTime.now());
+            }
+            if (execution.getCompletedAt() == null) {
+                execution.setCompletedAt(LocalDateTime.now());
+            }
+            execution.setReturnedToWarehouseAt(LocalDateTime.now());
+            tripExecutionRepo.save(execution);
+
+            Trip trip = execution.getTrip();
+            if (trip != null) {
+                trip.setStatus(TripStatus.COMPLETED);
+                if (trip.getCompletedAt() == null) {
+                    trip.setCompletedAt(execution.getCompletedAt());
+                }
+                if (trip.getVehicle() != null) {
+                    trip.getVehicle().setStatus(VehicleStatus.AVAILABLE);
+                    vehicleRepo.save(trip.getVehicle());
+                }
+                tripRepo.save(trip);
+            }
+
+            // Update or create TripOutcome
+            TripOutcome outcome = tripOutcomeRepo.findByTripExecutionId(executionId).orElse(null);
+            if (outcome == null) {
+                outcome = TripOutcome.builder()
+                        .tripExecution(execution)
+                        .status("SUBMITTED")
+                        .totalOrders((int) totalCount)
+                        .deliveredCount((int) deliveredCount)
+                        .failedCount((int) failedCount)
+                        .partialCount((int) partialCount)
+                        .submittedAt(LocalDateTime.now())
+                        .version(1)
+                        .build();
+            } else {
+                outcome.setTotalOrders((int) totalCount);
+                outcome.setDeliveredCount((int) deliveredCount);
+                outcome.setFailedCount((int) failedCount);
+                outcome.setPartialCount((int) partialCount);
+            }
+            tripOutcomeRepo.save(outcome);
+
+            tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                    executionId, trip != null ? trip.getTripId() : null,
+                    TripOutcomeEventType.ADMIN_OVERRIDE_FORCE_COMPLETE,
+                    com.elog.entity.PlanningActorType.USER, adminUsername,
+                    statusBefore, finalExecutionStatus,
+                    null, null, null, null, null, reason, null, null,
+                    trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                    trip != null ? trip.getDeliveryDate() : null,
+                    execution.getDriver() != null ? execution.getDriver().getUsername() : null
+            ));
+
+            log.info("Admin {} performed FORCE_COMPLETE_AND_RETURN on trip execution ID {}. Reason: {}", adminUsername, executionId, reason);
+            return buildDriverTripResponse(execution);
+
+        } else {
+            throw new BusinessException(
+                    ErrorCode.VALIDATION_FAILED,
+                    "Action không hợp lệ: " + request.getAction() + ". Chỉ chấp nhận FORCE_RETURN hoặc FORCE_COMPLETE_AND_RETURN.",
+                    HttpStatus.BAD_REQUEST);
+        }
     }
 }

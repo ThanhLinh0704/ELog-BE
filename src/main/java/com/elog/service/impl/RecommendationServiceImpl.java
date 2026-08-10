@@ -360,15 +360,27 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         if (allPairs.isEmpty()) {
+            long etaViolations = stops.stream()
+                    .filter(s -> constraintValidationService.validateStopEta(s, draftOrders) != null)
+                    .count();
+
             if (everyPointLacksVehicleForA || everyPointLacksVehicleForB) {
-                outReasons.add("Không có xe nào đủ tải trọng/thể tích cho ít nhất 1 trong 2 nửa tuyến, ở cả "
-                        + validSplitPoints.size() + " điểm chia thử được — cần xe lớn hơn hoặc tách bớt đơn sang đợt khác.");
+                if (etaViolations > 0) {
+                    outReasons.add(etaViolations + " điểm dừng vi phạm khung giờ giao hàng của đơn hàng (TIME_WINDOW) — cần điều chỉnh giờ xuất phát hoặc thứ tự điểm dừng, không phải đổi/thêm xe.");
+                } else {
+                    outReasons.add("Không có xe nào đủ tải trọng/thể tích cho ít nhất 1 trong 2 nửa tuyến, ở cả "
+                            + validSplitPoints.size() + " điểm chia thử được — cần xe lớn hơn hoặc tách bớt đơn sang đợt khác.");
+                }
             } else if (foundVehiclePairButSameDriverOnly && !foundVehiclePairButNoDriver) {
                 outReasons.add("Có xe phù hợp cho cả 2 nửa tuyến, nhưng chỉ có 1 tài xế đang rảnh đáp ứng được cả 2 xe — cần thêm ít nhất 1 tài xế khả dụng nữa.");
             } else if (foundVehiclePairButNoDriver) {
                 outReasons.add("Có cặp xe phù hợp cho cả 2 nửa tuyến nhưng không tìm được tài xế khả dụng tương ứng — kiểm tra lại danh sách tài xế đang rảnh (Active, không bận, đã xác nhận về kho).");
             } else {
-                outReasons.add("Có " + validSplitPoints.size() + " cách chia hợp lệ nhưng không tổ hợp 2 xe nào đáp ứng đồng thời tất cả ràng buộc.");
+                if (etaViolations > 0) {
+                    outReasons.add(etaViolations + " điểm dừng vi phạm khung giờ giao hàng của đơn hàng (TIME_WINDOW) — cần điều chỉnh giờ xuất phát hoặc thứ tự điểm dừng.");
+                } else {
+                    outReasons.add("Có " + validSplitPoints.size() + " cách chia hợp lệ nhưng không tổ hợp 2 xe nào đáp ứng đồng thời tất cả ràng buộc.");
+                }
             }
         }
 
@@ -660,12 +672,13 @@ public class RecommendationServiceImpl implements RecommendationService {
                     + maxFleetWeight + " kg @ 90% buffer).");
         }
 
-        // Check time window violations
-        long lateStops = stops.stream()
-                .filter(s -> "TIME_WINDOW_LATE".equals(s.getViolationCode()))
+        // Check time window violations (both store operating hours & order delivery time window)
+        List<Order> draftOrders = orderRepo.findByTripDraftId(draft.getId());
+        long etaViolations = stops.stream()
+                .filter(s -> constraintValidationService.validateStopEta(s, draftOrders) != null)
                 .count();
-        if (lateStops > 0) {
-            reasons.add(lateStops + " điểm dừng có ETA vượt quá giờ đóng cửa (TIME_WINDOW_LATE).");
+        if (etaViolations > 0) {
+            reasons.add(etaViolations + " điểm dừng vi phạm khung giờ giao hàng (TIME_WINDOW) — cần điều chỉnh giờ xuất phát hoặc thứ tự điểm dừng, không phải đổi/thêm xe.");
         }
 
         // Check driver availability
