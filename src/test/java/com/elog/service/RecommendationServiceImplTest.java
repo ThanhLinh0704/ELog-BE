@@ -126,5 +126,11 @@ class RecommendationServiceImplTest {
         assertThat(response.getViolatedConstraints()).isNotEmpty();
         assertThat(response.getViolatedConstraints().get(0))
                 .contains("vi phạm khung giờ giao hàng (TIME_WINDOW)");
+
+        // Assert no duplicate TIME_WINDOW reasons exist
+        long timeWindowReasonCount = response.getViolatedConstraints().stream()
+                .filter(r -> r != null && r.contains("TIME_WINDOW"))
+                .count();
+        assertThat(timeWindowReasonCount).isEqualTo(1);
     }
 }

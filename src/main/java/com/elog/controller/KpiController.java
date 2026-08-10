@@ -79,6 +79,42 @@ public class KpiController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @GetMapping("/by-vehicle")
+    @Operation(summary = "Get KPI breakdown by vehicle")
+    @PreAuthorize("hasAuthority('kpi:read')")
+    public ResponseEntity<ApiResponse<KpiByVehicleResponse>> getByVehicle(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String preset) {
+
+        LocalDate[] resolved = resolveDates(startDate, endDate, preset);
+        validateDateRange(resolved[0], resolved[1]);
+
+        KpiByVehicleResponse response = kpiService.getByVehicle(resolved[0], resolved[1]);
+        if (preset != null) {
+            response.getPeriod().setPreset(preset.toUpperCase());
+        }
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/by-driver")
+    @Operation(summary = "Get KPI breakdown by driver")
+    @PreAuthorize("hasAuthority('kpi:read')")
+    public ResponseEntity<ApiResponse<KpiByDriverResponse>> getByDriver(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) String preset) {
+
+        LocalDate[] resolved = resolveDates(startDate, endDate, preset);
+        validateDateRange(resolved[0], resolved[1]);
+
+        KpiByDriverResponse response = kpiService.getByDriver(resolved[0], resolved[1]);
+        if (preset != null) {
+            response.getPeriod().setPreset(preset.toUpperCase());
+        }
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     // ── Private helpers ──────────────────────────────────────────────
 
     private LocalDate[] resolveDates(LocalDate start, LocalDate end, String preset) {

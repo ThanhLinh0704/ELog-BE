@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Haversine-based ETA calculator.
@@ -169,10 +170,22 @@ public class HaversineEtaCalculator implements EtaCalculationService {
             prevLng = stopLng;
         }
 
-        // 5. Persist all at once
+        // 5. Calculate return leg distance (last stop to warehouse) and update totalDistanceKm
+        double returnDistKm = haversine(prevLat, prevLng, warehouseLat, warehouseLng);
+        java.math.BigDecimal returnKmBd = java.math.BigDecimal.valueOf(returnDistKm).setScale(2, java.math.RoundingMode.HALF_UP);
+        draft.setReturnDistanceKm(returnKmBd);
+
+        java.math.BigDecimal totalKm = activeStops.stream()
+                .map(TripDraftStop::getDistanceFromPrevKm)
+                .filter(Objects::nonNull)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                .add(returnKmBd);
+        draft.setTotalDistanceKm(totalKm);
+
+        // 6. Persist all at once
         stopRepo.saveAll(activeStops);
 
-        // 6. Update departure time on TripDraft
+        // 7. Update departure time on TripDraft
         draft.setPlannedDepartureTime(departureTime);
         tripDraftRepo.save(draft);
 

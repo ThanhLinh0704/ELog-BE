@@ -165,7 +165,13 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         // ── Step 3: No feasible plan ──────────────────────────────────────
         List<String> reasons = collectInfeasibilityReasons(draft, activeStops);
-        reasons.addAll(twoVehicleReasons);
+        boolean alreadyHasTimeWindowReason = reasons.stream().anyMatch(r -> r != null && r.contains("TIME_WINDOW"));
+        for (String r : twoVehicleReasons) {
+            if (alreadyHasTimeWindowReason && r != null && r.contains("TIME_WINDOW")) {
+                continue;
+            }
+            reasons.add(r);
+        }
         return RecommendationResultResponse.builder()
                 .tripDraftId(tripDraftId)
                 .planType("NO_PLAN")
