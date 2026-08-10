@@ -195,6 +195,16 @@ public class TripDraftServiceImpl implements TripDraftService {
             List<Long> orderIds = routeOrders.stream().map(Order::getId).toList();
             orderRepository.updateTripDraftId(orderIds, draft.getId());
 
+            // 5h. Automatically calculate ETA and total distance for draft
+            if (draft.getActiveStopCount() != null && draft.getActiveStopCount() > 0) {
+                try {
+                    etaCalculationService.calculateAndPersist(draft.getId(), java.time.LocalTime.of(7, 0));
+                    draft = tripDraftRepository.findById(draft.getId()).orElse(draft);
+                } catch (Exception e) {
+                    log.warn("Failed to calculate ETA for consolidated draft {}: {}", draft.getId(), e.getMessage());
+                }
+            }
+
             planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
                     draft.getId(), null, com.elog.entity.PlanningEventType.TRIP_DRAFT_CREATED,
                     com.elog.entity.PlanningActorType.SYSTEM, "System",

@@ -282,7 +282,7 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
         String routePolyline = trip.getRoutePolyline();
         java.math.BigDecimal totalDistanceKm = trip.getTotalDistanceKm();
 
-        if (!stopProgresses.isEmpty() && goongMapService != null) {
+        if (routePolyline == null && !stopProgresses.isEmpty() && goongMapService != null) {
             try {
                 double whLat = systemConfigRepo.findByConfigKey("WAREHOUSE_LAT")
                         .map(c -> Double.parseDouble(c.getConfigValue())).orElse(21.028512);
@@ -321,6 +321,8 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                                     }
                                 }
                             }
+                        } else {
+                            log.warn("Goong directions API returned no routes or rate-limited for leg {}->{} on tripId={}", p1, p2, tripId);
                         }
                     }
 

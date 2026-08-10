@@ -127,6 +127,16 @@ public class TripServiceImpl implements TripService {
             }
         }
 
+        List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+        java.util.Set<Long> busyDriverIdsOnDate = (deliveryDate != null)
+                ? new java.util.HashSet<>(tripRepository.findBusyDriverIdsOnDate(deliveryDate, busyStatuses))
+                : java.util.Collections.emptySet();
+
+        List<TripExecution> allUnreturned = tripExecutionRepository.findAllUnreturnedExecutions();
+        java.util.Map<Long, List<TripExecution>> unreturnedByDriverId = allUnreturned.stream()
+                .filter(te -> te.getDriver() != null && (te.getTrip() == null || te.getTrip().getDeliveryDate() == null || deliveryDate == null || !te.getTrip().getDeliveryDate().isAfter(deliveryDate)))
+                .collect(java.util.stream.Collectors.groupingBy(te -> te.getDriver().getId()));
+
         for (Vehicle v : activeVehicles) {
             if (v.getMaxVolumeM3() == null || v.getPayloadKg() == null) {
                 continue;
@@ -167,11 +177,8 @@ public class TripServiceImpl implements TripService {
                     assignedDriverAvailable = false;
                     assignedDriverBusyReason = "Tài xế cố định (" + assignedDriverName + ") hiện đang nghỉ/không hoạt động";
                 } else {
-                    List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
-                    boolean busyOnDate = deliveryDate != null && tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(driver.getId(), deliveryDate, busyStatuses);
-                    List<TripExecution> unreturned = tripExecutionRepository.findUnreturnedByDriverId(driver.getId()).stream()
-                            .filter(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || deliveryDate == null || !te.getTrip().getDeliveryDate().isAfter(deliveryDate))
-                            .toList();
+                    boolean busyOnDate = busyDriverIdsOnDate.contains(driver.getId());
+                    List<TripExecution> unreturned = unreturnedByDriverId.getOrDefault(driver.getId(), Collections.emptyList());
 
                     if (busyOnDate) {
                         assignedDriverAvailable = false;
@@ -1281,6 +1288,7 @@ public class TripServiceImpl implements TripService {
         double prevLng = warehouseLng;
 
         List<TripDraftStop> recalculatedStops = new ArrayList<>();
+        List<Order> groupDraftOrders = orderRepository.findByTripDraftId(draft.getId());
 
         for (int i = 0; i < sortedGroup.size(); i++) {
             TripDraftStop original = sortedGroup.get(i);
@@ -1323,7 +1331,7 @@ public class TripServiceImpl implements TripService {
                             .plannedEta(currentEta)
                             .plannedWaitingTimeMin(waitingTimeMin)
                             .build(),
-                    orderRepository.findByTripDraftId(draft.getId())
+                    groupDraftOrders
             );
 
             TripDraftStop recalculated = TripDraftStop.builder()
