@@ -85,7 +85,10 @@ public class TripDraft {
     @Column(name = "total_distance_km", precision = 10, scale = 2)
     private BigDecimal totalDistanceKm;
 
-    @Column(name = "route_polyline", columnDefinition = "TEXT")
+    @Column(name = "return_distance_km", precision = 10, scale = 2)
+    private BigDecimal returnDistanceKm;
+
+    @Column(name = "route_polyline", columnDefinition = "LONGTEXT")
     private String routePolyline;
 
 

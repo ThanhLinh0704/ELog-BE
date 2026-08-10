@@ -1,6 +1,8 @@
 package com.elog.service;
 
+import com.elog.dto.response.KpiByDriverResponse;
 import com.elog.dto.response.KpiByRouteResponse;
+import com.elog.dto.response.KpiByVehicleResponse;
 import com.elog.dto.response.KpiDailyTrendResponse;
 import com.elog.dto.response.KpiSummaryResponse;
 
@@ -29,4 +31,14 @@ public interface KpiService {
      * KPI breakdown per route.
      */
     KpiByRouteResponse getByRoute(LocalDate startDate, LocalDate endDate);
+
+    /**
+     * KPI breakdown per vehicle.
+     */
+    KpiByVehicleResponse getByVehicle(LocalDate startDate, LocalDate endDate);
+
+    /**
+     * KPI breakdown per driver.
+     */
+    KpiByDriverResponse getByDriver(LocalDate startDate, LocalDate endDate);
 }

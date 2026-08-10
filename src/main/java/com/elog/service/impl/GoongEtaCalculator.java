@@ -96,12 +96,13 @@ public class GoongEtaCalculator implements EtaCalculationService {
             }
         }
 
-        // 5. Construct list of coordinates (warehouse -> stop1 -> stop2 -> ... -> stopN)
+        // 5. Construct list of coordinates (warehouse -> stop1 -> stop2 -> ... -> stopN -> warehouse)
         List<double[]> coords = new ArrayList<>();
         coords.add(new double[]{warehouseLat, warehouseLng});
         for (TripDraftStop stop : activeStops) {
             coords.add(new double[]{stop.getStore().getLatitude(), stop.getStore().getLongitude()});
         }
+        coords.add(new double[]{warehouseLat, warehouseLng});
 
         // 6. Call Goong Directions API sequentially leg-by-leg
         List<GoongDirectionsResponse.Leg> legs = new ArrayList<>();
@@ -214,12 +215,22 @@ public class GoongEtaCalculator implements EtaCalculationService {
 
         }
 
-        // 8. Set total distance and polyline on TripDraft
+        // 8. Set return distance, total distance and polyline on TripDraft
+        if (legs.size() > activeStops.size()) {
+            GoongDirectionsResponse.Leg returnLeg = legs.get(activeStops.size());
+            long returnLegMeters = (returnLeg.getDistance() != null && returnLeg.getDistance().getValue() != null)
+                    ? returnLeg.getDistance().getValue() : 0L;
+            totalDistanceMeters += returnLegMeters;
+            BigDecimal returnKm = BigDecimal.valueOf(returnLegMeters / 1000.0).setScale(2, RoundingMode.HALF_UP);
+            draft.setReturnDistanceKm(returnKm);
+        }
+
         BigDecimal totalKm = BigDecimal.valueOf(totalDistanceMeters / 1000.0).setScale(2, RoundingMode.HALF_UP);
         draft.setTotalDistanceKm(totalKm);
 
         if (!legPolylines.isEmpty()) {
-            draft.setRoutePolyline(String.join(";", legPolylines));
+            String joined = String.join(";", legPolylines);
+            draft.setRoutePolyline(joined);
         }
 
         draft.setPlannedDepartureTime(departureTime);

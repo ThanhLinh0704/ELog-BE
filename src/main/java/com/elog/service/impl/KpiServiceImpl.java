@@ -51,6 +51,13 @@ public class KpiServiceImpl implements KpiService {
         FleetUtilizationKpi fleetKpi = calculateFleetUtilization(trips);
         TripCompletionKpi completionKpi = calculateTripCompletion(trips);
 
+        double totalFleetKmSum = trips.stream()
+                .map(Trip::getTotalDistanceKm)
+                .filter(Objects::nonNull)
+                .mapToDouble(BigDecimal::doubleValue)
+                .sum();
+        Double totalFleetKm = trips.isEmpty() ? null : round(totalFleetKmSum);
+
         return KpiSummaryResponse.builder()
                 .period(PeriodInfo.builder().startDate(startDate).endDate(endDate).build())
                 .generatedAt(LocalDateTime.now())
@@ -58,6 +65,7 @@ public class KpiServiceImpl implements KpiService {
                 .fleetUtilization(fleetKpi)
                 .tripCompletion(completionKpi)
                 .exceptions(exceptionKpi)
+                .totalFleetDistanceKm(totalFleetKm)
                 .build();
     }
 
@@ -181,6 +189,146 @@ public class KpiServiceImpl implements KpiService {
         return KpiByRouteResponse.builder()
                 .period(PeriodInfo.builder().startDate(startDate).endDate(endDate).build())
                 .routes(routeKpis)
+                .build();
+    }
+
+    @Override
+    public KpiByVehicleResponse getByVehicle(LocalDate startDate, LocalDate endDate) {
+        int threshold = getEtaThreshold();
+
+        List<Trip> trips = tripRepository.findTripsWithVehicleAndRouteInDateRange(startDate, endDate);
+        List<TripStop> processedStops = tripStopRepository.findProcessedStopsInDateRange(startDate, endDate);
+        List<DeliveryException> exceptions = deliveryExceptionRepository.findExceptionsInDateRange(startDate, endDate);
+
+        Map<Long, List<DeliveryException>> exceptionsByStopId = exceptions.stream()
+                .filter(de -> de.getTripStopId() != null)
+                .collect(Collectors.groupingBy(DeliveryException::getTripStopId));
+
+        Map<Long, List<Trip>> tripsByVehicle = trips.stream()
+                .filter(t -> t.getVehicle() != null)
+                .collect(Collectors.groupingBy(t -> t.getVehicle().getId()));
+
+        Map<Long, List<TripStop>> stopsByVehicle = processedStops.stream()
+                .filter(ts -> ts.getTrip() != null && ts.getTrip().getVehicle() != null)
+                .collect(Collectors.groupingBy(ts -> ts.getTrip().getVehicle().getId()));
+
+        List<KpiByVehicleResponse.VehicleKpi> vehicleKpis = new ArrayList<>();
+        for (Map.Entry<Long, List<Trip>> entry : tripsByVehicle.entrySet()) {
+            Long vehicleId = entry.getKey();
+            List<Trip> vehicleTrips = entry.getValue();
+            Vehicle vehicle = vehicleTrips.get(0).getVehicle();
+
+            List<TripStop> vehicleStops = stopsByVehicle.getOrDefault(vehicleId, Collections.emptyList());
+
+            int onTime = countOnTimeStops(vehicleStops, threshold);
+            Double onTimeRate = vehicleStops.isEmpty() ? null
+                    : round((double) onTime / vehicleStops.size() * 100);
+
+            Double volumeUtil = computeAvgVolumeUtil(vehicleTrips);
+            Double weightUtil = computeAvgWeightUtil(vehicleTrips);
+
+            double totalDistance = vehicleTrips.stream()
+                    .map(Trip::getTotalDistanceKm)
+                    .filter(Objects::nonNull)
+                    .mapToDouble(BigDecimal::doubleValue)
+                    .sum();
+
+            Set<Long> vehicleStopIds = vehicleStops.stream()
+                    .map(TripStop::getTripStopId)
+                    .collect(Collectors.toSet());
+
+            int totalExceptions = 0;
+            for (Long stopId : vehicleStopIds) {
+                totalExceptions += exceptionsByStopId.getOrDefault(stopId, Collections.emptyList()).size();
+            }
+
+            vehicleKpis.add(KpiByVehicleResponse.VehicleKpi.builder()
+                    .vehicleId(vehicle.getId())
+                    .licensePlate(vehicle.getPlateNumber())
+                    .vehicleType(vehicle.getVehicleType())
+                    .payloadKg(vehicle.getPayloadKg())
+                    .maxVolumeM3(vehicle.getMaxVolumeM3())
+                    .totalTrips(vehicleTrips.size())
+                    .totalDistanceKm(round(totalDistance))
+                    .avgVolumeUtilPct(volumeUtil)
+                    .avgWeightUtilPct(weightUtil)
+                    .onTimeRatePct(onTimeRate)
+                    .totalExceptions(totalExceptions)
+                    .build());
+        }
+
+        vehicleKpis.sort(Comparator.comparing(KpiByVehicleResponse.VehicleKpi::getTotalTrips, Comparator.reverseOrder()));
+
+        return KpiByVehicleResponse.builder()
+                .period(PeriodInfo.builder().startDate(startDate).endDate(endDate).build())
+                .vehicles(vehicleKpis)
+                .build();
+    }
+
+    @Override
+    public KpiByDriverResponse getByDriver(LocalDate startDate, LocalDate endDate) {
+        int threshold = getEtaThreshold();
+
+        List<Trip> trips = tripRepository.findTripsWithVehicleAndRouteInDateRange(startDate, endDate);
+        List<TripStop> processedStops = tripStopRepository.findProcessedStopsInDateRange(startDate, endDate);
+        List<DeliveryException> exceptions = deliveryExceptionRepository.findExceptionsInDateRange(startDate, endDate);
+
+        Map<Long, List<DeliveryException>> exceptionsByStopId = exceptions.stream()
+                .filter(de -> de.getTripStopId() != null)
+                .collect(Collectors.groupingBy(DeliveryException::getTripStopId));
+
+        Map<Long, List<Trip>> tripsByDriver = trips.stream()
+                .filter(t -> t.getDriver() != null)
+                .collect(Collectors.groupingBy(t -> t.getDriver().getId()));
+
+        Map<Long, List<TripStop>> stopsByDriver = processedStops.stream()
+                .filter(ts -> ts.getTrip() != null && ts.getTrip().getDriver() != null)
+                .collect(Collectors.groupingBy(ts -> ts.getTrip().getDriver().getId()));
+
+        List<KpiByDriverResponse.DriverKpi> driverKpis = new ArrayList<>();
+        for (Map.Entry<Long, List<Trip>> entry : tripsByDriver.entrySet()) {
+            Long driverId = entry.getKey();
+            List<Trip> driverTrips = entry.getValue();
+            User driver = driverTrips.get(0).getDriver();
+
+            List<TripStop> driverStops = stopsByDriver.getOrDefault(driverId, Collections.emptyList());
+
+            int onTime = countOnTimeStops(driverStops, threshold);
+            Double onTimeRate = driverStops.isEmpty() ? null
+                    : round((double) onTime / driverStops.size() * 100);
+
+            double totalDistance = driverTrips.stream()
+                    .map(Trip::getTotalDistanceKm)
+                    .filter(Objects::nonNull)
+                    .mapToDouble(BigDecimal::doubleValue)
+                    .sum();
+
+            Set<Long> driverStopIds = driverStops.stream()
+                    .map(TripStop::getTripStopId)
+                    .collect(Collectors.toSet());
+
+            int totalExceptions = 0;
+            for (Long stopId : driverStopIds) {
+                totalExceptions += exceptionsByStopId.getOrDefault(stopId, Collections.emptyList()).size();
+            }
+
+            driverKpis.add(KpiByDriverResponse.DriverKpi.builder()
+                    .driverId(driver.getId())
+                    .driverCode("DRV-" + driver.getId())
+                    .fullName(driver.getFullName() != null ? driver.getFullName() : driver.getUsername())
+                    .phoneNumber(driver.getPhoneNumber())
+                    .totalTrips(driverTrips.size())
+                    .totalDistanceKm(round(totalDistance))
+                    .onTimeRatePct(onTimeRate)
+                    .totalExceptions(totalExceptions)
+                    .build());
+        }
+
+        driverKpis.sort(Comparator.comparing(KpiByDriverResponse.DriverKpi::getTotalTrips, Comparator.reverseOrder()));
+
+        return KpiByDriverResponse.builder()
+                .period(PeriodInfo.builder().startDate(startDate).endDate(endDate).build())
+                .drivers(driverKpis)
                 .build();
     }
 

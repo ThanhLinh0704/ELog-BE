@@ -18,6 +18,7 @@ public class KpiSummaryResponse {
     private FleetUtilizationKpi fleetUtilization;
     private TripCompletionKpi tripCompletion;
     private ExceptionKpi exceptions;
+    private Double totalFleetDistanceKm;
 
     @Getter
     @Setter

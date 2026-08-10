@@ -425,4 +425,68 @@ class KpiServiceImplTest {
             assertThat(result.getRoutes().get(1).getOnTimeRatePct()).isEqualTo(100.0);
         }
     }
+
+    @Nested
+    @DisplayName("getByVehicle()")
+    class ByVehicleTests {
+
+        @Test
+        @DisplayName("getByVehicle: calculates distance, trips, utilization correctly")
+        void getByVehicle_correctCalculation() {
+            Vehicle v1 = buildVehicle(6.0, 800);
+            v1.setPlateNumber("51C-12345");
+            v1.setVehicleType("TRUCK_1_TON");
+
+            Route r1 = buildRoute(1L, "RT-Q1", "Quận 1");
+            Trip t1 = buildTrip(1L, START, TripStatus.COMPLETED, 4.0, 600, v1, r1);
+            t1.setTotalDistanceKm(BigDecimal.valueOf(25.5));
+
+            when(tripRepository.findTripsWithVehicleAndRouteInDateRange(START, END))
+                    .thenReturn(List.of(t1));
+            when(tripStopRepository.findProcessedStopsInDateRange(START, END))
+                    .thenReturn(Collections.emptyList());
+            when(deliveryExceptionRepository.findExceptionsInDateRange(START, END))
+                    .thenReturn(Collections.emptyList());
+
+            KpiByVehicleResponse result = kpiService.getByVehicle(START, END);
+
+            assertThat(result.getVehicles()).hasSize(1);
+            KpiByVehicleResponse.VehicleKpi vk = result.getVehicles().get(0);
+            assertThat(vk.getLicensePlate()).isEqualTo("51C-12345");
+            assertThat(vk.getTotalTrips()).isEqualTo(1);
+            assertThat(vk.getTotalDistanceKm()).isEqualTo(25.5);
+        }
+    }
+
+    @Nested
+    @DisplayName("getByDriver()")
+    class ByDriverTests {
+
+        @Test
+        @DisplayName("getByDriver: calculates driver trips and distance correctly")
+        void getByDriver_correctCalculation() {
+            Vehicle v1 = buildVehicle(6.0, 800);
+            Route r1 = buildRoute(1L, "RT-Q1", "Quận 1");
+            User driver = User.builder().id(10L).username("driver1").fullName("Nguyen Van A").phoneNumber("0901234567").build();
+
+            Trip t1 = buildTrip(1L, START, TripStatus.COMPLETED, 4.0, 600, v1, r1);
+            t1.setDriver(driver);
+            t1.setTotalDistanceKm(BigDecimal.valueOf(30.0));
+
+            when(tripRepository.findTripsWithVehicleAndRouteInDateRange(START, END))
+                    .thenReturn(List.of(t1));
+            when(tripStopRepository.findProcessedStopsInDateRange(START, END))
+                    .thenReturn(Collections.emptyList());
+            when(deliveryExceptionRepository.findExceptionsInDateRange(START, END))
+                    .thenReturn(Collections.emptyList());
+
+            KpiByDriverResponse result = kpiService.getByDriver(START, END);
+
+            assertThat(result.getDrivers()).hasSize(1);
+            KpiByDriverResponse.DriverKpi dk = result.getDrivers().get(0);
+            assertThat(dk.getFullName()).isEqualTo("Nguyen Van A");
+            assertThat(dk.getTotalTrips()).isEqualTo(1);
+            assertThat(dk.getTotalDistanceKm()).isEqualTo(30.0);
+        }
+    }
 }
