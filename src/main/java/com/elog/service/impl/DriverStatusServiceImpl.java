@@ -173,6 +173,7 @@ public class DriverStatusServiceImpl implements DriverStatusService {
                 .reasonNote(driver.getDriverInactiveReasonNote())
                 .statusUpdatedAt(driver.getDriverStatusUpdatedAt())
                 .statusUpdatedByName(updatedByName)
+                .licenseClass(driver.getLicenseClass() != null ? driver.getLicenseClass().name() : null)
                 .activeTripsWarning(warnings)
                 .build();
     }

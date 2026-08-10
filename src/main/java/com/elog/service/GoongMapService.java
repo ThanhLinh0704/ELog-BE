@@ -32,6 +32,7 @@ public class GoongMapService {
 
     /**
      * Get Directions between origin, waypoints, and destination from Goong Directions API.
+     * Fallbacks to OSRM Public Server if Goong is unavailable or rate-limited.
      *
      * @param origin      "lat,lng"
      * @param destination "lat,lng"
@@ -39,31 +40,116 @@ public class GoongMapService {
      * @return GoongDirectionsResponse or null if failed
      */
     public GoongDirectionsResponse getDirections(String origin, String destination, String waypoints) {
-        if (apiKey == null || apiKey.trim().isEmpty()) {
-            log.warn("Goong API Key is not configured.");
-            return null;
+        if (apiKey != null && !apiKey.trim().isEmpty()) {
+            try {
+                StringBuilder urlBuilder = new StringBuilder();
+                urlBuilder.append(baseUrl).append("/Direction")
+                        .append("?origin=").append(origin)
+                        .append("&destination=").append(destination)
+                        .append("&vehicle=").append(vehicle)
+                        .append("&api_key=").append(apiKey);
+
+                if (waypoints != null && !waypoints.trim().isEmpty()) {
+                    urlBuilder.append("&waypoints=").append(waypoints);
+                }
+
+                String url = urlBuilder.toString();
+                log.info("Calling Goong Directions API URL: {}", url);
+
+                GoongDirectionsResponse res = restTemplate.getForObject(url, GoongDirectionsResponse.class);
+                if (res != null && res.getRoutes() != null && !res.getRoutes().isEmpty()) {
+                    return res;
+                }
+                log.warn("Goong Directions API returned empty routes or rate limit error. Triggering OSRM fallback...");
+            } catch (Exception e) {
+                log.error("Error calling Goong Directions API: {}. Triggering OSRM fallback...", e.getMessage());
+            }
+        } else {
+            log.warn("Goong API Key is not configured. Triggering OSRM fallback...");
         }
 
+        return getDirectionsFromOsrmFallback(origin, destination, waypoints);
+    }
+
+    /**
+     * Fallback to OSRM Public Server when Goong is unavailable or rate-limited.
+     * OSRM API expects longitude,latitude format separated by semicolons.
+     */
+    private GoongDirectionsResponse getDirectionsFromOsrmFallback(String origin, String destination, String waypoints) {
+        if (origin == null || destination == null) {
+            return null;
+        }
         try {
-            StringBuilder urlBuilder = new StringBuilder();
-            urlBuilder.append(baseUrl).append("/Direction")
-                    .append("?origin=").append(origin)
-                    .append("&destination=").append(destination)
-                    .append("&vehicle=").append(vehicle)
-                    .append("&api_key=").append(apiKey);
+            java.util.List<String> osrmPoints = new java.util.ArrayList<>();
+            osrmPoints.add(formatToLngLat(origin));
 
             if (waypoints != null && !waypoints.trim().isEmpty()) {
-                urlBuilder.append("&waypoints=").append(waypoints);
+                String[] pts = waypoints.split("\\|");
+                for (String pt : pts) {
+                    if (!pt.trim().isEmpty()) {
+                        osrmPoints.add(formatToLngLat(pt.trim()));
+                    }
+                }
             }
 
-            String url = urlBuilder.toString();
-            log.info("Calling Goong Directions API URL: {}", url);
+            osrmPoints.add(formatToLngLat(destination));
 
-            return restTemplate.getForObject(url, GoongDirectionsResponse.class);
+            String osrmCoordsStr = String.join(";", osrmPoints);
+            String url = "https://router.project-osrm.org/route/v1/driving/" + osrmCoordsStr + "?overview=full&geometries=polyline";
+
+            log.info("Calling OSRM Fallback API URL: {}", url);
+
+            OsrmRouteResponse osrmRes = restTemplate.getForObject(url, OsrmRouteResponse.class);
+            if (osrmRes != null && osrmRes.getRoutes() != null && !osrmRes.getRoutes().isEmpty()) {
+                OsrmRouteResponse.OsrmRoute osrmRoute = osrmRes.getRoutes().get(0);
+
+                GoongDirectionsResponse.Polyline polyline = new GoongDirectionsResponse.Polyline();
+                polyline.setPoints(osrmRoute.getGeometry());
+
+                java.util.List<GoongDirectionsResponse.Leg> legs = new java.util.ArrayList<>();
+                if (osrmRoute.getLegs() != null) {
+                    for (OsrmRouteResponse.OsrmLeg oLeg : osrmRoute.getLegs()) {
+                        GoongDirectionsResponse.Leg leg = new GoongDirectionsResponse.Leg();
+
+                        GoongDirectionsResponse.ValueText dist = new GoongDirectionsResponse.ValueText();
+                        long distMeters = Math.round(oLeg.getDistance());
+                        dist.setValue(distMeters);
+                        dist.setText(String.format("%.1f km", distMeters / 1000.0));
+                        leg.setDistance(dist);
+
+                        GoongDirectionsResponse.ValueText dur = new GoongDirectionsResponse.ValueText();
+                        long durSecs = Math.round(oLeg.getDuration());
+                        dur.setValue(durSecs);
+                        dur.setText(String.format("%d phút", Math.round(durSecs / 60.0)));
+                        leg.setDuration(dur);
+
+                        legs.add(leg);
+                    }
+                }
+
+                GoongDirectionsResponse.Route gRoute = new GoongDirectionsResponse.Route();
+                gRoute.setOverviewPolyline(polyline);
+                gRoute.setLegs(legs);
+
+                GoongDirectionsResponse response = new GoongDirectionsResponse();
+                response.setRoutes(java.util.List.of(gRoute));
+                response.setStatus("OK");
+
+                log.info("Successfully fetched route from OSRM fallback with {} legs", legs.size());
+                return response;
+            }
         } catch (Exception e) {
-            log.error("Error calling Goong Directions API: {}", e.getMessage(), e);
-            return null;
+            log.error("Error calling OSRM Fallback API: {}", e.getMessage(), e);
         }
+        return null;
+    }
+
+    private String formatToLngLat(String latLngStr) {
+        String[] parts = latLngStr.split(",");
+        if (parts.length == 2) {
+            return parts[1].trim() + "," + parts[0].trim();
+        }
+        return latLngStr;
     }
 
     /**
@@ -94,6 +180,39 @@ public class GoongMapService {
 
 
     public boolean isConfigured() {
-        return apiKey != null && !apiKey.trim().isEmpty();
+        return true; // Always return true as OSRM Public fallback is available
+    }
+
+    @lombok.Data
+    private static class OsrmRouteResponse {
+        @com.fasterxml.jackson.annotation.JsonProperty("code")
+        private String code;
+
+        @com.fasterxml.jackson.annotation.JsonProperty("routes")
+        private java.util.List<OsrmRoute> routes;
+
+        @lombok.Data
+        public static class OsrmRoute {
+            @com.fasterxml.jackson.annotation.JsonProperty("geometry")
+            private String geometry;
+
+            @com.fasterxml.jackson.annotation.JsonProperty("distance")
+            private double distance;
+
+            @com.fasterxml.jackson.annotation.JsonProperty("duration")
+            private double duration;
+
+            @com.fasterxml.jackson.annotation.JsonProperty("legs")
+            private java.util.List<OsrmLeg> legs;
+        }
+
+        @lombok.Data
+        public static class OsrmLeg {
+            @com.fasterxml.jackson.annotation.JsonProperty("distance")
+            private double distance;
+
+            @com.fasterxml.jackson.annotation.JsonProperty("duration")
+            private double duration;
+        }
     }
 }

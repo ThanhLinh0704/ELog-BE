@@ -282,7 +282,7 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
         String routePolyline = trip.getRoutePolyline();
         java.math.BigDecimal totalDistanceKm = trip.getTotalDistanceKm();
 
-        if (!stopProgresses.isEmpty() && goongMapService != null) {
+        if (routePolyline == null && !stopProgresses.isEmpty() && goongMapService != null) {
             try {
                 double whLat = systemConfigRepo.findByConfigKey("WAREHOUSE_LAT")
                         .map(c -> Double.parseDouble(c.getConfigValue())).orElse(21.028512);
@@ -301,35 +301,32 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                         pointStrs.add(stop.getLatitude() + "," + stop.getLongitude());
                     }
 
-                    List<String> legPolylines = new java.util.ArrayList<>();
-                    long totalMeters = 0;
+                    String origin = pointStrs.get(0);
+                    String destination = pointStrs.get(pointStrs.size() - 1);
+                    String waypoints = pointStrs.size() > 2
+                            ? String.join("|", pointStrs.subList(1, pointStrs.size() - 1))
+                            : null;
 
-                    for (int i = 0; i < pointStrs.size() - 1; i++) {
-                        String p1 = pointStrs.get(i);
-                        String p2 = pointStrs.get(i + 1);
-
-                        var resp = goongMapService.getDirections(p1, p2, null);
-                        if (resp != null && resp.getRoutes() != null && !resp.getRoutes().isEmpty()) {
-                            var route = resp.getRoutes().get(0);
-                            if (route.getOverviewPolyline() != null && route.getOverviewPolyline().getPoints() != null) {
-                                legPolylines.add(route.getOverviewPolyline().getPoints());
-                            }
-                            if (route.getLegs() != null) {
-                                for (var leg : route.getLegs()) {
-                                    if (leg.getDistance() != null && leg.getDistance().getValue() != null) {
-                                        totalMeters += leg.getDistance().getValue();
-                                    }
+                    var resp = goongMapService.getDirections(origin, destination, waypoints);
+                    if (resp != null && resp.getRoutes() != null && !resp.getRoutes().isEmpty()) {
+                        var route = resp.getRoutes().get(0);
+                        if (route.getOverviewPolyline() != null && route.getOverviewPolyline().getPoints() != null) {
+                            routePolyline = route.getOverviewPolyline().getPoints();
+                            trip.setRoutePolyline(routePolyline);
+                        }
+                        if (route.getLegs() != null) {
+                            long totalMeters = 0;
+                            for (var leg : route.getLegs()) {
+                                if (leg.getDistance() != null && leg.getDistance().getValue() != null) {
+                                    totalMeters += leg.getDistance().getValue();
                                 }
                             }
+                            totalDistanceKm = java.math.BigDecimal.valueOf(totalMeters / 1000.0).setScale(2, java.math.RoundingMode.HALF_UP);
+                            trip.setTotalDistanceKm(totalDistanceKm);
                         }
-                    }
-
-                    if (!legPolylines.isEmpty()) {
-                        routePolyline = String.join(";", legPolylines);
-                        trip.setRoutePolyline(routePolyline);
-                        totalDistanceKm = java.math.BigDecimal.valueOf(totalMeters / 1000.0).setScale(2, java.math.RoundingMode.HALF_UP);
-                        trip.setTotalDistanceKm(totalDistanceKm);
                         tripRepo.save(trip);
+                    } else {
+                        log.warn("Goong directions API returned no routes or rate-limited for tripId={}", tripId);
                     }
                 }
             } catch (Exception e) {

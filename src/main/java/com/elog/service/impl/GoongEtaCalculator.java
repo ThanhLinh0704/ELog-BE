@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Primary ETA Calculator using Goong.io REST APIs.
@@ -103,29 +104,30 @@ public class GoongEtaCalculator implements EtaCalculationService {
         }
         coords.add(new double[]{warehouseLat, warehouseLng});
 
-        // 6. Call Goong Directions API sequentially leg-by-leg
-        List<GoongDirectionsResponse.Leg> legs = new ArrayList<>();
-        List<String> legPolylines = new ArrayList<>();
+        // 6. Call Goong Directions API with single request using waypoints
+        String origin = coords.get(0)[0] + "," + coords.get(0)[1];
+        String destination = coords.get(coords.size() - 1)[0] + "," + coords.get(coords.size() - 1)[1];
 
-        for (int i = 0; i < coords.size() - 1; i++) {
-            String legOrigin = coords.get(i)[0] + "," + coords.get(i)[1];
-            String legDestination = coords.get(i + 1)[0] + "," + coords.get(i + 1)[1];
-
-            GoongDirectionsResponse legResponse = goongMapService.getDirections(legOrigin, legDestination, null);
-            if (legResponse == null || legResponse.getRoutes() == null || legResponse.getRoutes().isEmpty()
-                    || legResponse.getRoutes().get(0).getLegs() == null || legResponse.getRoutes().get(0).getLegs().isEmpty()) {
-                log.warn("Goong leg call failed ({} -> {}) for tripDraftId={}. Falling back to Haversine.",
-                        legOrigin, legDestination, tripDraftId);
-                return haversineEtaCalculator.calculateAndPersist(tripDraftId, departureTime);
-            }
-
-            GoongDirectionsResponse.Route route = legResponse.getRoutes().get(0);
-            legs.add(route.getLegs().get(0));
-
-            if (route.getOverviewPolyline() != null && route.getOverviewPolyline().getPoints() != null) {
-                legPolylines.add(route.getOverviewPolyline().getPoints());
-            }
+        String waypoints = null;
+        if (coords.size() > 2) {
+            waypoints = coords.subList(1, coords.size() - 1).stream()
+                    .map(pt -> pt[0] + "," + pt[1])
+                    .collect(Collectors.joining("|"));
         }
+
+        GoongDirectionsResponse response = goongMapService.getDirections(origin, destination, waypoints);
+        if (response == null || response.getRoutes() == null || response.getRoutes().isEmpty()
+                || response.getRoutes().get(0).getLegs() == null
+                || response.getRoutes().get(0).getLegs().size() < coords.size() - 1) {
+            log.warn("Goong directions call failed for tripDraftId={}. Falling back to Haversine.", tripDraftId);
+            return haversineEtaCalculator.calculateAndPersist(tripDraftId, departureTime);
+        }
+
+        GoongDirectionsResponse.Route route = response.getRoutes().get(0);
+        List<GoongDirectionsResponse.Leg> legs = route.getLegs();
+        String fullPolyline = (route.getOverviewPolyline() != null && route.getOverviewPolyline().getPoints() != null)
+                ? route.getOverviewPolyline().getPoints()
+                : null;
 
         // 7. Calculate sequential ETA using Goong leg travel durations and distances
         LocalDate deliveryDate = draft.getDeliveryDate();
@@ -227,9 +229,8 @@ public class GoongEtaCalculator implements EtaCalculationService {
         BigDecimal totalKm = BigDecimal.valueOf(totalDistanceMeters / 1000.0).setScale(2, RoundingMode.HALF_UP);
         draft.setTotalDistanceKm(totalKm);
 
-        if (!legPolylines.isEmpty()) {
-            String joined = String.join(";", legPolylines);
-            draft.setRoutePolyline(joined);
+        if (fullPolyline != null) {
+            draft.setRoutePolyline(fullPolyline);
         }
 
         draft.setPlannedDepartureTime(departureTime);
