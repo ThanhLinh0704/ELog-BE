@@ -1,46 +1,29 @@
 package com.elog.service;
 
+import com.elog.dto.request.DeliveryOrderResultUpdateRequest;
+import com.elog.dto.response.DriverTripResponse;
+import com.elog.entity.*;
+import com.elog.exception.BusinessException;
+import com.elog.repository.*;
+import com.elog.service.impl.DriverTripServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@ExtendWith(MockitoExtension.class)
-public class DriverTripServiceImplTest {
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-01 | PRIORITY: P1
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivExecute(): valid data -> processes successfully
-     * GIVEN: requestValid=true; mockRepo.save()=entity; dependencies=ok
-     * WHEN: service.drivExecute(request)
-     * THEN: Returns valid response; repository.save() is called
-     */
-    @Test
-    void test_drivExecute_Scenario1() {
-        // Setup Mocking
-        // TODO: when(mockRepository.save(any())).thenReturn(mockEntity);
-        boolean executionResult = true;
-        assertTrue(executionResult, "L1 Test Passed: UT-DRIV-01");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-02 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivExecute_Scenario2() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-02");
-    }
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DriverTripServiceImplTest {
@@ -144,395 +127,20 @@ class DriverTripServiceImplTest {
                 .status(TripStopStatus.PENDING)
                 .build();
 
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-04 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivExecute_Scenario4() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-04");
-    }
+        when(deliveryOrderResultRepo.findById(1L)).thenReturn(Optional.of(result));
+        when(deliveryOrderResultRepo.findByTripExecutionIdAndStopId(50L, 200L))
+                .thenReturn(java.util.List.of(result));
+        when(tripStopRepo.findByTripDraftStopId(200L)).thenReturn(Optional.of(tripStop));
+        result.setStatus("DELIVERED");
 
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-05 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivExecute_Scenario5() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-05");
-    }
+        com.elog.dto.request.DeliveryOrderResultUpdateRequest req = com.elog.dto.request.DeliveryOrderResultUpdateRequest.builder()
+                .status("DELIVERED")
+                .build();
 
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-06 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivExecute_Scenario6() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-06");
-    }
+        driverTripService.updateOrderResult(50L, 1L, req, "driver1");
 
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-07 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivExecute_Scenario7() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-07");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-08 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivExecute_Scenario8() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-08");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-09 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivExecute_Scenario9() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-09");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-10 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivExecute_Scenario10() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-10");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-11 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivExecute_Scenario11() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-11");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-12 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivExecute_Scenario12() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-12");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-13 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivExecute_Scenario13() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-13");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-14 | PRIORITY: P1
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivValidate(): valid data -> processes successfully
-     * GIVEN: requestValid=true; mockRepo.save()=entity; dependencies=ok
-     * WHEN: service.drivValidate(request)
-     * THEN: Returns valid response; repository.save() is called
-     */
-    @Test
-    void test_drivValidate_Scenario1() {
-        // Setup Mocking
-        // TODO: when(mockRepository.save(any())).thenReturn(mockEntity);
-        boolean executionResult = true;
-        assertTrue(executionResult, "L1 Test Passed: UT-DRIV-14");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-15 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario2() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-15");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-16 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario3() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-16");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-17 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario4() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-17");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-18 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario5() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-18");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-19 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario6() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-19");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-20 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario7() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-20");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-21 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario8() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-21");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-22 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario9() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-22");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-23 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario10() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-23");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-24 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario11() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-24");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-25 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario12() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-25");
-    }
-
-    /**
-     * SHEET: DriverTripServiceImplTest
-     * TEST ID: UT-DRIV-26 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: drivValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.drivValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_drivValidate_Scenario13() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-DRIV-26");
+        assertThat(tripStop.getStatus()).isEqualTo(TripStopStatus.COMPLETED);
+        verify(tripStopRepo).save(tripStop);
     }
 
     @Test
