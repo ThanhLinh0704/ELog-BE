@@ -411,7 +411,6 @@ public class TripServiceImpl implements TripService {
         }
 
         List<TripSplitResponse.TripSummary> summaries = new ArrayList<>();
-        List<TripStatus> busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
 
         // BR-PLAN-03: Validate complete, non-duplicate, non-extraneous stop coverage for this trip draft
         List<TripDraftStop> allActiveStops = tripDraftStopRepository.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);

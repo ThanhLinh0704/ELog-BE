@@ -20,7 +20,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -125,7 +129,7 @@ public class ExceptionServiceImpl implements ExceptionService {
                 List<Long> stopIds = exceptions.stream().map(DeliveryException::getTripStopId).filter(Objects::nonNull).distinct().toList();
                 List<Long> executionIds = exceptions.stream().map(DeliveryException::getTripExecutionId).filter(Objects::nonNull).distinct().toList();
 
-                Map<Long, TripStop> stopMap = stopIds.isEmpty() ? Collections.emptyMap() : tripStopRepo.findAllById(stopIds).stream().collect(Collectors.toMap(TripStop::getId, s -> s));
+                Map<Long, TripStop> stopMap = stopIds.isEmpty() ? Collections.emptyMap() : tripStopRepo.findAllById(stopIds).stream().collect(Collectors.toMap(TripStop::getTripStopId, s -> s));
                 Map<Long, TripExecution> executionMap = executionIds.isEmpty() ? Collections.emptyMap() : tripExecutionRepo.findAllById(executionIds).stream().collect(Collectors.toMap(TripExecution::getId, e -> e));
 
                 exceptions = exceptions.stream().filter(e -> {

@@ -19,10 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Recommendation Engine — FT-06 (Single-Vehicle) + FT-07 (Two-Vehicle Fallback).
@@ -36,7 +34,6 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     // ── Constants ─────────────────────────────────────────────────────────────
     private static final BigDecimal SAFETY_BUFFER = new BigDecimal("0.90");
-    private static final double EARTH_RADIUS_KM = 6371.0;
     private static final BigDecimal MULTI_VEHICLE_PENALTY = new BigDecimal("15.0");
     private static final int TOP_N = 3;
 
@@ -511,41 +508,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         double costPerKm = v.getCostPerKm() != null ? v.getCostPerKm().doubleValue() : maxCostPerKm;
         double sCost = maxCostPerKm > 0 ? (1.0 - costPerKm / maxCostPerKm) * 100.0 : 50.0;
 
-        // S_speed: faster is better. Normalized.
-        double speedKmh = v.getAverageSpeedKmh() != null ? v.getAverageSpeedKmh().doubleValue() : 0;
-        double sSpeed = maxSpeedKmh > 0 ? (speedKmh / maxSpeedKmh) * 100.0 : 50.0;
-
-        // S_driver: has eligible driver = 100, else 0 (already filtered, so always 100 here)
-        double sDriver = eligibleDrivers.isEmpty() ? 0.0 : 100.0;
-
-        // S_time: slack time between last stop ETA and closing time (more slack = better)
-        double sTime = calculateSlackScore(stops);
-
         double totalScore = W_CAPACITY * sCapacity + W_COST * sCost;
 
         return BigDecimal.valueOf(totalScore).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private double calculateSlackScore(List<TripDraftStop> stops) {
-        if (stops.isEmpty()) return 50.0;
-
-        double totalSlackMinutes = 0;
-        int countWithWindow = 0;
-
-        for (TripDraftStop stop : stops) {
-            if (stop.getPlannedEta() != null && stop.getStore().getTimeWindowEnd() != null) {
-                LocalTime eta = stop.getPlannedEta().toLocalTime();
-                LocalTime closing = stop.getStore().getTimeWindowEnd();
-                long slackMin = java.time.Duration.between(eta, closing).toMinutes();
-                totalSlackMinutes += Math.max(0, slackMin);
-                countWithWindow++;
-            }
-        }
-
-        if (countWithWindow == 0) return 50.0; // neutral if no time windows
-        double avgSlack = totalSlackMinutes / countWithWindow;
-        // Normalize: 0 min slack → 0 score, 120+ min → 100
-        return Math.min(100.0, (avgSlack / 120.0) * 100.0);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
