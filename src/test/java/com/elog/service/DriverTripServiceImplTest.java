@@ -1,6 +1,5 @@
 package com.elog.service;
 
-import com.elog.dto.request.DeliveryOrderResultUpdateRequest;
 import com.elog.dto.response.DriverTripResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
@@ -14,16 +13,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class DriverTripServiceImplTest {
@@ -46,8 +42,6 @@ class DriverTripServiceImplTest {
     private TripStopRepository tripStopRepo;
     @Mock
     private DeliveryExceptionRepository deliveryExceptionRepo;
-    @Mock
-    private VehicleRepository vehicleRepo;
     @Mock
     private TripOutcomeHistoryService tripOutcomeHistoryService;
 
@@ -127,20 +121,115 @@ class DriverTripServiceImplTest {
                 .status(TripStopStatus.PENDING)
                 .build();
 
-        when(deliveryOrderResultRepo.findById(1L)).thenReturn(Optional.of(result));
-        when(deliveryOrderResultRepo.findByTripExecutionIdAndStopId(50L, 200L))
-                .thenReturn(java.util.List.of(result));
+        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+        when(deliveryOrderResultRepo.findByTripExecutionIdAndOrderId(50L, 10L)).thenReturn(Optional.of(result));
+        when(deliveryOrderResultRepo.findByTripExecutionId(50L)).thenReturn(java.util.List.of(result));
         when(tripStopRepo.findByTripDraftStopId(200L)).thenReturn(Optional.of(tripStop));
-        result.setStatus("DELIVERED");
 
-        com.elog.dto.request.DeliveryOrderResultUpdateRequest req = com.elog.dto.request.DeliveryOrderResultUpdateRequest.builder()
-                .status("DELIVERED")
-                .build();
+        com.elog.dto.request.UpdateOrderResultRequest req = new com.elog.dto.request.UpdateOrderResultRequest();
+        req.setStatus("DELIVERED");
 
-        driverTripService.updateOrderResult(50L, 1L, req, "driver1");
+        driverTripService.updateOrderResult(50L, 10L, req, "driver1");
 
         assertThat(tripStop.getStatus()).isEqualTo(TripStopStatus.COMPLETED);
+        assertThat(tripStop.getActualArrivalTime()).isNotNull();
         verify(tripStopRepo).save(tripStop);
+    }
+
+    @Test
+    @DisplayName("updateOrderResult: khi có đơn FAILED -> đồng bộ TripStop sang EXCEPTION")
+    void updateOrderResult_anyOrderFailedInStop_syncsTripStopToException() {
+        execution.setStatus("IN_PROGRESS");
+        TripDraftStop stop = TripDraftStop.builder().id(200L).build();
+        DeliveryOrderResult result = DeliveryOrderResult.builder()
+                .id(1L)
+                .tripExecution(execution)
+                .order(Order.builder().id(10L).orderRef("ORD-01").build())
+                .stop(stop)
+                .status("PENDING")
+                .build();
+
+        TripStop tripStop = TripStop.builder()
+                .tripStopId(300L)
+                .status(TripStopStatus.PENDING)
+                .build();
+
+        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+        when(deliveryOrderResultRepo.findByTripExecutionIdAndOrderId(50L, 10L)).thenReturn(Optional.of(result));
+        when(deliveryOrderResultRepo.findByTripExecutionId(50L)).thenReturn(java.util.List.of(result));
+        when(tripStopRepo.findByTripDraftStopId(200L)).thenReturn(Optional.of(tripStop));
+
+        com.elog.dto.request.UpdateOrderResultRequest req = new com.elog.dto.request.UpdateOrderResultRequest();
+        req.setStatus("FAILED");
+        req.setReasonCode("CUSTOMER_REJECTED");
+
+        driverTripService.updateOrderResult(50L, 10L, req, "driver1");
+
+        assertThat(tripStop.getStatus()).isEqualTo(TripStopStatus.EXCEPTION);
+        verify(tripStopRepo).save(tripStop);
+    }
+
+    @Test
+    @DisplayName("returnToWarehouse thành công: cập nhật returnedToWarehouseAt và giải phóng xe sang AVAILABLE")
+    void returnToWarehouse_success() {
+        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+        when(tripExecutionRepo.save(any(TripExecution.class))).thenAnswer(i -> i.getArgument(0));
+
+        DriverTripResponse response = driverTripService.returnToWarehouse(50L, "driver1");
+
+        assertThat(response).isNotNull();
+        assertThat(execution.getReturnedToWarehouseAt()).isNotNull();
+        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
+        verify(tripExecutionRepo).save(execution);
+    }
+
+    @Test
+    @DisplayName("returnToWarehouse thất bại khi chuyến xe chưa COMPLETED")
+    void returnToWarehouse_tripNotCompleted_throwsException() {
+        execution.setStatus("IN_PROGRESS");
+        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+
+        assertThatThrownBy(() -> driverTripService.returnToWarehouse(50L, "driver1"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Chuyến xe chưa hoàn thành");
+
+        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.IN_USE);
+    }
+
+    @Test
+    @DisplayName("returnToWarehouse thất bại khi chuyến xe đã được xác nhận về kho trước đó")
+    void returnToWarehouse_alreadyReturned_throwsException() {
+        execution.setReturnedToWarehouseAt(LocalDateTime.now().minusMinutes(20));
+        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+
+        assertThatThrownBy(() -> driverTripService.returnToWarehouse(50L, "driver1"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Chuyến xe đã được xác nhận về kho trước đó");
+    }
+
+    @Test
+    @DisplayName("startTrip thất bại khi chuyến xe thuộc về ngày trong tương lai")
+    void startTrip_futureDeliveryDate_throwsException() {
+        trip.setDeliveryDate(LocalDate.now().plusDays(2));
+        execution.setStatus("ASSIGNED");
+        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+
+        assertThatThrownBy(() -> driverTripService.startTrip(50L, "driver1"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Chưa đến ngày giao hàng");
+    }
+
+    @Test
+    @DisplayName("getActiveTrip lọc bỏ chuyến xe ASSIGNED ở ngày tương lai")
+    void getActiveTrip_assignedFutureDate_ignored() {
+        trip.setDeliveryDate(LocalDate.now().plusDays(1));
+        execution.setStatus("ASSIGNED");
+        when(tripExecutionRepo.findByDriverUsernameAndStatusIn("driver1", java.util.List.of("IN_PROGRESS", "ASSIGNED")))
+                .thenReturn(java.util.List.of(execution));
+
+        assertThatThrownBy(() -> driverTripService.getActiveTrip("driver1"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Không tìm thấy chuyến xe đang phân công");
     }
 
     @Test
@@ -197,51 +286,5 @@ class DriverTripServiceImplTest {
         assertThat(stop1.getStatus()).isEqualTo(TripStopStatus.IN_PROGRESS);
         assertThat(stop1.getActualArrivalTime()).isNotNull();
         verify(tripStopRepo).save(stop1);
-    }
-
-    @Test
-    @DisplayName("adminOverrideTripExecution FORCE_RETURN giải phóng xe về AVAILABLE thành công")
-    void adminOverride_forceReturn_success() {
-        execution.setStatus("COMPLETED");
-        trip.setVehicle(vehicle);
-        vehicle.setStatus(VehicleStatus.IN_USE);
-
-        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
-
-        com.elog.dto.request.AdminTripOverrideRequest request = com.elog.dto.request.AdminTripOverrideRequest.builder()
-                .action("FORCE_RETURN")
-                .reason("Driver lost phone, confirmed vehicle returned")
-                .build();
-
-        DriverTripResponse response = driverTripService.adminOverrideTripExecution(50L, request, "dispatcher01");
-
-        assertThat(response).isNotNull();
-        assertThat(execution.getReturnedToWarehouseAt()).isNotNull();
-        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
-        verify(vehicleRepo).save(vehicle);
-    }
-
-    @Test
-    @DisplayName("adminOverrideTripExecution FORCE_COMPLETE_AND_RETURN hoàn tất chuyến và giải phóng xe")
-    void adminOverride_forceCompleteAndReturn_success() {
-        execution.setStatus("IN_PROGRESS");
-        trip.setVehicle(vehicle);
-        vehicle.setStatus(VehicleStatus.IN_USE);
-
-        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
-
-        com.elog.dto.request.AdminTripOverrideRequest request = com.elog.dto.request.AdminTripOverrideRequest.builder()
-                .action("FORCE_COMPLETE_AND_RETURN")
-                .reason("Driver sick, admin force complete")
-                .defaultPendingOrderStatus("DELIVERED")
-                .build();
-
-        DriverTripResponse response = driverTripService.adminOverrideTripExecution(50L, request, "dispatcher01");
-
-        assertThat(response).isNotNull();
-        assertThat(execution.getStatus()).isEqualTo("COMPLETED");
-        assertThat(execution.getReturnedToWarehouseAt()).isNotNull();
-        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
-        verify(vehicleRepo).save(vehicle);
     }
 }

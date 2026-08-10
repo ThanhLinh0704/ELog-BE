@@ -1,453 +1,199 @@
 package com.elog.service;
 
+import com.elog.dto.request.*;
+import com.elog.dto.response.*;
+import com.elog.entity.Route;
+import com.elog.entity.RouteStop;
+import com.elog.entity.Store;
+import com.elog.entity.Province;
+import com.elog.entity.District;
+import com.elog.entity.Ward;
+import com.elog.exception.BusinessException;
+import com.elog.mapper.StoreMapper;
+import com.elog.repository.RouteStopRepository;
+import com.elog.repository.StoreRepository;
+import com.elog.repository.ProvinceRepository;
+import com.elog.repository.DistrictRepository;
+import com.elog.repository.WardRepository;
+import com.elog.service.impl.StoreServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.springframework.http.HttpStatus;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class StoreServiceImplTest {
+class StoreServiceImplTest {
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-01 | PRIORITY: P1
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storExecute(): valid data -> processes successfully
-     * GIVEN: requestValid=true; mockRepo.save()=entity; dependencies=ok
-     * WHEN: service.storExecute(request)
-     * THEN: Returns valid response; repository.save() is called
-     */
-    @Test
-    void test_storExecute_Scenario1() {
-        // Setup Mocking
-        // TODO: when(mockRepository.save(any())).thenReturn(mockEntity);
-        boolean executionResult = true;
-        assertTrue(executionResult, "L1 Test Passed: UT-STOR-01");
+    @Mock
+    StoreRepository storeRepository;
+    @Mock
+    RouteStopRepository routeStopRepository;
+    @Mock
+    ProvinceRepository provinceRepository;
+    @Mock
+    DistrictRepository districtRepository;
+    @Mock
+    WardRepository wardRepository;
+    @Mock
+    StoreMapper storeMapper;
+    @InjectMocks
+    StoreServiceImpl storeService;
+
+    private StoreCreateRequest validCreateRequest;
+    private Store savedStore;
+    private Province prov;
+    private District dist;
+    private Ward ward;
+
+    @BeforeEach
+    void setUp() {
+        validCreateRequest = new StoreCreateRequest();
+        validCreateRequest.setStoreCode("ST-Q1-001");
+        validCreateRequest.setStoreName("Dien May Test");
+        validCreateRequest.setProvinceCode("79");
+        validCreateRequest.setDistrictCode("760");
+        validCreateRequest.setWardCode("26740");
+        validCreateRequest.setAddressDetail("10 Le Lai");
+        validCreateRequest.setContactPhone("0901234567");
+        validCreateRequest.setLatitude(10.7756587);
+        validCreateRequest.setLongitude(106.7004238);
+
+        prov = Province.builder().code("79").fullName("Thành phố Hồ Chí Minh").build();
+        dist = District.builder().code("760").fullName("Quận 1").province(prov).build();
+        ward = Ward.builder().code("26740").fullName("Phường Bến Nghé").district(dist).build();
+
+        savedStore = Store.builder()
+                .id(1L).code("ST-Q1-001").name("Dien May Test")
+                .province(prov).district(dist).ward(ward).addressDetail("10 Le Lai").isActive(true)
+                .latitude(10.7756587).longitude(106.7004238)
+                .build();
     }
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-02 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
+    // ── createStore ──────────────────────────────────────────
+
     @Test
-    void test_storExecute_Scenario2() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-02");
+    void createStore_success() {
+        when(storeRepository.existsByCode("ST-Q1-001")).thenReturn(false);
+        when(provinceRepository.findById("79")).thenReturn(Optional.of(prov));
+        when(districtRepository.findById("760")).thenReturn(Optional.of(dist));
+        when(wardRepository.findById("26740")).thenReturn(Optional.of(ward));
+        when(storeMapper.toEntity(validCreateRequest)).thenReturn(savedStore);
+        when(storeRepository.save(any(Store.class))).thenReturn(savedStore);
+        when(routeStopRepository.findFirstByStoreId(1L)).thenReturn(Optional.empty());
+        StoreResponse expectedResponse = StoreResponse.builder().id(1L).storeCode("ST-Q1-001").build();
+        when(storeMapper.toResponse(any(), any(), any())).thenReturn(expectedResponse);
+
+        StoreResponse result = storeService.createStore(validCreateRequest);
+
+        assertThat(result.getId()).isEqualTo(1L);
+        verify(storeRepository).save(any(Store.class));
     }
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-03 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
     @Test
-    void test_storExecute_Scenario3() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-03");
+    void createStore_duplicateCode_throws409() {
+        when(storeRepository.existsByCode("ST-Q1-001")).thenReturn(true);
+
+        BusinessException ex = catchThrowableOfType(
+                () -> storeService.createStore(validCreateRequest), BusinessException.class);
+
+        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verify(storeRepository, never()).save(any());
     }
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-04 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
     @Test
-    void test_storExecute_Scenario4() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-04");
+    void createStore_latitudeWithoutLongitude_throws400() {
+        validCreateRequest.setLatitude(10.77);
+        validCreateRequest.setLongitude(null);
+        when(storeRepository.existsByCode(any())).thenReturn(false);
+
+        BusinessException ex = catchThrowableOfType(
+                () -> storeService.createStore(validCreateRequest), BusinessException.class);
+
+        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(storeRepository, never()).save(any());
     }
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-05 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
     @Test
-    void test_storExecute_Scenario5() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-05");
+    void createStore_longitudeWithoutLatitude_throws400() {
+        validCreateRequest.setLatitude(null);
+        validCreateRequest.setLongitude(106.70);
+        when(storeRepository.existsByCode(any())).thenReturn(false);
+
+        BusinessException ex = catchThrowableOfType(
+                () -> storeService.createStore(validCreateRequest), BusinessException.class);
+
+        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verify(storeRepository, never()).save(any());
     }
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-06 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
+    // ── getStoreById ─────────────────────────────────────────
+
     @Test
-    void test_storExecute_Scenario6() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-06");
+    void getStoreById_success() {
+        when(storeRepository.findById(1L)).thenReturn(Optional.of(savedStore));
+        when(routeStopRepository.findFirstByStoreId(1L)).thenReturn(Optional.empty());
+        StoreResponse expected = StoreResponse.builder().id(1L).build();
+        when(storeMapper.toResponse(any(), any(), any())).thenReturn(expected);
+
+        StoreResponse result = storeService.getStoreById(1L);
+
+        assertThat(result.getId()).isEqualTo(1L);
     }
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-07 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
     @Test
-    void test_storExecute_Scenario7() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-07");
+    void getStoreById_notFound_throws404() {
+        when(storeRepository.findById(99L)).thenReturn(Optional.empty());
+
+        BusinessException ex = catchThrowableOfType(
+                () -> storeService.getStoreById(99L), BusinessException.class);
+
+        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-08 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
+    // ── updateStoreStatus ─────────────────────────────────────
+
     @Test
-    void test_storExecute_Scenario8() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-08");
+    void updateStoreStatus_deactivate_storeInActiveRoute_throws409() {
+        when(storeRepository.findById(1L)).thenReturn(Optional.of(savedStore));
+        when(routeStopRepository.existsByStoreIdAndRouteIsActiveTrue(1L)).thenReturn(true);
+        Route activeRoute = Route.builder().id(1L).code("RT-Q1").name("Tuyen Q1").isActive(true).build();
+        RouteStop rs = RouteStop.builder().route(activeRoute).store(savedStore).sequenceOrder(1).build();
+        when(routeStopRepository.findFirstByStoreId(1L)).thenReturn(Optional.of(rs));
+
+        StoreStatusUpdateRequest req = new StoreStatusUpdateRequest();
+        req.setIsActive(false);
+
+        BusinessException ex = catchThrowableOfType(
+                () -> storeService.updateStoreStatus(1L, req), BusinessException.class);
+
+        assertThat(ex.getHttpStatus()).isEqualTo(HttpStatus.CONFLICT);
+        verify(storeRepository, never()).save(any());
     }
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-09 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
     @Test
-    void test_storExecute_Scenario9() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-09");
-    }
+    void updateStoreStatus_deactivate_noActiveRoute_success() {
+        when(storeRepository.findById(1L)).thenReturn(Optional.of(savedStore));
+        when(routeStopRepository.existsByStoreIdAndRouteIsActiveTrue(1L)).thenReturn(false);
+        when(storeRepository.save(any())).thenReturn(savedStore);
+        when(routeStopRepository.findFirstByStoreId(1L)).thenReturn(Optional.empty());
+        StoreResponse expected = StoreResponse.builder().id(1L).isActive(false).build();
+        when(storeMapper.toResponse(any(), any(), any())).thenReturn(expected);
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-10 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storExecute_Scenario10() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-10");
-    }
+        StoreStatusUpdateRequest req = new StoreStatusUpdateRequest();
+        req.setIsActive(false);
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-11 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storExecute_Scenario11() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-11");
-    }
+        StoreResponse result = storeService.updateStoreStatus(1L, req);
 
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-12 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storExecute_Scenario12() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-12");
+        assertThat(result.getIsActive()).isFalse();
+        verify(storeRepository).save(argThat(s -> !s.getIsActive()));
     }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-13 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storExecute(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storExecute(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storExecute_Scenario13() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-13");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-14 | PRIORITY: P1
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storValidate(): valid data -> processes successfully
-     * GIVEN: requestValid=true; mockRepo.save()=entity; dependencies=ok
-     * WHEN: service.storValidate(request)
-     * THEN: Returns valid response; repository.save() is called
-     */
-    @Test
-    void test_storValidate_Scenario1() {
-        // Setup Mocking
-        // TODO: when(mockRepository.save(any())).thenReturn(mockEntity);
-        boolean executionResult = true;
-        assertTrue(executionResult, "L1 Test Passed: UT-STOR-14");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-15 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario2() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-15");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-16 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario3() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-16");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-17 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario4() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-17");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-18 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario5() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-18");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-19 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario6() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-19");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-20 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario7() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-20");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-21 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario8() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-21");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-22 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario9() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-22");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-23 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario10() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-23");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-24 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario11() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-24");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-25 | PRIORITY: P2
-     * TECHNIQUE: Condition Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario12() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-25");
-    }
-
-    /**
-     * SHEET: StoreServiceImplTest
-     * TEST ID: UT-STOR-26 | PRIORITY: P2
-     * TECHNIQUE: Decision Coverage
-     * COVERS: storValidate(): missing required field or invalid data
-     * GIVEN: requestValid=false; mockRepo returns empty/error
-     * WHEN: service.storValidate(request)
-     * THEN: Throws BusinessException HTTP 400; save() is not called
-     */
-    @Test
-    void test_storValidate_Scenario13() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-STOR-26");
-    }
-
 }
