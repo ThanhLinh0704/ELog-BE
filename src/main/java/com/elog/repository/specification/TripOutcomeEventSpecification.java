@@ -17,12 +17,12 @@ public class TripOutcomeEventSpecification {
 
     public static Specification<TripOutcomeEvent> hasDriverUsername(String driverUsername) {
         return (root, query, cb) -> (driverUsername == null || driverUsername.isBlank()) ? null
-                : cb.equal(root.get("driverUsername"), driverUsername);
+                : cb.like(cb.lower(root.get("driverUsername")), "%" + driverUsername.toLowerCase().trim() + "%");
     }
 
     public static Specification<TripOutcomeEvent> hasRouteCode(String routeCode) {
         return (root, query, cb) -> (routeCode == null || routeCode.isBlank()) ? null
-                : cb.equal(root.get("routeCode"), routeCode);
+                : cb.like(cb.lower(root.get("routeCode")), "%" + routeCode.toLowerCase().trim() + "%");
     }
 
     public static Specification<TripOutcomeEvent> hasDeliveryDate(LocalDate date) {
@@ -31,7 +31,7 @@ public class TripOutcomeEventSpecification {
 
     public static Specification<TripOutcomeEvent> hasStoreCode(String storeCode) {
         return (root, query, cb) -> (storeCode == null || storeCode.isBlank()) ? null
-                : cb.equal(root.get("storeCode"), storeCode);
+                : cb.like(cb.lower(root.get("storeCode")), "%" + storeCode.toLowerCase().trim() + "%");
     }
 
     public static Specification<TripOutcomeEvent> hasDeliveryResult(String deliveryResult) {

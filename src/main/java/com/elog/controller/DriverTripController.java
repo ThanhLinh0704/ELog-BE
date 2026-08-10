@@ -50,6 +50,17 @@ public class DriverTripController {
         return ResponseEntity.ok(ApiResponse.success(response, "Đã bắt đầu chuyến xe thành công"));
     }
 
+    @PostMapping("/{executionId}/stops/{stopId}/arrive")
+    @Operation(summary = "Tài xế bấm Đã đến điểm giao")
+    @PreAuthorize("hasAuthority('trip:execute')")
+    public ResponseEntity<ApiResponse<DriverTripResponse>> arriveAtStop(
+            @PathVariable Long executionId,
+            @PathVariable Long stopId) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        DriverTripResponse response = driverTripService.arriveAtStop(executionId, stopId, username);
+        return ResponseEntity.ok(ApiResponse.success(response, "Đã ghi nhận đến điểm giao"));
+    }
+
     @PutMapping("/{executionId}/orders/{orderId}/result")
     @Operation(summary = "Cập nhật kết quả giao hàng từng đơn (DELIVERED, PARTIALLY_DELIVERED, FAILED)")
     @PreAuthorize("hasAuthority('trip:execute')")

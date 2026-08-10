@@ -269,6 +269,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         LocalDate deliveryDate = draft.getDeliveryDate();
         List<User> allDrivers = findActiveDrivers();
         List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+        List<Order> draftOrders = orderRepo.findByTripDraftId(draft.getId());
 
         // Normalization params
         double maxCostPerKm = allVehicles.stream()
@@ -301,7 +302,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             // Find vehicles that pass hard constraints for subA
             List<Vehicle> candidatesA = new ArrayList<>();
             for (Vehicle v : allVehicles) {
-                if (passesHardConstraintsForSub(v, subAVolume, subAWeight, stopsA, storesA, deliveryDate, busyStatuses)) {
+                if (passesHardConstraintsForSub(v, subAVolume, subAWeight, stopsA, storesA, draftOrders, deliveryDate, busyStatuses)) {
                     candidatesA.add(v);
                 }
             }
@@ -309,7 +310,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             // Find vehicles that pass hard constraints for subB
             List<Vehicle> candidatesB = new ArrayList<>();
             for (Vehicle v : allVehicles) {
-                if (passesHardConstraintsForSub(v, subBVolume, subBWeight, stopsB, storesB, deliveryDate, busyStatuses)) {
+                if (passesHardConstraintsForSub(v, subBVolume, subBWeight, stopsB, storesB, draftOrders, deliveryDate, busyStatuses)) {
                     candidatesB.add(v);
                 }
             }
@@ -359,15 +360,27 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         if (allPairs.isEmpty()) {
+            long etaViolations = stops.stream()
+                    .filter(s -> constraintValidationService.validateStopEta(s, draftOrders) != null)
+                    .count();
+
             if (everyPointLacksVehicleForA || everyPointLacksVehicleForB) {
-                outReasons.add("Không có xe nào đủ tải trọng/thể tích cho ít nhất 1 trong 2 nửa tuyến, ở cả "
-                        + validSplitPoints.size() + " điểm chia thử được — cần xe lớn hơn hoặc tách bớt đơn sang đợt khác.");
+                if (etaViolations > 0) {
+                    outReasons.add(etaViolations + " điểm dừng vi phạm khung giờ giao hàng của đơn hàng (TIME_WINDOW) — cần điều chỉnh giờ xuất phát hoặc thứ tự điểm dừng, không phải đổi/thêm xe.");
+                } else {
+                    outReasons.add("Không có xe nào đủ tải trọng/thể tích cho ít nhất 1 trong 2 nửa tuyến, ở cả "
+                            + validSplitPoints.size() + " điểm chia thử được — cần xe lớn hơn hoặc tách bớt đơn sang đợt khác.");
+                }
             } else if (foundVehiclePairButSameDriverOnly && !foundVehiclePairButNoDriver) {
                 outReasons.add("Có xe phù hợp cho cả 2 nửa tuyến, nhưng chỉ có 1 tài xế đang rảnh đáp ứng được cả 2 xe — cần thêm ít nhất 1 tài xế khả dụng nữa.");
             } else if (foundVehiclePairButNoDriver) {
                 outReasons.add("Có cặp xe phù hợp cho cả 2 nửa tuyến nhưng không tìm được tài xế khả dụng tương ứng — kiểm tra lại danh sách tài xế đang rảnh (Active, không bận, đã xác nhận về kho).");
             } else {
-                outReasons.add("Có " + validSplitPoints.size() + " cách chia hợp lệ nhưng không tổ hợp 2 xe nào đáp ứng đồng thời tất cả ràng buộc.");
+                if (etaViolations > 0) {
+                    outReasons.add(etaViolations + " điểm dừng vi phạm khung giờ giao hàng của đơn hàng (TIME_WINDOW) — cần điều chỉnh giờ xuất phát hoặc thứ tự điểm dừng.");
+                } else {
+                    outReasons.add("Có " + validSplitPoints.size() + " cách chia hợp lệ nhưng không tổ hợp 2 xe nào đáp ứng đồng thời tất cả ràng buộc.");
+                }
             }
         }
 
@@ -397,7 +410,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             return fails;
         }
 
-        if (!tripExecutionRepo.findUnreturnedByVehicleId(v.getId()).isEmpty()) {
+        if (hasUnreturnedVehicleConflict(v.getId(), deliveryDate)) {
             fails.add("Vehicle is IN_USE and has not confirmed return to warehouse yet");
             return fails;
         }
@@ -424,15 +437,12 @@ public class RecommendationServiceImpl implements RecommendationService {
             return fails;
         }
 
-        // HC-5: Time window check (ETA_i <= store_i.closingTime)
+        // HC-5: Time window & order delivery time window check
+        List<Order> draftOrders = orderRepo.findByTripDraftId(draft.getId());
         for (TripDraftStop stop : stops) {
-            if (stop.getPlannedEta() != null && stop.getStore().getTimeWindowEnd() != null) {
-                LocalTime eta = stop.getPlannedEta().toLocalTime();
-                LocalTime closing = stop.getStore().getTimeWindowEnd();
-                if (eta.isAfter(closing)) {
-                    fails.add("ETA " + eta + " exceeds closing time " + closing
-                            + " at store " + stop.getStore().getCode());
-                }
+            String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+            if (violation != null) {
+                fails.add(violation);
             }
         }
 
@@ -444,10 +454,11 @@ public class RecommendationServiceImpl implements RecommendationService {
      */
     private boolean passesHardConstraintsForSub(Vehicle v, BigDecimal subVolume, BigDecimal subWeight,
                                                  List<TripDraftStop> subStops, List<Store> subStores,
+                                                 List<Order> draftOrders,
                                                  LocalDate deliveryDate, List<TripStatus> busyStatuses) {
         if (v.getStatus() != VehicleStatus.AVAILABLE) return false;
         if (tripRepo.existsByVehicleIdAndDeliveryDateAndStatusIn(v.getId(), deliveryDate, busyStatuses)) return false;
-        if (!tripExecutionRepo.findUnreturnedByVehicleId(v.getId()).isEmpty()) return false;
+        if (hasUnreturnedVehicleConflict(v.getId(), deliveryDate)) return false;
 
         BigDecimal safetyBuffer = getSafetyBufferRatio();
         BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(safetyBuffer);
@@ -458,12 +469,11 @@ public class RecommendationServiceImpl implements RecommendationService {
         List<String> storeViolations = constraintValidationService.validateTripVehicleStops(subStores, v);
         if (!storeViolations.isEmpty()) return false;
 
-        // Time window check for sub-stops
+        // Time window check for sub-stops (store allowed hours, store closing time, and order delivery windows)
         for (TripDraftStop stop : subStops) {
-            if (stop.getPlannedEta() != null && stop.getStore().getTimeWindowEnd() != null) {
-                if (stop.getPlannedEta().toLocalTime().isAfter(stop.getStore().getTimeWindowEnd())) {
-                    return false;
-                }
+            String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+            if (violation != null) {
+                return false;
             }
         }
 
@@ -557,7 +567,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                     }
                     // Schedule check: not busy on date AND has returned to warehouse from all past executions
                     boolean busyOnDate = tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(d.getId(), date, busyStatuses);
-                    boolean unreturned = !tripExecutionRepo.findUnreturnedByDriverId(d.getId()).isEmpty();
+                    boolean unreturned = hasUnreturnedDriverConflict(d.getId(), date);
                     return !busyOnDate && !unreturned;
                 })
                 .toList();
@@ -662,12 +672,13 @@ public class RecommendationServiceImpl implements RecommendationService {
                     + maxFleetWeight + " kg @ 90% buffer).");
         }
 
-        // Check time window violations
-        long lateStops = stops.stream()
-                .filter(s -> "TIME_WINDOW_LATE".equals(s.getViolationCode()))
+        // Check time window violations (both store operating hours & order delivery time window)
+        List<Order> draftOrders = orderRepo.findByTripDraftId(draft.getId());
+        long etaViolations = stops.stream()
+                .filter(s -> constraintValidationService.validateStopEta(s, draftOrders) != null)
                 .count();
-        if (lateStops > 0) {
-            reasons.add(lateStops + " điểm dừng có ETA vượt quá giờ đóng cửa (TIME_WINDOW_LATE).");
+        if (etaViolations > 0) {
+            reasons.add(etaViolations + " điểm dừng vi phạm khung giờ giao hàng (TIME_WINDOW) — cần điều chỉnh giờ xuất phát hoặc thứ tự điểm dừng, không phải đổi/thêm xe.");
         }
 
         // Check driver availability
@@ -694,7 +705,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             boolean licenseOk = (v.getRequiredLicense() == null) ||
                     (assigned.getLicenseClass() != null && assigned.getLicenseClass().ordinal() >= v.getRequiredLicense().ordinal());
             boolean busy = tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(assigned.getId(), date, busyStatuses)
-                    || !tripExecutionRepo.findUnreturnedByDriverId(assigned.getId()).isEmpty();
+                    || hasUnreturnedDriverConflict(assigned.getId(), date);
 
             if (licenseOk && !busy) {
                 return new PairedDriverInfo(assigned, false);
@@ -708,6 +719,16 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         return null;
+    }
+
+    private boolean hasUnreturnedVehicleConflict(Long vehicleId, LocalDate targetDate) {
+        List<TripExecution> unreturned = tripExecutionRepo.findUnreturnedByVehicleId(vehicleId);
+        return unreturned.stream().anyMatch(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(targetDate));
+    }
+
+    private boolean hasUnreturnedDriverConflict(Long driverId, LocalDate targetDate) {
+        List<TripExecution> unreturned = tripExecutionRepo.findUnreturnedByDriverId(driverId);
+        return unreturned.stream().anyMatch(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(targetDate));
     }
 
     // ══════════════════════════════════════════════════════════════════════════

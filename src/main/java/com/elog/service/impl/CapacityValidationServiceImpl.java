@@ -35,6 +35,7 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
     private final UserRepository userRepo;
     private final OrderRepository orderRepository;
     private final com.elog.service.RecommendationService recommendationService;
+    private final com.elog.service.ConstraintValidationService constraintValidationService;
 
     @Override
     @Transactional
@@ -114,33 +115,11 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
             boolean etaAllowed = true;
             String etaViolationReason = null;
             for (TripDraftStop stop : draft.getStops()) {
-                if (stop.getIsActive()) {
-                    Store store = stop.getStore();
-                    if (stop.getPlannedEta() != null) {
-                        LocalTime etaTime = stop.getPlannedEta().toLocalTime();
-                        if (!isTimeWithinAllowedHours(etaTime, store.getAllowedDeliveryHours())) {
-                            etaAllowed = false;
-                            etaViolationReason = "Planned ETA (" + etaTime + ") is outside store " + store.getCode() + " allowed delivery hours (" + store.getAllowedDeliveryHours() + ")";
-                            break;
-                        }
-                        for (Order order : draftOrders) {
-                            if (order.getStore().getId().equals(store.getId())) {
-                                if (Boolean.TRUE.equals(order.getIsDeliveryTimeOverridden())) {
-                                    continue;
-                                }
-                                if (order.getDeliveryTimeWindow() != null && !order.getDeliveryTimeWindow().trim().isEmpty()) {
-                                    if (!isTimeWithinOrderWindow(etaTime, order.getDeliveryTimeWindow())) {
-                                        etaAllowed = false;
-                                        etaViolationReason = "Planned ETA (" + etaTime + ") violates delivery window (" + order.getDeliveryTimeWindow() + ") for order " + order.getOrderRef();
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        if (!etaAllowed) {
-                            break;
-                        }
-                    }
+                String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+                if (violation != null) {
+                    etaAllowed = false;
+                    etaViolationReason = violation;
+                    break;
                 }
             }
 
@@ -224,8 +203,15 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                     bindingConstraint = "VOLUME";
                 } else if (overallVolume == ConstraintResult.PASS && overallWeight == ConstraintResult.FAIL) {
                     bindingConstraint = "WEIGHT";
-                } else {
+                } else if (overallVolume == ConstraintResult.FAIL && overallWeight == ConstraintResult.FAIL) {
                     bindingConstraint = "BOTH";
+                } else {
+                    boolean hasEtaViolation = ineligibleVehicles.stream().anyMatch(v -> v.getFailureReason() != null && (v.getFailureReason().contains("Planned ETA") || v.getFailureReason().contains("violates delivery window") || v.getFailureReason().contains("allowed delivery hours") || v.getFailureReason().contains("exceeds closing time")));
+                    if (hasEtaViolation) {
+                        bindingConstraint = "TIME_WINDOW";
+                    } else {
+                        bindingConstraint = "ROUTE_CONSTRAINT";
+                    }
                 }
 
                 suggestion = "No single vehicle can accommodate this load, and no two-vehicle split is feasible either. "
@@ -323,33 +309,11 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                 boolean etaAllowed = true;
                 String etaViolationReason = null;
                 for (TripDraftStop stop : draft.getStops()) {
-                    if (stop.getIsActive()) {
-                        Store store = stop.getStore();
-                        if (stop.getPlannedEta() != null) {
-                            LocalTime etaTime = stop.getPlannedEta().toLocalTime();
-                            if (!isTimeWithinAllowedHours(etaTime, store.getAllowedDeliveryHours())) {
-                                etaAllowed = false;
-                                etaViolationReason = "Planned ETA (" + etaTime + ") is outside store " + store.getCode() + " allowed delivery hours (" + store.getAllowedDeliveryHours() + ")";
-                                break;
-                            }
-                            for (Order order : draftOrders) {
-                                if (order.getStore().getId().equals(store.getId())) {
-                                    if (Boolean.TRUE.equals(order.getIsDeliveryTimeOverridden())) {
-                                        continue;
-                                    }
-                                    if (order.getDeliveryTimeWindow() != null && !order.getDeliveryTimeWindow().trim().isEmpty()) {
-                                        if (!isTimeWithinOrderWindow(etaTime, order.getDeliveryTimeWindow())) {
-                                            etaAllowed = false;
-                                            etaViolationReason = "Planned ETA (" + etaTime + ") violates delivery window (" + order.getDeliveryTimeWindow() + ") for order " + order.getOrderRef();
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            if (!etaAllowed) {
-                                break;
-                            }
-                        }
+                    String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+                    if (violation != null) {
+                        etaAllowed = false;
+                        etaViolationReason = violation;
+                        break;
                     }
                 }
 
@@ -408,10 +372,22 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                 bindingConstraint = "VOLUME";
             } else if (draft.getVolumeCheckResult() == ConstraintResult.PASS && draft.getWeightCheckResult() == ConstraintResult.FAIL) {
                 bindingConstraint = "WEIGHT";
-            } else {
+            } else if (draft.getVolumeCheckResult() == ConstraintResult.FAIL && draft.getWeightCheckResult() == ConstraintResult.FAIL) {
                 bindingConstraint = "BOTH";
+            } else {
+                boolean hasEtaViolation = ineligibleVehicles.stream().anyMatch(v -> v.getFailureReason() != null && (v.getFailureReason().contains("Planned ETA") || v.getFailureReason().contains("violates delivery window") || v.getFailureReason().contains("allowed delivery hours") || v.getFailureReason().contains("exceeds closing time")));
+                if (hasEtaViolation) {
+                    bindingConstraint = "TIME_WINDOW";
+                } else {
+                    bindingConstraint = "ROUTE_CONSTRAINT";
+                }
             }
-            suggestion = "No single vehicle can accommodate this load. Consider trip splitting in Vehicle Assignment (BR-07) or checking route weight/ETA limits.";
+
+            if (validationPassed) {
+                suggestion = "No single vehicle can accommodate this load, but a two-vehicle split is feasible. Proceed to Vehicle Assignment (Split) to assign 2 vehicles (BR-07).";
+            } else {
+                suggestion = "No single vehicle can accommodate this load, and no two-vehicle split is feasible either. Consider checking route weight/ETA limits or fleet availability.";
+            }
         }
 
         ConfirmedByDto validatorDto = null;
@@ -422,11 +398,16 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                     .build();
         }
 
-        String message = validationPassed
-                ? "Capacity validation passed. " + eligibleVehicles.size() + " eligible vehicles available. Proceed to Vehicle Assignment."
-                : (draft.getVolumeCheckResult() == ConstraintResult.NOT_CHECKED
+        String message;
+        if (validationPassed) {
+            message = eligibleVehicles.isEmpty()
+                    ? "Capacity validation passed via two-vehicle split. Proceed to Vehicle Assignment (Split) — BR-07."
+                    : "Capacity validation passed. " + eligibleVehicles.size() + " eligible vehicles available. Proceed to Vehicle Assignment.";
+        } else {
+            message = (draft.getVolumeCheckResult() == ConstraintResult.NOT_CHECKED)
                     ? "Chưa có kết quả kiểm tra. Bấm Kiểm tra để bắt đầu."
-                    : "Capacity validation failed. Total volume " + draft.getTotalVolumeM3() + " m³ exceeds all available vehicle capacities or violates route limits.");
+                    : "Capacity validation failed. Total volume " + draft.getTotalVolumeM3() + " m³ exceeds all available vehicle capacities or violates route limits, and no two-vehicle split is feasible either.";
+        }
 
         return CapacityValidationResultResponse.builder()
                 .tripDraftId(draft.getId())
@@ -447,119 +428,5 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                 .message(message)
                 .build();
     }
-
-    private static final int GRACE_PERIOD_MINUTES = 20;
-
-    private boolean isTimeWithinOrderWindow(LocalTime time, String window) {
-        if (window == null || window.trim().isEmpty()) {
-            return true;
-        }
-        String cleanWindow = window.trim().toLowerCase();
-        
-        if (cleanWindow.contains("hành chính") || cleanWindow.contains("hanh chinh")) {
-            LocalTime start = LocalTime.of(8, 0);
-            LocalTime end = LocalTime.of(17, 0).plusMinutes(GRACE_PERIOD_MINUTES);
-            return !time.isBefore(start) && !time.isAfter(end);
-        }
-        
-        if (cleanWindow.contains("trước") || cleanWindow.contains("truoc")) {
-            LocalTime limit = parseTimeFromString(cleanWindow.replaceAll("trước|truoc", "").trim());
-            if (limit != null) {
-                return !time.isAfter(limit.plusMinutes(GRACE_PERIOD_MINUTES));
-            }
-            return true;
-        }
-        
-        if (cleanWindow.contains("sau")) {
-            LocalTime limit = parseTimeFromString(cleanWindow.replaceAll("sau", "").trim());
-            if (limit != null) {
-                return !time.isBefore(limit);
-            }
-            return true;
-        }
-        
-        if (cleanWindow.contains("-")) {
-            String[] parts = cleanWindow.split("-");
-            if (parts.length == 2) {
-                LocalTime start = parseTimeFromString(parts[0].trim());
-                LocalTime end = parseTimeFromString(parts[1].trim());
-                if (start != null && end != null) {
-                    LocalTime endWithGrace = end.plusMinutes(GRACE_PERIOD_MINUTES);
-                    if (start.isAfter(endWithGrace)) {
-                        return !time.isBefore(start) || !time.isAfter(endWithGrace);
-                    } else {
-                        return !time.isBefore(start) && !time.isAfter(endWithGrace);
-                    }
-                }
-            }
-        }
-        
-        LocalTime directTime = parseTimeFromString(cleanWindow);
-        if (directTime != null) {
-            return !time.isAfter(directTime.plusMinutes(GRACE_PERIOD_MINUTES));
-        }
-        
-        return true;
-    }
-
-    private LocalTime parseTimeFromString(String s) {
-        if (s == null) return null;
-        s = s.trim().replaceAll("\\s+", "");
-        if (s.isEmpty()) return null;
-        
-        try {
-            if (s.contains(":")) {
-                String[] parts = s.split(":");
-                int hour = Integer.parseInt(parts[0]);
-                int minute = parts.length > 1 ? Integer.parseInt(parts[1]) : 0;
-                return LocalTime.of(hour, minute);
-            }
-            
-            if (s.contains("h")) {
-                String[] parts = s.split("h");
-                int hour = Integer.parseInt(parts[0]);
-                int minute = (parts.length > 1 && !parts[1].isEmpty()) ? Integer.parseInt(parts[1]) : 0;
-                return LocalTime.of(hour, minute);
-            }
-            
-            if (s.matches("\\d+")) {
-                int hour = Integer.parseInt(s);
-                if (hour >= 0 && hour <= 23) {
-                    return LocalTime.of(hour, 0);
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Failed to parse time string: '{}'", s, e);
-        }
-        return null;
-    }
-
-    private boolean isTimeWithinAllowedHours(LocalTime time, String allowedHours) {
-        if (allowedHours == null || allowedHours.trim().isEmpty() || "All".equalsIgnoreCase(allowedHours.trim())) {
-            return true;
-        }
-        try {
-            String[] intervals = allowedHours.split(",");
-            for (String interval : intervals) {
-                String[] parts = interval.trim().split("-");
-                if (parts.length == 2) {
-                    LocalTime start = LocalTime.parse(parts[0].trim());
-                    LocalTime end = LocalTime.parse(parts[1].trim());
-                    if (start.isAfter(end)) {
-                        if (!time.isBefore(start) || !time.isAfter(end)) {
-                            return true;
-                        }
-                    } else {
-                        if (!time.isBefore(start) && !time.isAfter(end)) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Invalid allowed delivery hours format: '{}'", allowedHours, e);
-            return true;
-        }
-        return false;
-    }
 }
+

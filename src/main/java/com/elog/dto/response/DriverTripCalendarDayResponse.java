@@ -1,5 +1,6 @@
 package com.elog.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,5 +15,7 @@ import java.time.LocalDate;
 public class DriverTripCalendarDayResponse {
 
     private LocalDate date;
+
+    @JsonProperty("allCompleted")
     private boolean allCompleted;
 }

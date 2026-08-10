@@ -103,11 +103,63 @@ public class TripDraftServiceImplTest {
      * THEN: Throws BusinessException HTTP 400; save() is not called
      */
     @Test
-    void test_tripExecute_Scenario6() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-TRIP-06");
+    void consolidate_success() {
+        Store store1 = Store.builder().id(1L).code("ST-001").name("Store 1").build();
+        Store store2 = Store.builder().id(2L).code("ST-002").name("Store 2").build();
+
+        OrderItem item1 = OrderItem.builder()
+                .lineVolumeM3(BigDecimal.valueOf(1.5))
+                .lineWeightKg(BigDecimal.valueOf(100))
+                .build();
+        OrderItem item2 = OrderItem.builder()
+                .lineVolumeM3(BigDecimal.valueOf(0.5))
+                .lineWeightKg(BigDecimal.valueOf(50))
+                .build();
+
+        Order order = Order.builder()
+                .id(100L)
+                .store(store1)
+                .deliveryDate(deliveryDate)
+                .items(List.of(item1, item2))
+                .build();
+
+        Route route = Route.builder().id(10L).code("RT-001").build();
+        RouteStop rs1 = RouteStop.builder().id(1L).route(route).store(store1).sequenceOrder(1).build();
+        RouteStop rs2 = RouteStop.builder().id(2L).route(route).store(store2).sequenceOrder(2).build();
+
+        when(orderRepository.findByDeliveryDateAndStatus(deliveryDate, "ACCEPTED"))
+                .thenReturn(List.of(order));
+        when(routeStopRepository.findFirstByStoreId(1L)).thenReturn(Optional.of(rs1));
+        when(routeRepository.findById(10L)).thenReturn(Optional.of(route));
+        when(routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(10L))
+                .thenReturn(List.of(rs1, rs2));
+        when(tripDraftRepository.findByRouteIdAndDeliveryDate(10L, deliveryDate))
+                .thenReturn(Optional.empty());
+
+        when(tripDraftRepository.saveAndFlush(any(TripDraft.class))).thenAnswer(invocation -> {
+            TripDraft td = invocation.getArgument(0);
+            td.setId(50L);
+            return td;
+        });
+        when(tripDraftRepository.save(any(TripDraft.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ConsolidateResponse response = tripDraftService.consolidate(deliveryDate);
+
+        assertThat(response.getDeliveryDate()).isEqualTo(deliveryDate);
+        assertThat(response.getTripDraftsCreatedOrUpdated()).isEqualTo(1);
+        assertThat(response.getTripDrafts()).hasSize(1);
+        
+        TripDraftResponse draftResponse = response.getTripDrafts().get(0);
+        assertThat(draftResponse.getId()).isEqualTo(50L);
+        assertThat(draftResponse.getRouteCode()).isEqualTo("RT-001");
+        assertThat(draftResponse.getTotalVolumeM3()).isEqualByComparingTo(BigDecimal.valueOf(2.0));
+        assertThat(draftResponse.getTotalWeightKg()).isEqualByComparingTo(BigDecimal.valueOf(150));
+        assertThat(draftResponse.getActiveStopCount()).isEqualTo(1);
+        assertThat(draftResponse.getSkippedStopCount()).isEqualTo(1);
+
+        verify(tripDraftRepository).saveAndFlush(any(TripDraft.class));
+        verify(tripDraftRepository).save(any(TripDraft.class));
+        verify(orderRepository).updateTripDraftId(List.of(100L), 50L);
     }
 
     /**
@@ -137,11 +189,50 @@ public class TripDraftServiceImplTest {
      * THEN: Throws BusinessException HTTP 400; save() is not called
      */
     @Test
-    void test_tripExecute_Scenario8() {
-        // Setup Mocking
-        // TODO: when(mockRepository.findById(any())).thenReturn(Optional.empty());
-        boolean exceptionThrown = true;
-        assertTrue(exceptionThrown, "L1 Exception Caught: UT-TRIP-08");
+    void consolidate_existingDraftInDraftStatus_updatesDraft() {
+        Store store1 = Store.builder().id(1L).code("ST-001").name("Store 1").build();
+
+        OrderItem item1 = OrderItem.builder()
+                .lineVolumeM3(BigDecimal.valueOf(1.5))
+                .lineWeightKg(BigDecimal.valueOf(100))
+                .build();
+
+        Order order = Order.builder()
+                .id(100L)
+                .store(store1)
+                .deliveryDate(deliveryDate)
+                .items(List.of(item1))
+                .build();
+
+        Route route = Route.builder().id(10L).code("RT-001").build();
+        RouteStop rs1 = RouteStop.builder().id(1L).route(route).store(store1).sequenceOrder(1).build();
+
+        TripDraft existingDraft = TripDraft.builder()
+                .id(50L)
+                .route(route)
+                .deliveryDate(deliveryDate)
+                .status("DRAFT")
+                .build();
+
+        when(orderRepository.findByDeliveryDateAndStatus(deliveryDate, "ACCEPTED"))
+                .thenReturn(List.of(order));
+        when(routeStopRepository.findFirstByStoreId(1L)).thenReturn(Optional.of(rs1));
+        when(routeRepository.findById(10L)).thenReturn(Optional.of(route));
+        when(routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(10L))
+                .thenReturn(List.of(rs1));
+        when(tripDraftRepository.findByRouteIdAndDeliveryDate(10L, deliveryDate))
+                .thenReturn(Optional.of(existingDraft));
+
+        when(tripDraftRepository.saveAndFlush(any(TripDraft.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(tripDraftRepository.save(any(TripDraft.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ConsolidateResponse response = tripDraftService.consolidate(deliveryDate);
+
+        assertThat(response.getTripDraftsCreatedOrUpdated()).isEqualTo(1);
+        TripDraftResponse draftResponse = response.getTripDrafts().get(0);
+        assertThat(draftResponse.getId()).isEqualTo(50L);
+
+        verify(tripDraftRepository).save(existingDraft);
     }
 
     /**

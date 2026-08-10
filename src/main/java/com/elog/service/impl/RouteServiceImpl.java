@@ -14,6 +14,7 @@ import com.elog.repository.StoreRepository;
 import com.elog.repository.specification.RouteSpecification;
 import com.elog.service.RouteService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -26,6 +27,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RouteServiceImpl implements RouteService {
 
     private final RouteRepository routeRepository;
@@ -266,34 +268,45 @@ public class RouteServiceImpl implements RouteService {
             return builder.totalDistanceKm(0.0).totalDurationMin(0).build();
         }
 
-        String origin = warehouseLat + "," + warehouseLng;
-        String destination = validStops.get(validStops.size() - 1).getStore().getLatitude() + "," +
-                validStops.get(validStops.size() - 1).getStore().getLongitude();
-
-        String waypoints = null;
-        if (validStops.size() > 1) {
-            waypoints = validStops.subList(0, validStops.size() - 1).stream()
-                    .map(s -> s.getStore().getLatitude() + "," + s.getStore().getLongitude())
-                    .collect(Collectors.joining("|"));
+        List<double[]> coords = new ArrayList<>();
+        coords.add(new double[]{warehouseLat, warehouseLng});
+        for (RouteStop s : validStops) {
+            coords.add(new double[]{s.getStore().getLatitude(), s.getStore().getLongitude()});
         }
 
         if (goongMapService != null && goongMapService.isConfigured()) {
             try {
-                var goongRes = goongMapService.getDirections(origin, destination, waypoints);
-                if (goongRes != null && goongRes.getRoutes() != null && !goongRes.getRoutes().isEmpty()) {
-                    var r = goongRes.getRoutes().get(0);
-                    if (r.getOverviewPolyline() != null) {
-                        builder.routePolyline(r.getOverviewPolyline().getPoints());
-                    }
-                    if (r.getLegs() != null) {
-                        long totalMeters = r.getLegs().stream().mapToLong(leg -> leg.getDistance() != null && leg.getDistance().getValue() != null ? leg.getDistance().getValue() : 0).sum();
-                        long totalSecs = r.getLegs().stream().mapToLong(leg -> leg.getDuration() != null && leg.getDuration().getValue() != null ? leg.getDuration().getValue() : 0).sum();
-                        builder.totalDistanceKm(totalMeters / 1000.0);
-                        builder.totalDurationMin((int) (totalSecs / 60));
+                List<String> legPolylines = new ArrayList<>();
+                long totalMeters = 0;
+                long totalSecs = 0;
+
+                for (int i = 0; i < coords.size() - 1; i++) {
+                    double[] originPt = coords.get(i);
+                    double[] destPt = coords.get(i + 1);
+
+                    String origin = originPt[0] + "," + originPt[1];
+                    String destination = destPt[0] + "," + destPt[1];
+
+                    var goongRes = goongMapService.getDirections(origin, destination, null);
+                    if (goongRes != null && goongRes.getRoutes() != null && !goongRes.getRoutes().isEmpty()) {
+                        var r = goongRes.getRoutes().get(0);
+                        if (r.getOverviewPolyline() != null && r.getOverviewPolyline().getPoints() != null) {
+                            legPolylines.add(r.getOverviewPolyline().getPoints());
+                        }
+                        if (r.getLegs() != null) {
+                            totalMeters += r.getLegs().stream().mapToLong(leg -> leg.getDistance() != null && leg.getDistance().getValue() != null ? leg.getDistance().getValue() : 0).sum();
+                            totalSecs += r.getLegs().stream().mapToLong(leg -> leg.getDuration() != null && leg.getDuration().getValue() != null ? leg.getDuration().getValue() : 0).sum();
+                        }
                     }
                 }
+
+                if (!legPolylines.isEmpty()) {
+                    builder.routePolyline(String.join(";", legPolylines));
+                    builder.totalDistanceKm(totalMeters / 1000.0);
+                    builder.totalDurationMin((int) (totalSecs / 60));
+                }
             } catch (Exception e) {
-                // Ignore and return builder with null polyline
+                log.error("Error building route directions: {}", e.getMessage(), e);
             }
         }
 
