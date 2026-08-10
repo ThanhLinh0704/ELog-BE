@@ -49,9 +49,10 @@ public class StoreController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isActive,
             @RequestParam(required = false) Boolean hasRoute,
+            @RequestParam(required = false) String routeCode,
             @PageableDefault(size = 20) Pageable pageable) {
         ApiResponse<List<StoreListItemResponse>> response =
-                storeService.getAllStores(keyword, isActive, hasRoute, pageable);
+                storeService.getAllStores(keyword, isActive, hasRoute, routeCode, pageable);
         return ResponseEntity.ok(response);
     }
 

@@ -79,8 +79,20 @@ public class RouteServiceImpl implements RouteService {
                 .and(RouteSpecification.hasActiveStatus(isActive));
 
         Page<Route> page = routeRepository.findAll(spec, pageable);
+
+        List<Long> routeIds = page.getContent().stream().map(Route::getId).toList();
+        List<Object[]> rawCounts = routeIds.isEmpty()
+                ? java.util.Collections.emptyList()
+                : routeStopRepository.countStopsByRouteIdIn(routeIds);
+
+        java.util.Map<Long, Integer> countMap = rawCounts.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> ((Number) row[1]).intValue()
+                ));
+
         List<RouteResponse> content = page.getContent().stream()
-                .map(r -> routeMapper.toResponse(r, routeStopRepository.countByRouteId(r.getId())))
+                .map(r -> routeMapper.toResponse(r, countMap.getOrDefault(r.getId(), 0)))
                 .toList();
 
         ApiResponse.PaginationInfo pagination = ApiResponse.PaginationInfo.builder()

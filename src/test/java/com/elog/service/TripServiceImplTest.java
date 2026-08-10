@@ -403,9 +403,9 @@ class TripServiceImplTest {
                 .build();
 
         when(userRepository.findAll()).thenReturn(List.of(testDriver));
-        when(tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(any(), any(), any()))
-                .thenReturn(false);
-        when(tripExecutionRepository.findUnreturnedByDriverId(2L))
+        when(tripRepository.findBusyDriverIdsOnDate(any(), any()))
+                .thenReturn(List.of());
+        when(tripExecutionRepository.findAllUnreturnedExecutions())
                 .thenReturn(List.of(unreturnedExecution));
 
         List<AvailableDriverResponse> result = tripService.getAvailableDrivers(date);
@@ -423,9 +423,9 @@ class TripServiceImplTest {
         LocalDate date = LocalDate.now().plusDays(1);
 
         when(userRepository.findAll()).thenReturn(List.of(testDriver));
-        when(tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(any(), any(), any()))
-                .thenReturn(false);
-        when(tripExecutionRepository.findUnreturnedByDriverId(2L))
+        when(tripRepository.findBusyDriverIdsOnDate(any(), any()))
+                .thenReturn(List.of());
+        when(tripExecutionRepository.findAllUnreturnedExecutions())
                 .thenReturn(List.of());
 
         List<AvailableDriverResponse> result = tripService.getAvailableDrivers(date);
@@ -510,9 +510,9 @@ class TripServiceImplTest {
                 .build();
 
         when(userRepository.findAll()).thenReturn(List.of(testDriver));
-        when(tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(eq(2L), eq(targetDate), any()))
-                .thenReturn(false);
-        when(tripExecutionRepository.findUnreturnedByDriverId(2L))
+        when(tripRepository.findBusyDriverIdsOnDate(any(), any()))
+                .thenReturn(List.of());
+        when(tripExecutionRepository.findAllUnreturnedExecutions())
                 .thenReturn(List.of(futureExecution));
 
         List<AvailableDriverResponse> result = tripService.getAvailableDrivers(targetDate);

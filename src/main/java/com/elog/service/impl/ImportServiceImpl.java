@@ -84,6 +84,7 @@ public class ImportServiceImpl implements ImportService {
         // Cache for tracking locked trip draft per delivery date
         Map<LocalDate, Boolean> lockedDateCache = new HashMap<>();
 
+        List<ImportError> pendingErrors = new ArrayList<>();
         for (RowData row : rows) {
             try {
                 processRow(row, batch, deliveryDate, storeCache, productCache, orderCache, orderRefStoreCache, orderRefFirstRow, orderItemCache, lockedDateCache);
@@ -98,8 +99,13 @@ public class ImportServiceImpl implements ImportService {
                         .fieldName(ex.getFieldName())
                         .errorReason(ex.getMessage())
                         .build();
-                errorRepository.save(error);
+                pendingErrors.add(error);
             }
+        }
+        if (pendingErrors.size() == 1) {
+            errorRepository.save(pendingErrors.get(0));
+        } else if (pendingErrors.size() > 1) {
+            errorRepository.saveAll(pendingErrors);
         }
 
         // Step 5: Update batch summary

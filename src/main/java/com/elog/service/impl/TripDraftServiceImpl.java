@@ -785,17 +785,17 @@ public class TripDraftServiceImpl implements TripDraftService {
         BigDecimal totalVolume = BigDecimal.ZERO;
         BigDecimal totalWeight = BigDecimal.ZERO;
 
-        for (Order order : remainingOrders) {
-            List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
-            if (items != null) {
-                for (OrderItem item : items) {
-                    if (item.getLineVolumeM3() != null) {
-                        totalVolume = totalVolume.add(item.getLineVolumeM3());
-                    }
-                    if (item.getLineWeightKg() != null) {
-                        totalWeight = totalWeight.add(item.getLineWeightKg());
-                    }
-                }
+        List<Long> orderIds = remainingOrders.stream().map(Order::getId).toList();
+        List<OrderItem> allItems = orderIds.isEmpty()
+                ? Collections.emptyList()
+                : orderItemRepository.findByOrderIdIn(orderIds);
+
+        for (OrderItem item : allItems) {
+            if (item.getLineVolumeM3() != null) {
+                totalVolume = totalVolume.add(item.getLineVolumeM3());
+            }
+            if (item.getLineWeightKg() != null) {
+                totalWeight = totalWeight.add(item.getLineWeightKg());
             }
         }
 

@@ -213,15 +213,20 @@ public class TripServiceImpl implements TripService {
 
         List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
 
-        return drivers.stream().map(d -> {
-            boolean busyOnDate = tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(
-                    d.getId(), date, busyStatuses);
+        // 1. Batch fetch busy driver IDs on target date
+        java.util.Set<Long> busyDriverIdsOnDate = new java.util.HashSet<>(
+                tripRepository.findBusyDriverIdsOnDate(date, busyStatuses)
+        );
 
-            // Must match DRIVER_CONFLICT condition in validateVehicleAndDriverAvailability():
-            // driver with unreturned TripExecution (returnedToWarehouseAt IS NULL) whose trip deliveryDate <= target date is NOT available.
-            List<TripExecution> unreturned = tripExecutionRepository.findUnreturnedByDriverId(d.getId()).stream()
-                    .filter(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(date))
-                    .toList();
+        // 2. Batch fetch unreturned executions and group by driverId
+        List<TripExecution> allUnreturned = tripExecutionRepository.findAllUnreturnedExecutions();
+        java.util.Map<Long, List<TripExecution>> unreturnedByDriverId = allUnreturned.stream()
+                .filter(te -> te.getDriver() != null && (te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(date)))
+                .collect(java.util.stream.Collectors.groupingBy(te -> te.getDriver().getId()));
+
+        return drivers.stream().map(d -> {
+            boolean busyOnDate = busyDriverIdsOnDate.contains(d.getId());
+            List<TripExecution> unreturned = unreturnedByDriverId.getOrDefault(d.getId(), java.util.Collections.emptyList());
 
             boolean busy = busyOnDate || !unreturned.isEmpty();
             String busyReason;

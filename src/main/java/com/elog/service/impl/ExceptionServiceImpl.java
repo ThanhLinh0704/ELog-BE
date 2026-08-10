@@ -122,18 +122,24 @@ public class ExceptionServiceImpl implements ExceptionService {
                 User driverUser = userRepo.findByUsername(currentUsername).orElse(null);
                 Long driverId = driverUser != null ? driverUser.getId() : null;
 
+                List<Long> stopIds = exceptions.stream().map(DeliveryException::getTripStopId).filter(Objects::nonNull).distinct().toList();
+                List<Long> executionIds = exceptions.stream().map(DeliveryException::getTripExecutionId).filter(Objects::nonNull).distinct().toList();
+
+                Map<Long, TripStop> stopMap = stopIds.isEmpty() ? Collections.emptyMap() : tripStopRepo.findAllById(stopIds).stream().collect(Collectors.toMap(TripStop::getId, s -> s));
+                Map<Long, TripExecution> executionMap = executionIds.isEmpty() ? Collections.emptyMap() : tripExecutionRepo.findAllById(executionIds).stream().collect(Collectors.toMap(TripExecution::getId, e -> e));
+
                 exceptions = exceptions.stream().filter(e -> {
                     if (driverId != null && driverId.equals(e.getReportedBy())) {
                         return true;
                     }
                     if (e.getTripStopId() != null) {
-                        TripStop ts = tripStopRepo.findById(e.getTripStopId()).orElse(null);
+                        TripStop ts = stopMap.get(e.getTripStopId());
                         if (ts != null && ts.getTrip() != null && ts.getTrip().getDriver() != null) {
                             return currentUsername.equals(ts.getTrip().getDriver().getUsername());
                         }
                     }
                     if (e.getTripExecutionId() != null) {
-                        TripExecution te = tripExecutionRepo.findById(e.getTripExecutionId()).orElse(null);
+                        TripExecution te = executionMap.get(e.getTripExecutionId());
                         if (te != null && te.getDriver() != null) {
                             return currentUsername.equals(te.getDriver().getUsername());
                         }
