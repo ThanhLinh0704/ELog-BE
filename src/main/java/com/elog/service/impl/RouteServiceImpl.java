@@ -173,6 +173,9 @@ public class RouteServiceImpl implements RouteService {
                 .build();
         RouteStop saved = routeStopRepository.save(routeStop);
 
+        route.setRoutePolyline(null);
+        routeRepository.save(route);
+
         boolean hasCoords = store.getLatitude() != null && store.getLongitude() != null;
         return routeMapper.toStopResponse(saved, !hasCoords);
     }
@@ -219,6 +222,10 @@ public class RouteServiceImpl implements RouteService {
             result.add(routeMapper.toStopResponse(rs, !hasCoords));
         }
 
+        Route route = findRouteOrThrow(routeId);
+        route.setRoutePolyline(null);
+        routeRepository.save(route);
+
         return result;
     }
 
@@ -254,16 +261,33 @@ public class RouteServiceImpl implements RouteService {
             rs.setSequenceOrder(seq++);
             routeStopRepository.save(rs);
         }
+
+        Route route = findRouteOrThrow(routeId);
+        route.setRoutePolyline(null);
+        routeRepository.save(route);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public RouteDirectionsResponse getRouteDirections(Long routeId) {
         Route route = findRouteOrThrow(routeId);
         List<RouteStop> stops = routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(routeId);
 
         double warehouseLat = 21.032612;
         double warehouseLng = 105.868367;
+
+        if (route.getRoutePolyline() != null && !route.getRoutePolyline().trim().isEmpty()) {
+            return RouteDirectionsResponse.builder()
+                    .routeId(route.getId())
+                    .routeCode(route.getCode())
+                    .routeName(route.getName())
+                    .routePolyline(route.getRoutePolyline())
+                    .totalDistanceKm(route.getTotalDistanceKm())
+                    .totalDurationMin(route.getTotalDurationMin())
+                    .warehouseLat(warehouseLat)
+                    .warehouseLng(warehouseLng)
+                    .build();
+        }
 
         RouteDirectionsResponse.RouteDirectionsResponseBuilder builder = RouteDirectionsResponse.builder()
                 .routeId(route.getId())
@@ -288,34 +312,43 @@ public class RouteServiceImpl implements RouteService {
 
         if (goongMapService != null && goongMapService.isConfigured()) {
             try {
-                List<String> legPolylines = new ArrayList<>();
-                long totalMeters = 0;
-                long totalSecs = 0;
+                String origin = coords.get(0)[0] + "," + coords.get(0)[1];
+                String destination = coords.get(coords.size() - 1)[0] + "," + coords.get(coords.size() - 1)[1];
 
-                for (int i = 0; i < coords.size() - 1; i++) {
-                    double[] originPt = coords.get(i);
-                    double[] destPt = coords.get(i + 1);
-
-                    String origin = originPt[0] + "," + originPt[1];
-                    String destination = destPt[0] + "," + destPt[1];
-
-                    var goongRes = goongMapService.getDirections(origin, destination, null);
-                    if (goongRes != null && goongRes.getRoutes() != null && !goongRes.getRoutes().isEmpty()) {
-                        var r = goongRes.getRoutes().get(0);
-                        if (r.getOverviewPolyline() != null && r.getOverviewPolyline().getPoints() != null) {
-                            legPolylines.add(r.getOverviewPolyline().getPoints());
-                        }
-                        if (r.getLegs() != null) {
-                            totalMeters += r.getLegs().stream().mapToLong(leg -> leg.getDistance() != null && leg.getDistance().getValue() != null ? leg.getDistance().getValue() : 0).sum();
-                            totalSecs += r.getLegs().stream().mapToLong(leg -> leg.getDuration() != null && leg.getDuration().getValue() != null ? leg.getDuration().getValue() : 0).sum();
-                        }
-                    }
+                String waypoints = null;
+                if (coords.size() > 2) {
+                    waypoints = coords.subList(1, coords.size() - 1).stream()
+                            .map(pt -> pt[0] + "," + pt[1])
+                            .collect(Collectors.joining("|"));
                 }
 
-                if (!legPolylines.isEmpty()) {
-                    builder.routePolyline(String.join(";", legPolylines));
-                    builder.totalDistanceKm(totalMeters / 1000.0);
-                    builder.totalDurationMin((int) (totalSecs / 60));
+                var goongRes = goongMapService.getDirections(origin, destination, waypoints);
+                if (goongRes != null && goongRes.getRoutes() != null && !goongRes.getRoutes().isEmpty()) {
+                    var r = goongRes.getRoutes().get(0);
+                    if (r.getOverviewPolyline() != null && r.getOverviewPolyline().getPoints() != null) {
+                        String polyline = r.getOverviewPolyline().getPoints();
+                        builder.routePolyline(polyline);
+                        route.setRoutePolyline(polyline);
+                    }
+                    if (r.getLegs() != null) {
+                        long totalMeters = r.getLegs().stream()
+                                .mapToLong(leg -> leg.getDistance() != null && leg.getDistance().getValue() != null ? leg.getDistance().getValue() : 0)
+                                .sum();
+                        long totalSecs = r.getLegs().stream()
+                                .mapToLong(leg -> leg.getDuration() != null && leg.getDuration().getValue() != null ? leg.getDuration().getValue() : 0)
+                                .sum();
+                        double distKm = totalMeters / 1000.0;
+                        int durMin = (int) (totalSecs / 60);
+
+                        builder.totalDistanceKm(distKm);
+                        builder.totalDurationMin(durMin);
+
+                        route.setTotalDistanceKm(distKm);
+                        route.setTotalDurationMin(durMin);
+                    }
+                    routeRepository.save(route);
+                } else {
+                    log.warn("Goong directions API returned no routes or rate-limited for routeId={}", routeId);
                 }
             } catch (Exception e) {
                 log.error("Error building route directions: {}", e.getMessage(), e);
