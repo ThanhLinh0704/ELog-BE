@@ -5,6 +5,7 @@ import com.elog.service.RecommendationService;
 import com.elog.service.TripDraftService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,8 +15,8 @@ import java.time.LocalTime;
 
 /**
  * Runner component to execute auto-pipeline (order consolidation, ETA calculation & recommendations)
- * in isolated REQUIRES_NEW transactions per delivery date.
- * This prevents exceptions in calculation of date X from marking the primary import transaction as rollback-only.
+ * in isolated REQUIRES_NEW transactions per delivery date asynchronously.
+ * This prevents background processing from delaying the primary Excel import response.
  */
 @Component
 @RequiredArgsConstructor
@@ -26,6 +27,7 @@ public class AutoPipelineRunner {
     private final EtaCalculationService etaCalculationService;
     private final RecommendationService recommendationService;
 
+    @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void runForDate(LocalDate deliveryDate) {
         log.info("Auto-Pipeline: starting isolated transaction for deliveryDate={}", deliveryDate);

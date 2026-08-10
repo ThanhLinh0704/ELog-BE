@@ -24,6 +24,9 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         boolean existsByDriverIdAndDeliveryDateAndStatusIn(
                         Long driverId, LocalDate deliveryDate, List<TripStatus> statuses);
 
+        @Query("SELECT DISTINCT t.driver.id FROM Trip t WHERE t.deliveryDate = :date AND t.status IN :statuses AND t.driver.id IS NOT NULL")
+        List<Long> findBusyDriverIdsOnDate(@Param("date") LocalDate date, @Param("statuses") List<TripStatus> statuses);
+
         List<Trip> findByDriverIdAndStatusIn(Long driverId, List<TripStatus> statuses);
 
         boolean existsByDriverIdAndDeliveryDateAndStatusInAndTripIdNot(
