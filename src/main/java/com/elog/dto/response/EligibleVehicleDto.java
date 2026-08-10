@@ -15,4 +15,8 @@ public class EligibleVehicleDto {
     private BigDecimal maxWeightKg;
     private BigDecimal remainingVolumeM3;
     private BigDecimal remainingWeightKg;
+    private Long assignedDriverId;
+    private String assignedDriverName;
+    private Boolean assignedDriverAvailable;
+    private String assignedDriverBusyReason;
 }

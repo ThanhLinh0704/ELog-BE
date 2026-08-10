@@ -22,5 +22,6 @@ public class DriverResponse {
     private String reasonNote;
     private LocalDateTime statusUpdatedAt;
     private String statusUpdatedByName;
+    private String licenseClass;
     private List<ActiveTripWarningResponse> activeTripsWarning;
 }
