@@ -113,8 +113,9 @@ public class RouteController {
     @Operation(summary = "Get route road directions polyline and warehouse location")
     @PreAuthorize("hasAuthority('route:read')")
     public ResponseEntity<ApiResponse<RouteDirectionsResponse>> getRouteDirections(
-            @PathVariable Long id) {
-        RouteDirectionsResponse response = routeService.getRouteDirections(id);
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "false") Boolean forceRefresh) {
+        RouteDirectionsResponse response = routeService.getRouteDirections(id, Boolean.TRUE.equals(forceRefresh));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

@@ -270,13 +270,24 @@ public class RouteServiceImpl implements RouteService {
     @Override
     @Transactional
     public RouteDirectionsResponse getRouteDirections(Long routeId) {
+        return getRouteDirections(routeId, false);
+    }
+
+    @Override
+    @Transactional
+    public RouteDirectionsResponse getRouteDirections(Long routeId, boolean forceRefresh) {
         Route route = findRouteOrThrow(routeId);
         List<RouteStop> stops = routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(routeId);
 
         double warehouseLat = 21.032612;
         double warehouseLng = 105.868367;
 
-        if (route.getRoutePolyline() != null && !route.getRoutePolyline().trim().isEmpty()) {
+        if (forceRefresh) {
+            route.setRoutePolyline(null);
+            route.setTotalDistanceKm(null);
+            route.setTotalDurationMin(null);
+            routeRepository.save(route);
+        } else if (route.getRoutePolyline() != null && !route.getRoutePolyline().trim().isEmpty()) {
             return RouteDirectionsResponse.builder()
                     .routeId(route.getId())
                     .routeCode(route.getCode())
