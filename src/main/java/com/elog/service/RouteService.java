@@ -20,4 +20,5 @@ public interface RouteService {
 
     // Road directions
     RouteDirectionsResponse getRouteDirections(Long routeId);
+    RouteDirectionsResponse getRouteDirections(Long routeId, boolean forceRefresh);
 }
