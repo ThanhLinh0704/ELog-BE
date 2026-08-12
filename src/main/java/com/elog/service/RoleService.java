@@ -1,8 +1,8 @@
 package com.elog.service;
 
-import com.elog.dto.request.RolePermissionsUpdateRequest;
-import com.elog.dto.response.PermissionResponse;
-import com.elog.dto.response.RoleResponse;
+import com.elog.dto.request.user.RolePermissionsUpdateRequest;
+import com.elog.dto.response.user.PermissionResponse;
+import com.elog.dto.response.user.RoleResponse;
 
 import java.util.List;
 

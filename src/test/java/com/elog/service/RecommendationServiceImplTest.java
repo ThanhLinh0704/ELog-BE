@@ -1,6 +1,6 @@
 package com.elog.service;
 
-import com.elog.dto.response.RecommendationResultResponse;
+import com.elog.dto.response.trip.RecommendationResultResponse;
 import com.elog.entity.*;
 import com.elog.repository.*;
 import com.elog.service.impl.RecommendationServiceImpl;

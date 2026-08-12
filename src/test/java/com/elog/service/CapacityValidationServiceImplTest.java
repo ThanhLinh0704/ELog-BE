@@ -1,6 +1,6 @@
 package com.elog.service;
 
-import com.elog.dto.response.*;
+import com.elog.dto.response.vehicle.CapacityValidationResultResponse;
 import com.elog.entity.*;
 import com.elog.repository.OrderRepository;
 import com.elog.repository.TripDraftRepository;

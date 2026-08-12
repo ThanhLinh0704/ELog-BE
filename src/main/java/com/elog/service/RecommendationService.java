@@ -1,6 +1,6 @@
 package com.elog.service;
 
-import com.elog.dto.response.RecommendationResultResponse;
+import com.elog.dto.response.trip.RecommendationResultResponse;
 
 /**
  * Recommendation Engine — suggests Top-3 vehicle plans for a TripDraft.

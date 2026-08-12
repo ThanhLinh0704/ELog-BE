@@ -1,6 +1,6 @@
 package com.elog.mapper;
 
-import com.elog.dto.response.UserResponse;
+import com.elog.dto.response.user.UserResponse;
 import com.elog.entity.LicenseClass;
 import com.elog.entity.Role;
 import com.elog.entity.User;

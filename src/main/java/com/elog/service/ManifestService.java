@@ -1,7 +1,7 @@
 package com.elog.service;
 
-import com.elog.dto.response.ManifestByStopResponse;
-import com.elog.dto.response.ManifestResponse;
+import com.elog.dto.response.trip.ManifestByStopResponse;
+import com.elog.dto.response.trip.ManifestResponse;
 
 public interface ManifestService {
 

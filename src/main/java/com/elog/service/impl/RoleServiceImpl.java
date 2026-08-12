@@ -1,8 +1,8 @@
 package com.elog.service.impl;
 
-import com.elog.dto.request.RolePermissionsUpdateRequest;
-import com.elog.dto.response.PermissionResponse;
-import com.elog.dto.response.RoleResponse;
+import com.elog.dto.request.user.RolePermissionsUpdateRequest;
+import com.elog.dto.response.user.PermissionResponse;
+import com.elog.dto.response.user.RoleResponse;
 import com.elog.entity.Permission;
 import com.elog.entity.Role;
 import com.elog.exception.BusinessException;

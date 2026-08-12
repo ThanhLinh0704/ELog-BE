@@ -1,6 +1,8 @@
 package com.elog.controller;
 
-import com.elog.dto.response.*;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.trip.ActiveTripsResponse;
+import com.elog.dto.response.trip.TripProgressResponse;
 import com.elog.service.TripMonitoringService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

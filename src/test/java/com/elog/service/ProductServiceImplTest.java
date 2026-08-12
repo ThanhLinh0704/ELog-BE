@@ -1,7 +1,7 @@
 package com.elog.service;
 
-import com.elog.dto.request.ProductCreateRequest;
-import com.elog.dto.response.ProductResponse;
+import com.elog.dto.request.product.ProductCreateRequest;
+import com.elog.dto.response.product.ProductResponse;
 import com.elog.entity.Product;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;

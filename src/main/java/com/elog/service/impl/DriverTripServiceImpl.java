@@ -1,9 +1,13 @@
 package com.elog.service.impl;
 
-import com.elog.dto.request.UpdateOrderResultRequest;
-import com.elog.dto.response.DriverTripResponse;
-import com.elog.dto.response.DriverTripResponse.*;
-import com.elog.dto.response.TripOutcomeResponse;
+import com.elog.dto.response.user.DriverTripResponse.DriverOrderDto;
+import com.elog.dto.response.user.DriverTripResponse.DriverOrderItemDto;
+import com.elog.dto.response.user.DriverTripResponse.DriverStopDto;
+import com.elog.dto.response.user.DriverTripResponse.LifoLoadingItemDto;
+import com.elog.dto.request.trip.AdminTripOverrideRequest;
+import com.elog.dto.request.trip.UpdateOrderResultRequest;
+import com.elog.dto.response.trip.TripOutcomeResponse;
+import com.elog.dto.response.user.DriverTripResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -668,7 +672,7 @@ public class DriverTripServiceImpl implements DriverTripService {
 
     @Override
     @Transactional
-    public DriverTripResponse adminOverrideTripExecution(Long executionId, com.elog.dto.request.AdminTripOverrideRequest request, String adminUsername) {
+    public DriverTripResponse adminOverrideTripExecution(Long executionId, com.elog.dto.request.trip.AdminTripOverrideRequest request, String adminUsername) {
         TripExecution execution = tripExecutionRepo.findById(executionId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.RESOURCE_NOT_FOUND,

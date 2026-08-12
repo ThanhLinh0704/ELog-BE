@@ -1,6 +1,9 @@
 package com.elog.service;
 
-import com.elog.dto.response.*;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.trip.ConsolidateResponse;
+import com.elog.dto.response.trip.StopOrderItemResponse;
+import com.elog.dto.response.trip.TripDraftResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.repository.*;

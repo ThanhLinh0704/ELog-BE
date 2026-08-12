@@ -1,7 +1,11 @@
 package com.elog.controller;
 
-import com.elog.dto.request.*;
-import com.elog.dto.response.*;
+import com.elog.dto.request.store.StoreCreateRequest;
+import com.elog.dto.request.store.StoreStatusUpdateRequest;
+import com.elog.dto.request.store.StoreUpdateRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.store.StoreListItemResponse;
+import com.elog.dto.response.store.StoreResponse;
 import com.elog.service.StoreService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

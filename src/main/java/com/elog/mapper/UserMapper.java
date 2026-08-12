@@ -1,7 +1,7 @@
 package com.elog.mapper;
 
-import com.elog.dto.request.UserCreateRequest;
-import com.elog.dto.response.UserResponse;
+import com.elog.dto.request.user.UserCreateRequest;
+import com.elog.dto.response.user.UserResponse;
 import com.elog.entity.Role;
 import com.elog.entity.User;
 import org.springframework.stereotype.Component;

@@ -1,7 +1,7 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.StopEtaResponse;
 import com.elog.dto.response.goong.GoongDirectionsResponse;
+import com.elog.dto.response.trip.StopEtaResponse;
 import com.elog.entity.Store;
 import com.elog.entity.TripDraft;
 import com.elog.entity.TripDraftStop;

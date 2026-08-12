@@ -1,7 +1,7 @@
 package com.elog.service;
 
-import com.elog.dto.request.VehicleCreateRequest;
-import com.elog.dto.response.VehicleResponse;
+import com.elog.dto.request.vehicle.VehicleCreateRequest;
+import com.elog.dto.response.vehicle.VehicleResponse;
 import com.elog.entity.Vehicle;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;

@@ -1,8 +1,9 @@
 package com.elog.service;
 
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.ImportBatchResponse;
-import com.elog.dto.response.ImportErrorResponse;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.importbatch.ImportBatchResponse;
+import com.elog.dto.response.importbatch.ImportedOrderDetailResponse;
+import com.elog.dto.response.importbatch.ImportErrorResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -1132,10 +1133,10 @@ class ImportServiceImplTest {
 
         when(orderRepository.findByImportBatchId(1L)).thenReturn(List.of(order));
 
-        List<com.elog.dto.response.ImportedOrderDetailResponse> results = importService.getImportedOrders(1L);
+        List<com.elog.dto.response.importbatch.ImportedOrderDetailResponse> results = importService.getImportedOrders(1L);
 
         assertThat(results).hasSize(1);
-        com.elog.dto.response.ImportedOrderDetailResponse res = results.get(0);
+        com.elog.dto.response.importbatch.ImportedOrderDetailResponse res = results.get(0);
         assertThat(res.getOrderRef()).isEqualTo("DH-001");
         assertThat(res.getStoreCode()).isEqualTo("ST-001");
         assertThat(res.getStoreName()).isEqualTo("Store 1");

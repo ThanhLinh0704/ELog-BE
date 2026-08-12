@@ -1,7 +1,9 @@
 package com.elog.service;
 
-import com.elog.dto.response.*;
-import com.elog.dto.response.KpiDailyTrendResponse.DailyDataPoint;
+import com.elog.dto.response.kpi.KpiByRouteResponse;
+import com.elog.dto.response.kpi.KpiDailyTrendResponse.DailyDataPoint;
+import com.elog.dto.response.kpi.KpiDailyTrendResponse;
+import com.elog.dto.response.kpi.KpiSummaryResponse;
 import com.elog.entity.*;
 import com.elog.repository.*;
 import com.elog.service.impl.KpiServiceImpl;

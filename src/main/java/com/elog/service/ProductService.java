@@ -1,11 +1,11 @@
 package com.elog.service;
 
-import com.elog.dto.request.ProductCreateRequest;
-import com.elog.dto.request.ProductStatusUpdateRequest;
-import com.elog.dto.request.ProductUpdateRequest;
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.ProductListItemResponse;
-import com.elog.dto.response.ProductResponse;
+import com.elog.dto.request.product.ProductCreateRequest;
+import com.elog.dto.request.product.ProductStatusUpdateRequest;
+import com.elog.dto.request.product.ProductUpdateRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.product.ProductListItemResponse;
+import com.elog.dto.response.product.ProductResponse;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;

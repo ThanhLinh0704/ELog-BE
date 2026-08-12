@@ -1,9 +1,9 @@
 package com.elog.controller;
 
-import com.elog.dto.request.DriverStatusUpdateRequest;
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.DriverResponse;
-import com.elog.dto.response.DriverStatusHistoryResponse;
+import com.elog.dto.request.user.DriverStatusUpdateRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.user.DriverResponse;
+import com.elog.dto.response.user.DriverStatusHistoryResponse;
 import com.elog.service.DriverStatusService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
