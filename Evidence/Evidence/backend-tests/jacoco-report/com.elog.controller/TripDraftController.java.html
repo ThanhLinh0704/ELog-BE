@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TripDraftController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.controller</a> &gt; <span class="el_source">TripDraftController.java</span></div><h1>TripDraftController.java</h1><pre class="source lang-java linenums">package com.elog.controller;
+
+import com.elog.dto.request.ConsolidateRequest;
+import com.elog.dto.request.RecalculateEtaRequest;
+import com.elog.dto.request.StopUpdateRequest;
+import com.elog.dto.response.*;
+import com.elog.service.CapacityValidationService;
+import com.elog.service.ManifestService;
+import com.elog.service.TripDraftService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@RestController
+@RequestMapping(&quot;/api/trip-drafts&quot;)
+@RequiredArgsConstructor
+@Tag(name = &quot;Trip Drafts&quot;, description = &quot;US-10 Route Consolidation, US-11 Trip Draft Review, US-12 Capacity Validation &amp; US-13 LIFO Manifest APIs&quot;)
+public class TripDraftController {
+
+    private final TripDraftService tripDraftService;
+    private final CapacityValidationService capacityValidationService;
+    private final ManifestService manifestService;
+
+    // ── US-10 endpoints ──────────────────────────────────────────
+
+    @PostMapping(&quot;/consolidate&quot;)
+    @Operation(summary = &quot;Trigger consolidation for all routes on a delivery date&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;ConsolidateResponse&gt;&gt; consolidate(
+            @Valid @RequestBody ConsolidateRequest request) {
+<span class="nc" id="L43">        ConsolidateResponse response = tripDraftService.consolidate(request.getDeliveryDate());</span>
+<span class="nc" id="L44">        return ResponseEntity.ok(ApiResponse.success(response, &quot;Consolidation hoàn tất&quot;));</span>
+    }
+
+    @GetMapping
+    @Operation(summary = &quot;Get trip drafts by delivery date (paginated)&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;TripDraftResponse&gt;&gt;&gt; getTripDrafts(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
+            @PageableDefault(size = 20) Pageable pageable) {
+<span class="nc" id="L53">        ApiResponse&lt;List&lt;TripDraftResponse&gt;&gt; response =</span>
+<span class="nc" id="L54">                tripDraftService.getTripDrafts(deliveryDate, pageable);</span>
+<span class="nc" id="L55">        return ResponseEntity.ok(response);</span>
+    }
+
+    @GetMapping(&quot;/{id}&quot;)
+    @Operation(summary = &quot;Get trip draft detail with active/skipped stop list&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;TripDraftResponse&gt;&gt; getTripDraftById(
+            @PathVariable Long id) {
+<span class="nc" id="L63">        TripDraftResponse response = tripDraftService.getTripDraftById(id);</span>
+<span class="nc" id="L64">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    // ── US-11 endpoints ──────────────────────────────────────────
+
+    @GetMapping(&quot;/{id}/stops&quot;)
+    @Operation(summary = &quot;Get all stops (active + skipped) for trip draft review&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;TripDraftResponse&gt;&gt; getStopsForReview(
+            @PathVariable Long id) {
+<span class="nc" id="L74">        TripDraftResponse response = tripDraftService.getStopsForReview(id);</span>
+<span class="nc" id="L75">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    @PatchMapping(&quot;/{id}/stops/{stopId}&quot;)
+    @Operation(summary = &quot;Toggle active/skipped status for a stop&quot;)
+    @PreAuthorize(&quot;hasRole('DISPATCHER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;TripDraftStopResponse&gt;&gt; updateStop(
+            @PathVariable Long id,
+            @PathVariable Long stopId,
+            @Valid @RequestBody StopUpdateRequest request) {
+<span class="nc" id="L85">        TripDraftStopResponse response = tripDraftService.updateStop(id, stopId, request);</span>
+<span class="nc" id="L86">        return ResponseEntity.ok(ApiResponse.success(response,</span>
+                &quot;Stop updated. ETA recalculation required — call POST /recalculate-eta.&quot;));
+    }
+
+    @PostMapping(&quot;/{id}/recalculate-eta&quot;)
+    @Operation(summary = &quot;Recalculate ETA for all active stops using Haversine&quot;)
+    @PreAuthorize(&quot;hasRole('DISPATCHER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;RecalculateEtaResponse&gt;&gt; recalculateEta(
+            @PathVariable Long id,
+            @Valid @RequestBody RecalculateEtaRequest request) {
+<span class="nc" id="L96">        RecalculateEtaResponse response = tripDraftService.recalculateEta(id, request);</span>
+<span class="nc" id="L97">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    @PostMapping(&quot;/{id}/confirm&quot;)
+    @Operation(summary = &quot;Confirm trip draft — DC-07 gate (DRAFT → PLANNED)&quot;)
+    @PreAuthorize(&quot;hasRole('DISPATCHER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;ConfirmResponse&gt;&gt; confirmTripDraft(
+            @PathVariable Long id) {
+<span class="nc" id="L105">        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L106">        ConfirmResponse response = tripDraftService.confirmTripDraft(id, currentUsername);</span>
+<span class="nc" id="L107">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    // ── US-12 endpoints ──────────────────────────────────────────
+
+    @PostMapping(&quot;/{id}/validate-capacity&quot;)
+    @Operation(summary = &quot;Trigger capacity validation for a trip draft against the vehicle fleet&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;CapacityValidationResultResponse&gt;&gt; validateCapacity(
+            @PathVariable Long id) {
+<span class="nc" id="L117">        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L118">        CapacityValidationResultResponse response = capacityValidationService.validate(id, currentUsername);</span>
+<span class="nc" id="L119">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    @GetMapping(&quot;/{id}/validation-result&quot;)
+    @Operation(summary = &quot;Get stored capacity validation result&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'WAREHOUSE_STAFF', 'SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;CapacityValidationResultResponse&gt;&gt; getValidationResult(
+            @PathVariable Long id) {
+<span class="nc" id="L127">        CapacityValidationResultResponse response = capacityValidationService.getValidationResult(id);</span>
+<span class="nc" id="L128">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    // ── US-13 endpoints ──────────────────────────────────────────
+
+    @PostMapping(&quot;/{id}/generate-manifest&quot;)
+    @Operation(summary = &quot;Generate LIFO loading manifest for a validated trip draft&quot;)
+    @PreAuthorize(&quot;hasRole('DISPATCHER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;ManifestResponse&gt;&gt; generateManifest(
+            @PathVariable Long id) {
+<span class="nc" id="L138">        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L139">        ManifestResponse response = manifestService.generateManifest(id, currentUsername);</span>
+<span class="nc" id="L140">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="nc" id="L141">                .body(ApiResponse.success(response, response.getMessage()));</span>
+    }
+
+    @GetMapping(&quot;/{id}/manifest&quot;)
+    @Operation(summary = &quot;Get LIFO manifest flat list for a trip draft&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;ManifestResponse&gt;&gt; getManifest(
+            @PathVariable Long id) {
+<span class="nc" id="L149">        ManifestResponse response = manifestService.getManifest(id);</span>
+<span class="nc" id="L150">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    @GetMapping(&quot;/{id}/manifest/by-stop&quot;)
+    @Operation(summary = &quot;Get LIFO manifest grouped by stop (for Warehouse Staff)&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'WAREHOUSE_STAFF')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;ManifestByStopResponse&gt;&gt; getManifestByStop(
+            @PathVariable Long id) {
+<span class="nc" id="L158">        ManifestByStopResponse response = manifestService.getManifestByStop(id);</span>
+<span class="nc" id="L159">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

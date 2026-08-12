@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.controller</a> &gt; <span class="el_source">UserController.java</span></div><h1>UserController.java</h1><pre class="source lang-java linenums">package com.elog.controller;
+
+import com.elog.dto.request.*;
+import com.elog.dto.response.*;
+import com.elog.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping(&quot;/api/users&quot;)
+@RequiredArgsConstructor
+@Tag(name = &quot;Users&quot;, description = &quot;User management APIs (Admin only)&quot;)
+public class UserController {
+
+    private final UserService userService;
+
+    @PostMapping
+    @Operation(summary = &quot;Create a new user&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;UserResponse&gt;&gt; createUser(@Valid @RequestBody UserCreateRequest request) {
+<span class="nc" id="L32">        UserResponse response = userService.createUser(request);</span>
+<span class="nc" id="L33">        return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="nc" id="L34">                .body(ApiResponse.success(response, &quot;User created successfully&quot;));</span>
+    }
+
+    @GetMapping(&quot;/{id}&quot;)
+    @Operation(summary = &quot;Get user details by ID&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;UserResponse&gt;&gt; getUserById(@PathVariable Long id) {
+<span class="nc" id="L41">        UserResponse response = userService.getUserById(id);</span>
+<span class="nc" id="L42">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    @GetMapping
+    @Operation(summary = &quot;Get paginated and filtered list of users&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;UserResponse&gt;&gt;&gt; getAllUsers(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String role,
+            @RequestParam(required = false) Boolean isActive,
+            @org.springdoc.core.annotations.ParameterObject @PageableDefault(size = 20) Pageable pageable) {
+<span class="nc" id="L53">        ApiResponse&lt;List&lt;UserResponse&gt;&gt; response = userService.getAllUsers(keyword, role, isActive, pageable);</span>
+<span class="nc" id="L54">        return ResponseEntity.ok(response);</span>
+    }
+
+    @PutMapping(&quot;/{id}&quot;)
+    @Operation(summary = &quot;Update user base information&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;UserResponse&gt;&gt; updateUser(
+            @PathVariable Long id,
+            @Valid @RequestBody UserUpdateRequest request) {
+<span class="nc" id="L63">        UserResponse response = userService.updateUser(id, request);</span>
+<span class="nc" id="L64">        return ResponseEntity.ok(ApiResponse.success(response, &quot;User updated successfully&quot;));</span>
+    }
+
+    @PatchMapping(&quot;/{id}/roles&quot;)
+    @Operation(summary = &quot;Assign/unassign roles to user&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;UserResponse&gt;&gt; updateUserRoles(
+            @PathVariable Long id,
+            @Valid @RequestBody UserRolesUpdateRequest request) {
+<span class="nc" id="L73">        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L74">        UserResponse response = userService.updateUserRoles(id, request, currentUsername);</span>
+<span class="nc" id="L75">        return ResponseEntity.ok(ApiResponse.success(response, &quot;Roles updated successfully&quot;));</span>
+    }
+
+    @PatchMapping(&quot;/{id}/status&quot;)
+    @Operation(summary = &quot;Lock/unlock a user account&quot;)
+    @PreAuthorize(&quot;hasRole('SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;UserResponse&gt;&gt; updateUserStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UserStatusUpdateRequest request) {
+<span class="nc" id="L84">        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();</span>
+<span class="nc" id="L85">        UserResponse response = userService.updateUserStatus(id, request, currentUsername);</span>
+<span class="nc" id="L86">        return ResponseEntity.ok(ApiResponse.success(response, &quot;User status updated successfully&quot;));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

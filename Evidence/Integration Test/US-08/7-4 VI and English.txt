@@ -1,0 +1,43 @@
+NFR	Test Type	Tool	VUs	Ramp-up	Duration	Pass Threshold
+NFR-P01	Latency test — POST /api/auth/login	Node.js fetch	1	N/A	5 runs	p95 < 1s · Measured: 590ms ✅
+NFR-P01	Error path — POST /api/auth/login (invalid)	Node.js fetch	1	N/A	5 runs	p95 < 1s · Measured: 299ms ✅
+NFR-P02	CRUD read — GET /api/users	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 35ms ✅
+NFR-P02	CRUD read — GET /api/vehicles	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 22ms ✅
+NFR-P02	CRUD read — GET /api/stores	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 125ms ✅
+NFR-P02	CRUD read — GET /api/routes	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 28ms ✅
+NFR-P02	CRUD read — GET /api/products	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 31ms ✅
+NFR-P03	Import small file — POST /api/imports (3.6KB)	Node.js fetch	1	N/A	1 run	< 5s · Measured: 1,875ms ✅
+NFR-P03	Import 500 rows — POST /api/imports (12KB)	Node.js fetch	1	N/A	1 run	< 10s · Measured: 2,448ms ✅
+NFR-P03	Batch list — GET /api/imports	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 17ms ✅
+NFR-P04	Consolidation — POST /api/trip-drafts/consolidate	Node.js fetch	1	N/A	1 run	< 3s · Measured: 108ms ✅
+NFR-P04	Draft detail — GET /api/trip-drafts/{id}	Node.js fetch	1	N/A	1 run	< 500ms · Measured: 74ms ✅
+NFR-P04	Draft stops — GET /api/trip-drafts/{id}/stops	Node.js fetch	1	N/A	1 run	< 500ms · Measured: 61ms ✅
+NFR-P04	Optimal departure — POST optimal-departure	Node.js fetch	1	N/A	1 run	< 500ms · Measured: 15ms ✅
+NFR-P05	Recommendation Engine — GET recommendations	Node.js fetch	1	N/A	1 run	< 5s · Measured: 732ms ✅
+NFR-P05	Validation result — GET validation-result	Node.js fetch	1	N/A	1 run	< 500ms · Measured: 28ms ✅
+NFR-P05	Planning history — GET /api/trip-drafts/{id}/history	Node.js fetch	1	N/A	1 run	< 500ms · Measured: 23ms ✅
+NFR-P06	KPI summary — GET /api/kpi/summary	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 24ms ✅
+NFR-P06	KPI trend — GET /api/kpi/daily-trend	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 19ms ✅
+NFR-P06	KPI by route — GET /api/kpi/by-route	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 23ms ✅
+NFR-P07	Monitoring — GET /api/dashboard/active-trips	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 15ms ✅
+NFR-P07	Outcome queue — GET /api/trip-outcomes	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 29ms ✅
+NFR-P08	Driver app — GET /api/trips/my-trips	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 20ms ✅
+NFR-P09	Fleet capacity — GET /api/vehicles/fleet-capacity	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 18ms ✅
+NFR-P09	Available vehicles — GET /api/vehicles/available	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 27ms ✅
+NFR-P09	Driver list — GET /api/drivers	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 31ms ✅
+NFR-P10	Health check — GET /api/health	Node.js fetch	1	N/A	5 runs	p95 < 100ms · Measured: 5ms ✅
+NFR-SEC01	Authorization — GET /api/users (Driver→403)	Node.js fetch	1	N/A	5 runs	p95 < 500ms · Measured: 10ms ✅
+
+
+NFR Code	Group	Description
+NFR-P01	Authentication	Login processing time including BCrypt password hash verification
+NFR-P02	Master Data CRUD	Read latency for core management entities (Users, Vehicles, Stores, Routes, Products)
+NFR-P03	File Import (FT-01)	Excel file upload, parse, validate, and persist orders
+NFR-P04	Trip Draft Planning (FT-02/03)	Route consolidation, draft detail, stops, ETA, departure time
+NFR-P05	Recommendation Engine (FT-04/05/06)	Vehicle feasibility evaluation, scoring, ranking computation
+NFR-P06	KPI Dashboard (US-19)	KPI computation, trend aggregation, route breakdown
+NFR-P07	Monitoring & Outcome (FT-08)	Active trip monitoring and trip outcome validation queue response time
+NFR-P08	Driver App (FT-09)	Driver mobile application API response time
+NFR-P09	Fleet Operations	Fleet capacity, vehicle availability, and driver availability query time
+NFR-P10	Health	Application health check endpoint response time
+NFR-SEC01	Security	Unauthorized access rejection response time (RBAC enforcement)

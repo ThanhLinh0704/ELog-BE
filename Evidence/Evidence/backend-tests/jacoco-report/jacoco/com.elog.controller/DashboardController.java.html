@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DashboardController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.controller</a> &gt; <span class="el_source">DashboardController.java</span></div><h1>DashboardController.java</h1><pre class="source lang-java linenums">package com.elog.controller;
+
+import com.elog.dto.response.*;
+import com.elog.service.TripMonitoringService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+
+@RestController
+@RequiredArgsConstructor
+@Tag(name = &quot;Dashboard&quot;, description = &quot;US-17 Dispatcher/Manager monitoring dashboard APIs&quot;)
+public class DashboardController {
+
+    private final TripMonitoringService tripMonitoringService;
+
+    /**
+     * Dashboard chính: danh sách tất cả active trips của ngày
+     * Default: ngày hôm nay. Cho phép truyền ?date= để xem ngày khác
+     */
+    @GetMapping(&quot;/api/dashboard/active-trips&quot;)
+    @Operation(summary = &quot;Get all active trips for a date (DISPATCHED/IN_PROGRESS/COMPLETED)&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;ActiveTripsResponse&gt;&gt; getActiveTrips(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+
+<span class="nc bnc" id="L32" title="All 2 branches missed.">        LocalDate queryDate = (date != null) ? date : LocalDate.now();</span>
+<span class="nc" id="L33">        ActiveTripsResponse response = tripMonitoringService.getActiveTripsDashboard(queryDate);</span>
+<span class="nc" id="L34">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    /**
+     * Chi tiết tiến độ từng stop của 1 trip
+     * Dùng khi Dispatcher click &quot;Xem chi tiết&quot; trên 1 trip card
+     */
+    @GetMapping(&quot;/api/trips/{id}/progress&quot;)
+    @Operation(summary = &quot;Get detailed stop-by-stop progress of a trip&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;TripProgressResponse&gt;&gt; getTripProgress(@PathVariable Long id) {
+<span class="nc" id="L45">        TripProgressResponse response = tripMonitoringService.getTripProgress(id);</span>
+<span class="nc" id="L46">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

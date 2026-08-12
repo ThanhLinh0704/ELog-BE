@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserSpecification.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.repository.specification</a> &gt; <span class="el_source">UserSpecification.java</span></div><h1>UserSpecification.java</h1><pre class="source lang-java linenums">package com.elog.repository.specification;
+
+import com.elog.entity.Role;
+import com.elog.entity.User;
+import jakarta.persistence.criteria.Join;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.util.StringUtils;
+
+<span class="nc" id="L9">public class UserSpecification {</span>
+
+    // Lọc theo từ khóa (username, fullName, email)
+    public static Specification&lt;User&gt; hasKeyword(String keyword) {
+<span class="fc" id="L13">        return (root, query, cb) -&gt; {</span>
+<span class="nc bnc" id="L14" title="All 2 branches missed.">            if (!StringUtils.hasText(keyword)) return null;</span>
+<span class="nc" id="L15">            String pattern = &quot;%&quot; + keyword.toLowerCase() + &quot;%&quot;;</span>
+<span class="nc" id="L16">            return cb.or(</span>
+<span class="nc" id="L17">                cb.like(cb.lower(root.get(&quot;username&quot;)), pattern),</span>
+<span class="nc" id="L18">                cb.like(cb.lower(root.get(&quot;fullName&quot;)), pattern),</span>
+<span class="nc" id="L19">                cb.like(cb.lower(root.get(&quot;email&quot;)), pattern)</span>
+            );
+        };
+    }
+
+    // Lọc theo vai trò (Role Name)
+    public static Specification&lt;User&gt; hasRole(String roleName) {
+<span class="fc" id="L26">        return (root, query, cb) -&gt; {</span>
+<span class="nc bnc" id="L27" title="All 2 branches missed.">            if (!StringUtils.hasText(roleName)) return null;</span>
+<span class="nc" id="L28">            Join&lt;User, Role&gt; roleJoin = root.join(&quot;roles&quot;);</span>
+<span class="nc" id="L29">            return cb.equal(roleJoin.get(&quot;name&quot;), roleName);</span>
+        };
+    }
+
+    // Lọc theo trạng thái hoạt động (isActive)
+    public static Specification&lt;User&gt; hasActiveStatus(Boolean isActive) {
+<span class="fc" id="L35">        return (root, query, cb) -&gt; {</span>
+<span class="nc bnc" id="L36" title="All 2 branches missed.">            if (isActive == null) return null;</span>
+<span class="nc" id="L37">            return cb.equal(root.get(&quot;isActive&quot;), isActive);</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

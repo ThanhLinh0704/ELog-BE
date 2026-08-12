@@ -1,0 +1,14 @@
+TC-01_1 — SYSTEM_ADMIN gọi GET users theo ID → 200
+Verify: PASS
+Auth: Bearer Token — token của admin 
+(Bearer Token
+
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaXNwYXRjaGVyMDEiLCJpYXQiOjE3ODE0ODE2MDAsImV4cCI6MTc4MTY1NDQwMH0.IHZ0wnjW2qpjKjNOkSF7yBdKnBYAvfYRmPpvLEp4wX4
+
+)
+URL: http://localhost:8080/api/v1/users/1
+Mô tả: SYSTEM_ADMIN gọi GET user theo ID hợp lệ → server trả 200 OK với thông tin user đúng format.
+
+Lỗi ở file: Không có.
+Đoạn code lỗi: Không có.
+Sửa: Không cần.

@@ -1,0 +1,42 @@
+TC-02 — Bug Report: DISPATCHER nhận 200 thay vì 403
+
+
+Verify: NG
+
+
+Bearer Token:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaXNwYXRjaGVyMDEiLCJpYXQiOjE3ODE0ODE2MDAsImV4cCI6MTc4MTY1NDQwMH0.IHZ0wnjW2qpjKjNOkSF7yBdKnBYAvfYRmPpvLEp4wX4
+
+
+
+TC-02 — Bug Report: DISPATCHER nhận 200 thay vì 403
+Root cause: 2 lỗi kết hợp khiến toàn bộ role check bị vô hiệu.
+
+BUG-01 — SecurityConfig.java dòng 37
+
+File: src/main/java/com/elog/config/SecurityConfig.java
+
+
+private static final String[] PUBLIC_URLS = {
+    "/api/v1/auth/**",
+    "/api/v1/users/**",   // ← WRONG: đây là public, không cần token
+    "/api/v1/health",
+    ...
+};
+/api/v1/users/** bị đưa vào danh sách public → Spring Security cho phép tất cả mọi người truy cập không cần xác thực → DISPATCHER qua được mà không cần token, không cần đúng role.
+
+Fix: Xoá dòng "/api/v1/users/**" khỏi PUBLIC_URLS.
+
+
+BUG-02 — UserController.java dòng 23
+File: src/main/java/com/elog/controller/UserController.java
+
+
+// @PreAuthorize("hasRole('SYSTEM_ADMIN')") // ← bị comment out
+public class UserController {
+Dù SecurityConfig được fix, nếu @PreAuthorize vẫn bị comment thì không có role check nào ở tầng controller → bất kỳ authenticated user nào cũng vào được.
+
+Fix: Bỏ comment @PreAuthorize("hasRole('SYSTEM_ADMIN')").
+
+
+

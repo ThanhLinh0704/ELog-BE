@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ErrorCode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.exception</a> &gt; <span class="el_source">ErrorCode.java</span></div><h1>ErrorCode.java</h1><pre class="source lang-java linenums">package com.elog.exception;
+
+import lombok.Getter;
+
+/**
+ * Application-level error codes — map 1:1 to the codes in
+ * docs/api-conventions.md.
+ * Used in ApiErrorResponse.code field so frontend can handle errors
+ * programmatically.
+ */
+<span class="fc" id="L11">@Getter</span>
+public enum ErrorCode {
+
+    // Resource errors
+<span class="fc" id="L15">    RESOURCE_NOT_FOUND(&quot;RESOURCE_NOT_FOUND&quot;),</span>
+<span class="fc" id="L16">    ACCESS_DENIED(&quot;ACCESS_DENIED&quot;),</span>
+<span class="fc" id="L17">    INVALID_CREDENTIALS(&quot;INVALID_CREDENTIALS&quot;),</span>
+<span class="fc" id="L18">    TOKEN_EXPIRED(&quot;TOKEN_EXPIRED&quot;),</span>
+<span class="fc" id="L19">    TOKEN_INVALID(&quot;TOKEN_INVALID&quot;),</span>
+<span class="fc" id="L20">    ACCOUNT_DISABLED(&quot;ACCOUNT_DISABLED&quot;),</span>
+
+    // Business rule violations
+<span class="fc" id="L23">    PRODUCT_NOT_FOUND(&quot;PRODUCT_NOT_FOUND&quot;),</span>
+<span class="fc" id="L24">    PRODUCT_SKU_DUPLICATE(&quot;PRODUCT_SKU_DUPLICATE&quot;),</span>
+<span class="fc" id="L25">    PRODUCT_SKU_IMMUTABLE(&quot;PRODUCT_SKU_IMMUTABLE&quot;),</span>
+
+<span class="fc" id="L27">    STORE_NOT_FOUND(&quot;STORE_NOT_FOUND&quot;),</span>
+<span class="fc" id="L28">    STORE_CODE_DUPLICATE(&quot;STORE_CODE_DUPLICATE&quot;),</span>
+<span class="fc" id="L29">    STORE_ACTIVE_ROUTE(&quot;STORE_ACTIVE_ROUTE&quot;),</span>
+<span class="fc" id="L30">    INVALID_COORDINATES(&quot;INVALID_COORDINATES&quot;),</span>
+<span class="fc" id="L31">    STORE_NOT_ASSIGNABLE(&quot;STORE_NOT_ASSIGNABLE&quot;), // BR-02</span>
+
+    // Route business rules
+<span class="fc" id="L34">    ROUTE_NOT_FOUND(&quot;ROUTE_NOT_FOUND&quot;),</span>
+<span class="fc" id="L35">    ROUTE_CODE_DUPLICATE(&quot;ROUTE_CODE_DUPLICATE&quot;),</span>
+<span class="fc" id="L36">    ROUTE_STOP_DUPLICATE(&quot;ROUTE_STOP_DUPLICATE&quot;),</span>
+<span class="fc" id="L37">    ROUTE_INSUFFICIENT_STOPS(&quot;ROUTE_INSUFFICIENT_STOPS&quot;),</span>
+<span class="fc" id="L38">    ROUTE_STOP_NOT_FOUND(&quot;ROUTE_STOP_NOT_FOUND&quot;),</span>
+<span class="fc" id="L39">    ROUTE_STOP_REORDER_INVALID(&quot;ROUTE_STOP_REORDER_INVALID&quot;),</span>
+<span class="fc" id="L40">    STORE_INACTIVE(&quot;STORE_INACTIVE&quot;),</span>
+
+    // Vehicle business rules
+<span class="fc" id="L43">    VEHICLE_NOT_FOUND(&quot;VEHICLE_NOT_FOUND&quot;),</span>
+<span class="fc" id="L44">    VEHICLE_PLATE_DUPLICATE(&quot;VEHICLE_PLATE_DUPLICATE&quot;),</span>
+
+<span class="fc" id="L46">    CAPACITY_EXCEEDED(&quot;CAPACITY_EXCEEDED&quot;), // BR-03</span>
+<span class="fc" id="L47">    FLEET_CAPACITY_INSUFFICIENT(&quot;FLEET_CAPACITY_INSUFFICIENT&quot;), // BR-08</span>
+<span class="fc" id="L48">    INVALID_STATE_TRANSITION(&quot;INVALID_STATE_TRANSITION&quot;), // DC-01</span>
+<span class="fc" id="L49">    EPOD_REQUIRED(&quot;EPOD_REQUIRED&quot;), // BR-11</span>
+
+    // Import
+<span class="fc" id="L52">    EXCEL_PARSE_ERROR(&quot;EXCEL_PARSE_ERROR&quot;),</span>
+<span class="fc" id="L53">    DUPLICATE_DELIVERY_DATE(&quot;DUPLICATE_DELIVERY_DATE&quot;),</span>
+<span class="fc" id="L54">    INVALID_FILE_FORMAT(&quot;INVALID_FILE_FORMAT&quot;),</span>
+<span class="fc" id="L55">    FILE_TOO_LARGE(&quot;FILE_TOO_LARGE&quot;),</span>
+
+    // Trip Draft (US-10)
+<span class="fc" id="L58">    TRIP_DRAFT_NOT_FOUND(&quot;TRIP_DRAFT_NOT_FOUND&quot;),</span>
+<span class="fc" id="L59">    TRIP_DRAFT_LOCKED(&quot;TRIP_DRAFT_LOCKED&quot;),</span>
+
+    // Trip Draft Review (US-11)
+<span class="fc" id="L62">    CANNOT_ACTIVATE_EMPTY_STOP(&quot;CANNOT_ACTIVATE_EMPTY_STOP&quot;),</span>
+<span class="fc" id="L63">    NO_ACTIVE_STOP(&quot;NO_ACTIVE_STOP&quot;),</span>
+<span class="fc" id="L64">    ETA_NOT_CALCULATED(&quot;ETA_NOT_CALCULATED&quot;),</span>
+<span class="fc" id="L65">    ETA_MISSING_COORDINATES(&quot;ETA_MISSING_COORDINATES&quot;),</span>
+<span class="fc" id="L66">    ALREADY_CONFIRMED(&quot;ALREADY_CONFIRMED&quot;),</span>
+
+    // Capacity Validation (US-12)
+<span class="fc" id="L69">    TRIP_DRAFT_NOT_CONFIRMED(&quot;TRIP_DRAFT_NOT_CONFIRMED&quot;),</span>
+<span class="fc" id="L70">    ALREADY_VALIDATED(&quot;ALREADY_VALIDATED&quot;),</span>
+<span class="fc" id="L71">    NO_ITEMS_TO_VALIDATE(&quot;NO_ITEMS_TO_VALIDATE&quot;),</span>
+<span class="fc" id="L72">    NO_ACTIVE_VEHICLE(&quot;NO_ACTIVE_VEHICLE&quot;),</span>
+
+    // LIFO Manifest (US-13)
+<span class="fc" id="L75">    TRIP_DRAFT_NOT_VALIDATED(&quot;TRIP_DRAFT_NOT_VALIDATED&quot;),</span>
+<span class="fc" id="L76">    MANIFEST_ALREADY_EXISTS(&quot;MANIFEST_ALREADY_EXISTS&quot;),</span>
+<span class="fc" id="L77">    MANIFEST_NOT_FOUND(&quot;MANIFEST_NOT_FOUND&quot;),</span>
+
+    // Vehicle Assignment (US-15)
+<span class="fc" id="L80">    VEHICLE_NOT_ELIGIBLE(&quot;VEHICLE_NOT_ELIGIBLE&quot;),</span>
+<span class="fc" id="L81">    VEHICLE_CONFLICT(&quot;VEHICLE_CONFLICT&quot;),</span>
+<span class="fc" id="L82">    DRIVER_CONFLICT(&quot;DRIVER_CONFLICT&quot;),</span>
+<span class="fc" id="L83">    DRIVER_NOT_FOUND(&quot;DRIVER_NOT_FOUND&quot;),</span>
+<span class="fc" id="L84">    INSUFFICIENT_FLEET(&quot;INSUFFICIENT_FLEET&quot;),</span>
+<span class="fc" id="L85">    TRIP_DRAFT_ALREADY_ASSIGNED(&quot;TRIP_DRAFT_ALREADY_ASSIGNED&quot;),</span>
+
+    // Dispatch (US-16)
+<span class="fc" id="L88">    TRIP_NOT_FOUND(&quot;TRIP_NOT_FOUND&quot;),</span>
+<span class="fc" id="L89">    TRIP_LOCKED(&quot;TRIP_LOCKED&quot;),</span>
+<span class="fc" id="L90">    TRIP_COMPLETED(&quot;TRIP_COMPLETED&quot;),</span>
+<span class="fc" id="L91">    INVALID_TRIP_TRANSITION(&quot;INVALID_TRIP_TRANSITION&quot;),</span>
+<span class="fc" id="L92">    FLEET_CAPACITY_SHORTFALL(&quot;FLEET_CAPACITY_SHORTFALL&quot;),</span>
+<span class="fc" id="L93">    HANDOVER_SLIP_NOT_AVAILABLE(&quot;HANDOVER_SLIP_NOT_AVAILABLE&quot;),</span>
+
+    // Trip Monitoring (US-17)
+<span class="fc" id="L96">    NOT_YOUR_TRIP(&quot;NOT_YOUR_TRIP&quot;),</span>
+<span class="fc" id="L97">    TRIP_STOP_NOT_FOUND(&quot;TRIP_STOP_NOT_FOUND&quot;),</span>
+<span class="fc" id="L98">    STOP_NOT_PENDING(&quot;STOP_NOT_PENDING&quot;),</span>
+<span class="fc" id="L99">    STOP_NOT_IN_PROGRESS(&quot;STOP_NOT_IN_PROGRESS&quot;),</span>
+<span class="fc" id="L100">    STOP_ALREADY_DONE(&quot;STOP_ALREADY_DONE&quot;),</span>
+<span class="fc" id="L101">    PREVIOUS_STOP_NOT_DONE(&quot;PREVIOUS_STOP_NOT_DONE&quot;),</span>
+
+    // Exception Management (US-18)
+<span class="fc" id="L104">    REJECTION_ALREADY_RECORDED(&quot;REJECTION_ALREADY_RECORDED&quot;),</span>
+<span class="fc" id="L105">    EXCEPTION_NOT_FOUND(&quot;EXCEPTION_NOT_FOUND&quot;),</span>
+<span class="fc" id="L106">    EXCEPTION_ALREADY_RESOLVED(&quot;ALREADY_RESOLVED&quot;),</span>
+
+    // Validation
+<span class="fc" id="L109">    FIELD_REQUIRED(&quot;Field cannot be blank&quot;),</span>
+<span class="fc" id="L110">    INVALID_FORMAT(&quot;Invalid format&quot;),</span>
+<span class="fc" id="L111">    INVALID_SIZE(&quot;Invalid size&quot;),</span>
+<span class="fc" id="L112">    USERNAME_INVALID(&quot;Username must be 3-50 characters and contain only letters, numbers, and underscores&quot;),</span>
+<span class="fc" id="L113">    PASSWORD_INVALID(</span>
+            &quot;Password must be at least 8 characters, containing at least 1 uppercase letter, 1 number, and 1 special character&quot;),
+
+    // Generic
+<span class="fc" id="L117">    VALIDATION_FAILED(&quot;VALIDATION_FAILED&quot;),</span>
+<span class="fc" id="L118">    INTERNAL_ERROR(&quot;INTERNAL_ERROR&quot;);</span>
+
+    private final String code;
+
+<span class="fc" id="L122">    ErrorCode(String code) {</span>
+<span class="fc" id="L123">        this.code = code;</span>
+<span class="fc" id="L124">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

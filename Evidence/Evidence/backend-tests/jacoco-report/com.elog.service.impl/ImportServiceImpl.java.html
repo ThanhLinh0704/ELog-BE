@@ -1,0 +1,553 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImportServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.service.impl</a> &gt; <span class="el_source">ImportServiceImpl.java</span></div><h1>ImportServiceImpl.java</h1><pre class="source lang-java linenums">package com.elog.service.impl;
+
+import com.elog.dto.response.ApiResponse;
+import com.elog.dto.response.ImportBatchResponse;
+import com.elog.dto.response.ImportErrorResponse;
+import com.elog.entity.*;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.*;
+import com.elog.service.ImportService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.InputStream;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.*;
+
+<span class="fc" id="L29">@Slf4j</span>
+@Service
+@RequiredArgsConstructor
+public class ImportServiceImpl implements ImportService {
+
+    private final ImportBatchRepository batchRepository;
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final ImportErrorRepository errorRepository;
+    private final StoreRepository storeRepository;
+    private final ProductRepository productRepository;
+
+    // ── POST /api/imports ─────────────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public ImportBatchResponse importExcel(MultipartFile file, LocalDate deliveryDate,
+                                            boolean confirmReplace, Long uploadedBy) {
+        // Step 1: Validate file format (BEFORE transaction — nothing to rollback)
+<span class="fc" id="L48">        validateFile(file);</span>
+
+        // Step 2: Parse Excel rows (so size check throws BEFORE creating db batch)
+<span class="fc" id="L51">        List&lt;RowData&gt; rows = parseExcelFile(file);</span>
+
+        // Step 3: Check existing active batch for this delivery date
+<span class="fc" id="L54">        Optional&lt;ImportBatch&gt; existingBatch = batchRepository.findActiveByDate(deliveryDate);</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (existingBatch.isPresent()) {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (!confirmReplace) {</span>
+<span class="fc" id="L57">                throw new DuplicateBatchException(existingBatch.get().getId(), deliveryDate);</span>
+            }
+            // Deactivate old batch (soft replace)
+<span class="fc" id="L60">            ImportBatch oldBatch = existingBatch.get();</span>
+<span class="fc" id="L61">            oldBatch.setIsActive(false);</span>
+<span class="fc" id="L62">            batchRepository.saveAndFlush(oldBatch); // Force update to DB before inserting new active batch to prevent UNIQUE constraint violation</span>
+        }
+
+        // Step 4: Create new batch
+        ImportBatch batch;
+        try {
+<span class="fc" id="L68">            batch = ImportBatch.builder()</span>
+<span class="fc" id="L69">                    .deliveryDate(deliveryDate)</span>
+<span class="fc" id="L70">                    .fileName(file.getOriginalFilename())</span>
+<span class="fc" id="L71">                    .uploadedBy(uploadedBy)</span>
+<span class="fc" id="L72">                    .status(&quot;PROCESSING&quot;)</span>
+<span class="fc" id="L73">                    .build();</span>
+<span class="fc" id="L74">            batch = batchRepository.save(batch);</span>
+<span class="fc" id="L75">            batchRepository.flush(); // force unique constraint check</span>
+<span class="fc" id="L76">        } catch (DataIntegrityViolationException e) {</span>
+            // Race condition: another request created a batch for this date concurrently
+<span class="fc" id="L78">            log.warn(&quot;Concurrent batch creation for date {}: {}&quot;, deliveryDate, e.getMessage());</span>
+<span class="fc" id="L79">            throw new BusinessException(ErrorCode.EXCEL_PARSE_ERROR,</span>
+                    &quot;Đã có dữ liệu nhập cho ngày &quot; + deliveryDate + &quot;. Vui lòng thử lại.&quot;,
+                    HttpStatus.CONFLICT);
+<span class="fc" id="L82">        }</span>
+
+<span class="fc" id="L84">        int totalRows = rows.size();</span>
+<span class="fc" id="L85">        int acceptedRows = 0;</span>
+<span class="fc" id="L86">        int rejectedRows = 0;</span>
+
+        // Cache for stores and products to avoid repeated DB lookups
+<span class="fc" id="L89">        Map&lt;String, Store&gt; storeCache = new HashMap&lt;&gt;();</span>
+<span class="fc" id="L90">        Map&lt;String, Product&gt; productCache = new HashMap&lt;&gt;();</span>
+        // Cache for orders: key = orderRef + &quot;|&quot; + storeId
+<span class="fc" id="L92">        Map&lt;String, Order&gt; orderCache = new HashMap&lt;&gt;();</span>
+        // Cache for tracking orderRef store mapped in this batch to detect ORDER_REF_STORE_MISMATCH
+<span class="fc" id="L94">        Map&lt;String, Store&gt; orderRefStoreCache = new HashMap&lt;&gt;();</span>
+        // Cache for tracking orderRef first row number for the error message
+<span class="fc" id="L96">        Map&lt;String, Integer&gt; orderRefFirstRow = new HashMap&lt;&gt;();</span>
+        // Cache for tracking created order items to accumulate duplicates
+<span class="fc" id="L98">        Map&lt;String, OrderItem&gt; orderItemCache = new HashMap&lt;&gt;();</span>
+
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (RowData row : rows) {</span>
+            try {
+<span class="fc" id="L102">                processRow(row, batch, deliveryDate, storeCache, productCache, orderCache, orderRefStoreCache, orderRefFirstRow, orderItemCache);</span>
+<span class="fc" id="L103">                acceptedRows++;</span>
+<span class="fc" id="L104">            } catch (RowRejectedException ex) {</span>
+<span class="fc" id="L105">                rejectedRows++;</span>
+<span class="fc" id="L106">                ImportError error = ImportError.builder()</span>
+<span class="fc" id="L107">                        .importBatch(batch)</span>
+<span class="fc" id="L108">                        .rowNumber(row.rowNumber)</span>
+<span class="fc" id="L109">                        .rawData(row.toRawString())</span>
+<span class="fc" id="L110">                        .errorCode(ex.getErrorCode())</span>
+<span class="fc" id="L111">                        .fieldName(ex.getFieldName())</span>
+<span class="fc" id="L112">                        .errorReason(ex.getMessage())</span>
+<span class="fc" id="L113">                        .build();</span>
+<span class="fc" id="L114">                errorRepository.save(error);</span>
+<span class="fc" id="L115">            }</span>
+<span class="fc" id="L116">        }</span>
+
+        // Step 5: Update batch summary
+<span class="fc" id="L119">        batch.setTotalRows(totalRows);</span>
+<span class="fc" id="L120">        batch.setAcceptedRows(acceptedRows);</span>
+<span class="fc" id="L121">        batch.setRejectedRows(rejectedRows);</span>
+<span class="fc" id="L122">        batch.setStatus(&quot;COMPLETED&quot;);</span>
+<span class="fc" id="L123">        batchRepository.save(batch);</span>
+
+<span class="fc" id="L125">        long ordersCreated = orderRepository.countByBatchId(batch.getId());</span>
+
+<span class="fc" id="L127">        return toResponse(batch, ordersCreated);</span>
+    }
+
+    // ── GET /api/imports ──────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse&lt;List&lt;ImportBatchResponse&gt;&gt; getBatches(LocalDate deliveryDate, Pageable pageable) {
+        Page&lt;ImportBatch&gt; page;
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (deliveryDate != null) {</span>
+<span class="fc" id="L137">            page = batchRepository.findByDeliveryDate(deliveryDate, pageable);</span>
+        } else {
+<span class="fc" id="L139">            page = batchRepository.findAllBatches(pageable);</span>
+        }
+
+<span class="fc" id="L142">        List&lt;ImportBatchResponse&gt; items = page.getContent().stream()</span>
+<span class="fc" id="L143">                .map(b -&gt; toResponse(b, orderRepository.countByBatchId(b.getId())))</span>
+<span class="fc" id="L144">                .toList();</span>
+
+<span class="fc" id="L146">        return ApiResponse.&lt;List&lt;ImportBatchResponse&gt;&gt;builder()</span>
+<span class="fc" id="L147">                .success(true)</span>
+<span class="fc" id="L148">                .data(items)</span>
+<span class="fc" id="L149">                .pagination(ApiResponse.PaginationInfo.builder()</span>
+<span class="fc" id="L150">                        .page(page.getNumber())</span>
+<span class="fc" id="L151">                        .size(page.getSize())</span>
+<span class="fc" id="L152">                        .totalElements(page.getTotalElements())</span>
+<span class="fc" id="L153">                        .totalPages(page.getTotalPages())</span>
+<span class="fc" id="L154">                        .build())</span>
+<span class="fc" id="L155">                .build();</span>
+    }
+
+    // ── GET /api/imports/{batchId} ────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public ImportBatchResponse getBatchById(Long batchId) {
+<span class="fc" id="L163">        ImportBatch batch = batchRepository.findById(batchId)</span>
+<span class="fc" id="L164">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,</span>
+                        &quot;Import batch not found: &quot; + batchId, HttpStatus.NOT_FOUND));
+<span class="fc" id="L166">        long ordersCreated = orderRepository.countByBatchId(batchId);</span>
+<span class="fc" id="L167">        return toResponse(batch, ordersCreated);</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse&lt;List&lt;ImportErrorResponse&gt;&gt; getBatchErrors(Long batchId, String errorCode, Pageable pageable) {
+        // Verify batch exists
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (!batchRepository.existsById(batchId)) {</span>
+<span class="fc" id="L175">            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,</span>
+                    &quot;Import batch not found: &quot; + batchId, HttpStatus.NOT_FOUND);
+        }
+
+<span class="pc bpc" id="L179" title="1 of 4 branches missed.">        String filterCode = (errorCode == null || errorCode.trim().isEmpty()) ? null : errorCode.trim();</span>
+<span class="fc" id="L180">        Page&lt;ImportError&gt; page = errorRepository.findByImportBatchIdAndErrorCode(batchId, filterCode, pageable);</span>
+
+<span class="fc" id="L182">        List&lt;ImportErrorResponse&gt; items = page.getContent().stream()</span>
+<span class="fc" id="L183">                .map(e -&gt; ImportErrorResponse.builder()</span>
+<span class="fc" id="L184">                        .rowNumber(e.getRowNumber())</span>
+<span class="fc" id="L185">                        .rawData(e.getRawData())</span>
+<span class="fc" id="L186">                        .errorCode(e.getErrorCode())</span>
+<span class="fc" id="L187">                        .fieldName(e.getFieldName())</span>
+<span class="fc" id="L188">                        .errorReason(e.getErrorReason())</span>
+<span class="fc" id="L189">                        .build())</span>
+<span class="fc" id="L190">                .toList();</span>
+
+<span class="fc" id="L192">        return ApiResponse.&lt;List&lt;ImportErrorResponse&gt;&gt;builder()</span>
+<span class="fc" id="L193">                .success(true)</span>
+<span class="fc" id="L194">                .data(items)</span>
+<span class="fc" id="L195">                .pagination(ApiResponse.PaginationInfo.builder()</span>
+<span class="fc" id="L196">                        .page(page.getNumber())</span>
+<span class="fc" id="L197">                        .size(page.getSize())</span>
+<span class="fc" id="L198">                        .totalElements(page.getTotalElements())</span>
+<span class="fc" id="L199">                        .totalPages(page.getTotalPages())</span>
+<span class="fc" id="L200">                        .build())</span>
+<span class="fc" id="L201">                .build();</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] exportBatchErrors(Long batchId) {
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (!batchRepository.existsById(batchId)) {</span>
+<span class="fc" id="L208">            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,</span>
+                    &quot;Import batch not found: &quot; + batchId, HttpStatus.NOT_FOUND);
+        }
+
+<span class="fc" id="L212">        try (Workbook workbook = new XSSFWorkbook();</span>
+<span class="fc" id="L213">             java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {</span>
+
+<span class="fc" id="L215">            List&lt;ImportError&gt; errors = errorRepository.findByImportBatchIdOrderByRowNumberAsc(batchId);</span>
+<span class="fc" id="L216">            Sheet sheet = workbook.createSheet(&quot;Import Errors&quot;);</span>
+
+            // Create header row
+<span class="fc" id="L219">            Row headerRow = sheet.createRow(0);</span>
+<span class="fc" id="L220">            String[] headers = {&quot;Dòng&quot;, &quot;Mã lỗi&quot;, &quot;Trường&quot;, &quot;Dữ liệu gốc&quot;, &quot;Lý do&quot;};</span>
+            
+            // Header style
+<span class="fc" id="L223">            CellStyle headerStyle = workbook.createCellStyle();</span>
+<span class="fc" id="L224">            Font font = workbook.createFont();</span>
+<span class="fc" id="L225">            font.setBold(true);</span>
+<span class="fc" id="L226">            headerStyle.setFont(font);</span>
+
+<span class="fc bfc" id="L228" title="All 2 branches covered.">            for (int i = 0; i &lt; headers.length; i++) {</span>
+<span class="fc" id="L229">                Cell cell = headerRow.createCell(i);</span>
+<span class="fc" id="L230">                cell.setCellValue(headers[i]);</span>
+<span class="fc" id="L231">                cell.setCellStyle(headerStyle);</span>
+            }
+
+            // Fill data rows
+<span class="fc" id="L235">            int rowIdx = 1;</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">            for (ImportError error : errors) {</span>
+<span class="fc" id="L237">                Row row = sheet.createRow(rowIdx++);</span>
+<span class="fc" id="L238">                row.createCell(0).setCellValue(error.getRowNumber());</span>
+<span class="fc" id="L239">                row.createCell(1).setCellValue(error.getErrorCode());</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">                row.createCell(2).setCellValue(error.getFieldName() != null ? error.getFieldName() : &quot;&quot;);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">                row.createCell(3).setCellValue(error.getRawData() != null ? error.getRawData() : &quot;&quot;);</span>
+<span class="fc" id="L242">                row.createCell(4).setCellValue(error.getErrorReason());</span>
+<span class="fc" id="L243">            }</span>
+
+            // Auto-size columns
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            for (int i = 0; i &lt; headers.length; i++) {</span>
+<span class="fc" id="L247">                sheet.autoSizeColumn(i);</span>
+            }
+
+<span class="fc" id="L250">            workbook.write(out);</span>
+<span class="fc" id="L251">            return out.toByteArray();</span>
+<span class="fc" id="L252">        } catch (Exception e) {</span>
+<span class="fc" id="L253">            log.error(&quot;Error exporting import batch errors: {}&quot;, e.getMessage(), e);</span>
+<span class="fc" id="L254">            throw new BusinessException(ErrorCode.INTERNAL_ERROR,</span>
+                    &quot;Không thể xuất file báo cáo lỗi&quot;, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private void validateFile(MultipartFile file) {
+<span class="fc bfc" id="L262" title="All 4 branches covered.">        if (file == null || file.isEmpty()) {</span>
+<span class="fc" id="L263">            throw new BusinessException(ErrorCode.EXCEL_PARSE_ERROR,</span>
+                    &quot;File không được để trống&quot;, HttpStatus.BAD_REQUEST);
+        }
+
+<span class="fc" id="L267">        String originalFilename = file.getOriginalFilename();</span>
+<span class="pc bpc" id="L268" title="1 of 4 branches missed.">        if (originalFilename == null || !originalFilename.toLowerCase().endsWith(&quot;.xlsx&quot;)) {</span>
+<span class="fc" id="L269">            throw new BusinessException(ErrorCode.EXCEL_PARSE_ERROR,</span>
+                    &quot;Chỉ hỗ trợ file định dạng .xlsx&quot;, HttpStatus.BAD_REQUEST);
+        }
+<span class="fc" id="L272">    }</span>
+
+    private List&lt;RowData&gt; parseExcelFile(MultipartFile file) {
+<span class="fc" id="L275">        List&lt;RowData&gt; rows = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L276">        try (InputStream is = file.getInputStream();</span>
+<span class="fc" id="L277">             Workbook workbook = new XSSFWorkbook(is)) {</span>
+
+<span class="fc" id="L279">            Sheet sheet = workbook.getSheetAt(0);</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">            if (sheet == null) {</span>
+<span class="nc" id="L281">                throw new BusinessException(ErrorCode.EXCEL_PARSE_ERROR,</span>
+                        &quot;File Excel không có sheet nào&quot;, HttpStatus.BAD_REQUEST);
+            }
+
+            // Pre-check size
+<span class="fc" id="L286">            int rowCount = 0;</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">            for (int i = 1; i &lt;= sheet.getLastRowNum(); i++) {</span>
+<span class="fc" id="L288">                Row row = sheet.getRow(i);</span>
+<span class="pc bpc" id="L289" title="1 of 4 branches missed.">                if (row != null &amp;&amp; !isEmptyRow(row)) {</span>
+<span class="fc" id="L290">                    rowCount++;</span>
+                }
+            }
+<span class="fc bfc" id="L293" title="All 2 branches covered.">            if (rowCount &gt; 5000) {</span>
+<span class="fc" id="L294">                throw new BusinessException(ErrorCode.FILE_TOO_LARGE,</span>
+                        &quot;File Excel vượt quá giới hạn 5.000 dòng dữ liệu&quot;, HttpStatus.BAD_REQUEST);
+            }
+
+            // Skip header row (row 0)
+<span class="fc bfc" id="L299" title="All 2 branches covered.">            for (int i = 1; i &lt;= sheet.getLastRowNum(); i++) {</span>
+<span class="fc" id="L300">                Row row = sheet.getRow(i);</span>
+<span class="pc bpc" id="L301" title="1 of 4 branches missed.">                if (row == null || isEmptyRow(row)) {</span>
+<span class="fc" id="L302">                    continue;</span>
+                }
+
+<span class="fc" id="L305">                RowData data = new RowData();</span>
+<span class="fc" id="L306">                data.rowNumber = i + 1; // 1-indexed, counting header</span>
+<span class="fc" id="L307">                data.orderRef = getCellStringValue(row.getCell(0));</span>
+<span class="fc" id="L308">                data.storeCode = getCellStringValue(row.getCell(1));</span>
+<span class="fc" id="L309">                data.sku = getCellStringValue(row.getCell(2));</span>
+<span class="fc" id="L310">                data.quantityRaw = getCellStringValue(row.getCell(3));</span>
+<span class="fc" id="L311">                rows.add(data);</span>
+            }
+<span class="fc" id="L313">        } catch (BusinessException e) {</span>
+<span class="fc" id="L314">            throw e;</span>
+<span class="fc" id="L315">        } catch (Exception e) {</span>
+<span class="fc" id="L316">            log.error(&quot;Error parsing Excel file: {}&quot;, e.getMessage(), e);</span>
+<span class="fc" id="L317">            throw new BusinessException(ErrorCode.EXCEL_PARSE_ERROR,</span>
+                    &quot;File Excel bị hỏng hoặc không đọc được&quot;, HttpStatus.BAD_REQUEST);
+<span class="fc" id="L319">        }</span>
+<span class="fc" id="L320">        return rows;</span>
+    }
+
+    private void processRow(RowData row, ImportBatch batch, LocalDate deliveryDate,
+                            Map&lt;String, Store&gt; storeCache, Map&lt;String, Product&gt; productCache,
+                            Map&lt;String, Order&gt; orderCache, Map&lt;String, Store&gt; orderRefStoreCache,
+                            Map&lt;String, Integer&gt; orderRefFirstRow, Map&lt;String, OrderItem&gt; orderItemCache) {
+
+        // Validate required fields (MISSING_FIELD)
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        String storeCode = row.storeCode != null ? row.storeCode.trim() : &quot;&quot;;</span>
+<span class="fc bfc" id="L330" title="All 2 branches covered.">        if (storeCode.isEmpty()) {</span>
+<span class="fc" id="L331">            throw new RowRejectedException(&quot;Mã cửa hàng không được để trống&quot;, &quot;MISSING_FIELD&quot;, &quot;store_code&quot;);</span>
+        }
+
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        String sku = row.sku != null ? row.sku.trim() : &quot;&quot;;</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">        if (sku.isEmpty()) {</span>
+<span class="fc" id="L336">            throw new RowRejectedException(&quot;SKU không được để trống&quot;, &quot;MISSING_FIELD&quot;, &quot;sku&quot;);</span>
+        }
+
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">        String quantityRaw = row.quantityRaw != null ? row.quantityRaw.trim() : &quot;&quot;;</span>
+<span class="fc bfc" id="L340" title="All 2 branches covered.">        if (quantityRaw.isEmpty()) {</span>
+<span class="fc" id="L341">            throw new RowRejectedException(&quot;Thiếu giá trị Số lượng&quot;, &quot;MISSING_FIELD&quot;, &quot;quantity&quot;);</span>
+        }
+
+        // Validate quantity format (INVALID_QUANTITY)
+        int quantity;
+        try {
+<span class="fc" id="L347">            double dVal = Double.parseDouble(quantityRaw);</span>
+<span class="fc bfc" id="L348" title="All 4 branches covered.">            if (dVal != Math.floor(dVal) || dVal &lt;= 0) {</span>
+<span class="fc" id="L349">                throw new NumberFormatException();</span>
+            }
+<span class="fc" id="L351">            quantity = (int) dVal;</span>
+<span class="fc" id="L352">        } catch (NumberFormatException | NullPointerException e) {</span>
+<span class="fc" id="L353">            throw new RowRejectedException(&quot;Số lượng phải là số nguyên dương (giá trị: '&quot; + row.quantityRaw + &quot;')&quot;, &quot;INVALID_QUANTITY&quot;, &quot;quantity&quot;);</span>
+<span class="fc" id="L354">        }</span>
+
+        // Lookup store (STORE_NOT_FOUND)
+<span class="fc bfc" id="L357" title="All 2 branches covered.">        if (!storeCache.containsKey(storeCode)) {</span>
+<span class="fc" id="L358">            storeCache.put(storeCode, storeRepository.findByCode(storeCode).orElse(null));</span>
+        }
+<span class="fc" id="L360">        Store store = storeCache.get(storeCode);</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">        if (store == null) {</span>
+<span class="fc" id="L362">            throw new RowRejectedException(&quot;Mã cửa hàng '&quot; + storeCode + &quot;' không tồn tại trong hệ thống&quot;, &quot;STORE_NOT_FOUND&quot;, &quot;store_code&quot;);</span>
+        }
+
+        // Lookup product by SKU (SKU_NOT_FOUND, SKU_INACTIVE)
+<span class="fc bfc" id="L366" title="All 2 branches covered.">        if (!productCache.containsKey(sku)) {</span>
+<span class="fc" id="L367">            productCache.put(sku, productRepository.findBySku(sku).orElse(null));</span>
+        }
+<span class="fc" id="L369">        Product product = productCache.get(sku);</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        if (product == null) {</span>
+<span class="fc" id="L371">            throw new RowRejectedException(&quot;SKU '&quot; + sku + &quot;' chưa có trong danh mục sản phẩm&quot;, &quot;SKU_NOT_FOUND&quot;, &quot;sku&quot;);</span>
+        }
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        if (!Boolean.TRUE.equals(product.getIsActive())) {</span>
+<span class="fc" id="L374">            throw new RowRejectedException(&quot;SKU '&quot; + sku + &quot;' đã ngừng kinh doanh&quot;, &quot;SKU_INACTIVE&quot;, &quot;sku&quot;);</span>
+        }
+
+        // Determine order_ref
+<span class="pc bpc" id="L378" title="1 of 4 branches missed.">        String orderRef = (row.orderRef != null &amp;&amp; !row.orderRef.trim().isEmpty())</span>
+<span class="fc" id="L379">                ? row.orderRef.trim()</span>
+<span class="fc" id="L380">                : &quot;AUTO-&quot; + batch.getId() + &quot;-&quot; + row.rowNumber;</span>
+
+        // Check ORDER_REF_STORE_MISMATCH
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        if (orderRefStoreCache.containsKey(orderRef)) {</span>
+<span class="fc" id="L384">            Store existingStore = orderRefStoreCache.get(orderRef);</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            if (!existingStore.getId().equals(store.getId())) {</span>
+<span class="fc" id="L386">                Integer firstRow = orderRefFirstRow.get(orderRef);</span>
+<span class="fc" id="L387">                throw new RowRejectedException(&quot;Mã đơn '&quot; + orderRef + &quot;' đã dùng cho cửa hàng '&quot; + existingStore.getCode() + &quot;' (dòng &quot; + firstRow + &quot;) — không thể dùng lại cho cửa hàng khác&quot;, &quot;ORDER_REF_STORE_MISMATCH&quot;, &quot;order_ref&quot;);</span>
+            }
+<span class="fc" id="L389">        } else {</span>
+<span class="fc" id="L390">            orderRefStoreCache.put(orderRef, store);</span>
+<span class="fc" id="L391">            orderRefFirstRow.put(orderRef, row.rowNumber);</span>
+        }
+
+        // Find or create Order
+<span class="fc" id="L395">        String orderKey = orderRef + &quot;|&quot; + store.getId();</span>
+<span class="fc" id="L396">        Order order = orderCache.computeIfAbsent(orderKey, k -&gt; {</span>
+<span class="fc" id="L397">            Optional&lt;Order&gt; existing = orderRepository.findByBatchAndOrderRefAndStore(</span>
+<span class="fc" id="L398">                    batch.getId(), orderRef, store.getId());</span>
+<span class="fc" id="L399">            return existing.orElseGet(() -&gt; {</span>
+<span class="fc" id="L400">                Order newOrder = Order.builder()</span>
+<span class="fc" id="L401">                        .importBatch(batch)</span>
+<span class="fc" id="L402">                        .orderRef(orderRef)</span>
+<span class="fc" id="L403">                        .store(store)</span>
+<span class="fc" id="L404">                        .deliveryDate(deliveryDate)</span>
+<span class="fc" id="L405">                        .status(&quot;ACCEPTED&quot;)</span>
+<span class="fc" id="L406">                        .build();</span>
+<span class="fc" id="L407">                return orderRepository.save(newOrder);</span>
+            });
+        });
+
+        // Create or update OrderItem with snapshot (Accumulation for identical product in same order)
+<span class="fc" id="L412">        String orderItemKey = order.getId() + &quot;|&quot; + product.getId();</span>
+<span class="fc" id="L413">        BigDecimal unitWeight = product.getWeightKg();</span>
+<span class="fc" id="L414">        BigDecimal unitVolume = product.getVolumeM3();</span>
+
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        if (orderItemCache.containsKey(orderItemKey)) {</span>
+<span class="fc" id="L417">            OrderItem existingItem = orderItemCache.get(orderItemKey);</span>
+<span class="fc" id="L418">            int newQuantity = existingItem.getQuantity() + quantity;</span>
+<span class="fc" id="L419">            existingItem.setQuantity(newQuantity);</span>
+<span class="fc" id="L420">            BigDecimal newQtyDecimal = BigDecimal.valueOf(newQuantity);</span>
+<span class="fc" id="L421">            existingItem.setLineWeightKg(unitWeight.multiply(newQtyDecimal).setScale(3, RoundingMode.HALF_UP));</span>
+<span class="fc" id="L422">            existingItem.setLineVolumeM3(unitVolume.multiply(newQtyDecimal).setScale(6, RoundingMode.HALF_UP));</span>
+            
+<span class="fc" id="L424">            orderItemRepository.save(existingItem);</span>
+<span class="fc" id="L425">            log.warn(&quot;Dòng trùng SKU '{}' cho đơn hàng '{}'. Tiến hành cộng dồn số lượng. Số lượng mới: {}&quot;, sku, orderRef, newQuantity);</span>
+<span class="fc" id="L426">        } else {</span>
+<span class="fc" id="L427">            BigDecimal qty = BigDecimal.valueOf(quantity);</span>
+<span class="fc" id="L428">            OrderItem item = OrderItem.builder()</span>
+<span class="fc" id="L429">                    .order(order)</span>
+<span class="fc" id="L430">                    .product(product)</span>
+<span class="fc" id="L431">                    .sku(sku)</span>
+<span class="fc" id="L432">                    .quantity(quantity)</span>
+<span class="fc" id="L433">                    .unitWeightKg(unitWeight)</span>
+<span class="fc" id="L434">                    .unitVolumeM3(unitVolume)</span>
+<span class="fc" id="L435">                    .lineWeightKg(unitWeight.multiply(qty).setScale(3, RoundingMode.HALF_UP))</span>
+<span class="fc" id="L436">                    .lineVolumeM3(unitVolume.multiply(qty).setScale(6, RoundingMode.HALF_UP))</span>
+<span class="fc" id="L437">                    .build();</span>
+<span class="fc" id="L438">            OrderItem savedItem = orderItemRepository.save(item);</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">            orderItemCache.put(orderItemKey, savedItem != null ? savedItem : item);</span>
+        }
+<span class="fc" id="L441">    }</span>
+
+    private boolean isEmptyRow(Row row) {
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        for (int i = 0; i &lt; 4; i++) {</span>
+<span class="fc" id="L445">            Cell cell = row.getCell(i);</span>
+<span class="pc bpc" id="L446" title="1 of 4 branches missed.">            if (cell != null &amp;&amp; cell.getCellType() != CellType.BLANK) {</span>
+<span class="fc" id="L447">                String val = getCellStringValue(cell);</span>
+<span class="pc bpc" id="L448" title="1 of 4 branches missed.">                if (val != null &amp;&amp; !val.trim().isEmpty()) {</span>
+<span class="fc" id="L449">                    return false;</span>
+                }
+            }
+        }
+<span class="fc" id="L453">        return true;</span>
+    }
+
+    private String getCellStringValue(Cell cell) {
+<span class="fc bfc" id="L457" title="All 2 branches covered.">        if (cell == null) return &quot;&quot;;</span>
+<span class="fc bfc" id="L458" title="All 5 branches covered.">        return switch (cell.getCellType()) {</span>
+<span class="fc" id="L459">            case STRING -&gt; cell.getStringCellValue();</span>
+            case NUMERIC -&gt; {
+<span class="fc" id="L461">                double d = cell.getNumericCellValue();</span>
+<span class="fc bfc" id="L462" title="All 4 branches covered.">                if (d == Math.floor(d) &amp;&amp; !Double.isInfinite(d)) {</span>
+<span class="fc" id="L463">                    yield String.valueOf((long) d);</span>
+                }
+<span class="fc" id="L465">                yield String.valueOf(d);</span>
+            }
+<span class="fc" id="L467">            case BOOLEAN -&gt; String.valueOf(cell.getBooleanCellValue());</span>
+            case FORMULA -&gt; {
+                try {
+<span class="fc" id="L470">                    yield cell.getStringCellValue();</span>
+<span class="fc" id="L471">                } catch (IllegalStateException e) {</span>
+<span class="fc" id="L472">                    double d = cell.getNumericCellValue();</span>
+<span class="pc bpc" id="L473" title="1 of 4 branches missed.">                    if (d == Math.floor(d) &amp;&amp; !Double.isInfinite(d)) {</span>
+<span class="fc" id="L474">                        yield String.valueOf((long) d);</span>
+                    }
+<span class="fc" id="L476">                    yield String.valueOf(d);</span>
+                }
+            }
+<span class="fc" id="L479">            default -&gt; &quot;&quot;;</span>
+        };
+    }
+
+    private ImportBatchResponse toResponse(ImportBatch batch, long ordersCreated) {
+<span class="fc" id="L484">        return ImportBatchResponse.builder()</span>
+<span class="fc" id="L485">                .batchId(batch.getId())</span>
+<span class="fc" id="L486">                .deliveryDate(batch.getDeliveryDate())</span>
+<span class="fc" id="L487">                .fileName(batch.getFileName())</span>
+<span class="fc" id="L488">                .totalRows(batch.getTotalRows())</span>
+<span class="fc" id="L489">                .acceptedRows(batch.getAcceptedRows())</span>
+<span class="fc" id="L490">                .rejectedRows(batch.getRejectedRows())</span>
+<span class="fc" id="L491">                .ordersCreated(ordersCreated)</span>
+<span class="fc" id="L492">                .status(batch.getStatus())</span>
+<span class="fc" id="L493">                .isActive(batch.getIsActive())</span>
+<span class="fc" id="L494">                .createdAt(batch.getCreatedAt())</span>
+<span class="fc" id="L495">                .build();</span>
+    }
+
+    // ── Inner exception for per-row rejection ─────────────────────────────────
+
+    private static class RowRejectedException extends RuntimeException {
+        private final String errorCode;
+        private final String fieldName;
+
+        RowRejectedException(String message, String errorCode, String fieldName) {
+<span class="fc" id="L505">            super(message);</span>
+<span class="fc" id="L506">            this.errorCode = errorCode;</span>
+<span class="fc" id="L507">            this.fieldName = fieldName;</span>
+<span class="fc" id="L508">        }</span>
+
+        public String getErrorCode() {
+<span class="fc" id="L511">            return errorCode;</span>
+        }
+
+        public String getFieldName() {
+<span class="fc" id="L515">            return fieldName;</span>
+        }
+    }
+
+    // ── Inner class for parsed row data ───────────────────────────────────────
+
+    private static class RowData {
+        int rowNumber;
+        String orderRef;
+        String storeCode;
+        String sku;
+        String quantityRaw;
+
+        String toRawString() {
+<span class="fc" id="L529">            return String.join(&quot;,&quot;, nvl(orderRef), nvl(storeCode), nvl(sku), nvl(quantityRaw));</span>
+        }
+
+        private String nvl(String s) {
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">            return s != null ? s : &quot;&quot;;</span>
+        }
+    }
+
+    // ── Custom exception for duplicate batch (HTTP 409) ───────────────────────
+
+    public static class DuplicateBatchException extends RuntimeException {
+        private final Long existingBatchId;
+        private final LocalDate deliveryDate;
+
+        public DuplicateBatchException(Long existingBatchId, LocalDate deliveryDate) {
+<span class="fc" id="L544">            super(&quot;Đã có dữ liệu nhập cho ngày &quot; + deliveryDate);</span>
+<span class="fc" id="L545">            this.existingBatchId = existingBatchId;</span>
+<span class="fc" id="L546">            this.deliveryDate = deliveryDate;</span>
+<span class="fc" id="L547">        }</span>
+
+<span class="nc" id="L549">        public Long getExistingBatchId() { return existingBatchId; }</span>
+<span class="nc" id="L550">        public LocalDate getDeliveryDate() { return deliveryDate; }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

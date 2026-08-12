@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VehicleSpecification.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.repository.specification</a> &gt; <span class="el_source">VehicleSpecification.java</span></div><h1>VehicleSpecification.java</h1><pre class="source lang-java linenums">package com.elog.repository.specification;
+
+import com.elog.entity.Vehicle;
+import org.springframework.data.jpa.domain.Specification;
+
+import java.math.BigDecimal;
+
+public class VehicleSpecification {
+
+    private VehicleSpecification() {}
+
+    public static Specification&lt;Vehicle&gt; hasKeyword(String keyword) {
+<span class="fc" id="L13">        return (root, query, cb) -&gt; {</span>
+<span class="nc bnc" id="L14" title="All 4 branches missed.">            if (keyword == null || keyword.isBlank()) return null;</span>
+<span class="nc" id="L15">            String pattern = &quot;%&quot; + keyword.toLowerCase() + &quot;%&quot;;</span>
+<span class="nc" id="L16">            return cb.or(</span>
+<span class="nc" id="L17">                    cb.like(cb.lower(root.get(&quot;plateNumber&quot;)), pattern),</span>
+<span class="nc" id="L18">                    cb.like(cb.lower(root.get(&quot;vehicleType&quot;)), pattern)</span>
+            );
+        };
+    }
+
+    public static Specification&lt;Vehicle&gt; hasActiveStatus(Boolean isActive) {
+<span class="fc" id="L24">        return (root, query, cb) -&gt; {</span>
+<span class="nc bnc" id="L25" title="All 2 branches missed.">            if (isActive == null) return null;</span>
+<span class="nc" id="L26">            return cb.equal(root.get(&quot;isActive&quot;), isActive);</span>
+        };
+    }
+
+    public static Specification&lt;Vehicle&gt; hasMinimumWeight(BigDecimal minWeightKg) {
+<span class="fc" id="L31">        return (root, query, cb) -&gt; {</span>
+<span class="nc bnc" id="L32" title="All 2 branches missed.">            if (minWeightKg == null) return null;</span>
+<span class="nc" id="L33">            return cb.greaterThanOrEqualTo(root.get(&quot;maxWeightKg&quot;), minWeightKg);</span>
+        };
+    }
+
+    public static Specification&lt;Vehicle&gt; hasMinimumVolume(BigDecimal minVolumeM3) {
+<span class="fc" id="L38">        return (root, query, cb) -&gt; {</span>
+<span class="nc bnc" id="L39" title="All 2 branches missed.">            if (minVolumeM3 == null) return null;</span>
+<span class="nc" id="L40">            return cb.greaterThanOrEqualTo(root.get(&quot;maxVolumeM3&quot;), minVolumeM3);</span>
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

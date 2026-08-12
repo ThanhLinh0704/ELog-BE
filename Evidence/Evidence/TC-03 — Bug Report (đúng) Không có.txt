@@ -1,0 +1,25 @@
+TC-03 — Bug Report (đúng): Không có token nhận 200 thay vì 401
+
+Verify: NG
+Auth: No Auth
+
+Expected: 401 Unauthorized
+Actual: 200 OK
+
+Nguyên nhân — SecurityConfig.java dòng 37
+File: src/main/java/com/elog/config/SecurityConfig.java
+
+
+private static final String[] PUBLIC_URLS = {
+    "/api/v1/auth/**",
+    "/api/v1/users/**",   // ← BUG: pattern này match cả /api/v1/users
+    "/api/v1/health",
+    ...
+};
+Spring Security AntMatcher coi /** khớp với cả path gốc /api/v1/users → endpoint này được đưa vào permitAll() → không kiểm tra token → request không có token vẫn nhận 200 với toàn bộ danh sách users.
+
+Đây là cùng root cause với TC-02
+TC	Expected	Actual	Root bug
+TC-02	403	200	SecurityConfig.java dòng 37
+TC-03	401	200	SecurityConfig.java dòng 37
+Fix: Xoá "/api/v1/users/**" khỏi PUBLIC_URLS.

@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HaversineEtaCalculator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.service.impl</a> &gt; <span class="el_source">HaversineEtaCalculator.java</span></div><h1>HaversineEtaCalculator.java</h1><pre class="source lang-java linenums">package com.elog.service.impl;
+
+import com.elog.dto.response.StopEtaResponse;
+import com.elog.entity.Store;
+import com.elog.entity.TripDraft;
+import com.elog.entity.TripDraftStop;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.SystemConfigRepository;
+import com.elog.repository.TripDraftRepository;
+import com.elog.repository.TripDraftStopRepository;
+import com.elog.service.EtaCalculationService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Haversine-based ETA calculator.
+ * Computes sequential linear ETA for active stops using GPS coordinates,
+ * average speed from SystemConfig, and per-stop service time.
+ */
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L32">@Slf4j</span>
+public class HaversineEtaCalculator implements EtaCalculationService {
+
+    private static final double EARTH_RADIUS_KM = 6371.0;
+
+    private final SystemConfigRepository configRepo;
+    private final TripDraftRepository tripDraftRepo;
+    private final TripDraftStopRepository stopRepo;
+
+    @Override
+    @Transactional
+    public List&lt;StopEtaResponse&gt; calculateAndPersist(Long tripDraftId, LocalTime departureTime) {
+        // 1. Load config
+<span class="nc" id="L45">        double avgSpeedKmh = getConfigDouble(&quot;AVG_SPEED_KMH&quot;);</span>
+<span class="nc" id="L46">        double warehouseLat = getConfigDouble(&quot;WAREHOUSE_LAT&quot;);</span>
+<span class="nc" id="L47">        double warehouseLng = getConfigDouble(&quot;WAREHOUSE_LNG&quot;);</span>
+
+        // 2. Load TripDraft
+<span class="nc" id="L50">        TripDraft draft = tripDraftRepo.findById(tripDraftId)</span>
+<span class="nc" id="L51">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.TRIP_DRAFT_NOT_FOUND,
+                        &quot;Trip Draft not found with id: &quot; + tripDraftId,
+                        HttpStatus.NOT_FOUND));
+
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (!&quot;DRAFT&quot;.equals(draft.getStatus())) {</span>
+<span class="nc" id="L57">            throw new BusinessException(</span>
+                    ErrorCode.TRIP_DRAFT_LOCKED,
+<span class="nc" id="L59">                    &quot;Trip Draft already confirmed (status=&quot; + draft.getStatus() + &quot;). Cannot recalculate ETA.&quot;,</span>
+                    HttpStatus.CONFLICT);
+        }
+
+        // 3. Load active stops in order
+<span class="nc" id="L64">        List&lt;TripDraftStop&gt; activeStops = stopRepo</span>
+<span class="nc" id="L65">                .findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);</span>
+
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (activeStops.isEmpty()) {</span>
+<span class="nc" id="L68">            throw new BusinessException(</span>
+                    ErrorCode.NO_ACTIVE_STOP,
+                    &quot;Trip Draft &quot; + tripDraftId + &quot; has no active stops. Cannot calculate ETA.&quot;,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // 4. Calculate sequential ETA
+<span class="nc" id="L75">        LocalDate deliveryDate = draft.getDeliveryDate();</span>
+<span class="nc" id="L76">        LocalDateTime currentEta = LocalDateTime.of(deliveryDate, departureTime);</span>
+<span class="nc" id="L77">        double prevLat = warehouseLat;</span>
+<span class="nc" id="L78">        double prevLng = warehouseLng;</span>
+<span class="nc" id="L79">        List&lt;StopEtaResponse&gt; results = new ArrayList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        for (int i = 0; i &lt; activeStops.size(); i++) {</span>
+<span class="nc" id="L82">            TripDraftStop stop = activeStops.get(i);</span>
+<span class="nc" id="L83">            Store store = stop.getStore();</span>
+
+<span class="nc bnc" id="L85" title="All 4 branches missed.">            if (store.getLatitude() == null || store.getLongitude() == null) {</span>
+<span class="nc" id="L86">                throw new BusinessException(</span>
+                        ErrorCode.ETA_MISSING_COORDINATES,
+<span class="nc" id="L88">                        &quot;Store &quot; + store.getCode() + &quot; is missing GPS coordinates. Cannot calculate ETA.&quot;,</span>
+                        HttpStatus.UNPROCESSABLE_ENTITY);
+            }
+
+<span class="nc" id="L92">            double stopLat = store.getLatitude();</span>
+<span class="nc" id="L93">            double stopLng = store.getLongitude();</span>
+
+            // Add service time of PREVIOUS stop (not for the first stop)
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L97">                int prevServiceMin = activeStops.get(i - 1).getRouteStop().getAvgServiceTimeMin();</span>
+<span class="nc" id="L98">                currentEta = currentEta.plusMinutes(prevServiceMin);</span>
+            }
+
+            // Calculate travel time
+<span class="nc" id="L102">            double distanceKm = haversine(prevLat, prevLng, stopLat, stopLng);</span>
+<span class="nc" id="L103">            long travelMinutes = Math.round((distanceKm / avgSpeedKmh) * 60);</span>
+<span class="nc" id="L104">            currentEta = currentEta.plusMinutes(travelMinutes);</span>
+
+            // Set planned ETA
+<span class="nc" id="L107">            stop.setPlannedEta(currentEta);</span>
+
+<span class="nc" id="L109">            results.add(StopEtaResponse.builder()</span>
+<span class="nc" id="L110">                    .tripDraftStopId(stop.getId())</span>
+<span class="nc" id="L111">                    .sequenceNo(stop.getSequenceNo())</span>
+<span class="nc" id="L112">                    .storeCode(store.getCode())</span>
+<span class="nc" id="L113">                    .plannedEta(currentEta)</span>
+<span class="nc" id="L114">                    .build());</span>
+
+<span class="nc" id="L116">            prevLat = stopLat;</span>
+<span class="nc" id="L117">            prevLng = stopLng;</span>
+        }
+
+        // 5. Persist all at once
+<span class="nc" id="L121">        stopRepo.saveAll(activeStops);</span>
+
+        // 6. Update departure time on TripDraft
+<span class="nc" id="L124">        draft.setPlannedDepartureTime(departureTime);</span>
+<span class="nc" id="L125">        tripDraftRepo.save(draft);</span>
+
+<span class="nc" id="L127">        log.info(&quot;US-11: ETA calculated for TripDraft id={}, {} active stops&quot;, tripDraftId, results.size());</span>
+<span class="nc" id="L128">        return results;</span>
+    }
+
+    /**
+     * Haversine formula — great-circle distance between two GPS points.
+     */
+    double haversine(double lat1, double lng1, double lat2, double lng2) {
+<span class="nc" id="L135">        double dLat = Math.toRadians(lat2 - lat1);</span>
+<span class="nc" id="L136">        double dLng = Math.toRadians(lng2 - lng1);</span>
+<span class="nc" id="L137">        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)</span>
+<span class="nc" id="L138">                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))</span>
+<span class="nc" id="L139">                * Math.sin(dLng / 2) * Math.sin(dLng / 2);</span>
+<span class="nc" id="L140">        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));</span>
+<span class="nc" id="L141">        return EARTH_RADIUS_KM * c;</span>
+    }
+
+    private double getConfigDouble(String key) {
+<span class="nc" id="L145">        return configRepo.findByConfigKey(key)</span>
+<span class="nc" id="L146">                .map(config -&gt; Double.parseDouble(config.getConfigValue()))</span>
+<span class="nc" id="L147">                .orElseThrow(() -&gt; {</span>
+<span class="nc" id="L148">                    log.error(&quot;Missing config key: {}&quot;, key);</span>
+<span class="nc" id="L149">                    return new BusinessException(</span>
+                            ErrorCode.INTERNAL_ERROR,
+                            &quot;Missing system config key: &quot; + key,
+                            HttpStatus.INTERNAL_SERVER_ERROR);
+                });
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

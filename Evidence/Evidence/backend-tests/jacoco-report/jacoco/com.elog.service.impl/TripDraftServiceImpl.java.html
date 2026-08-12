@@ -1,0 +1,468 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TripDraftServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.service.impl</a> &gt; <span class="el_source">TripDraftServiceImpl.java</span></div><h1>TripDraftServiceImpl.java</h1><pre class="source lang-java linenums">package com.elog.service.impl;
+
+import com.elog.dto.request.RecalculateEtaRequest;
+import com.elog.dto.request.StopUpdateRequest;
+import com.elog.dto.response.*;
+import com.elog.entity.*;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.*;
+import com.elog.service.EtaCalculationService;
+import com.elog.service.TripDraftService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L28">@Slf4j</span>
+public class TripDraftServiceImpl implements TripDraftService {
+
+    private final OrderRepository orderRepository;
+    private final RouteStopRepository routeStopRepository;
+    private final TripDraftRepository tripDraftRepository;
+    private final TripDraftStopRepository tripDraftStopRepository;
+    private final RouteRepository routeRepository;
+    private final UserRepository userRepository;
+    private final EtaCalculationService etaCalculationService;
+    private final OrderItemRepository orderItemRepository;
+
+    @Override
+    @Transactional
+    public ConsolidateResponse consolidate(LocalDate deliveryDate) {
+        // 1. Fetch all ACCEPTED orders for this date (active batch only)
+<span class="fc" id="L44">        List&lt;Order&gt; acceptedOrders = orderRepository</span>
+<span class="fc" id="L45">                .findByDeliveryDateAndStatus(deliveryDate, &quot;ACCEPTED&quot;);</span>
+
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (acceptedOrders.isEmpty()) {</span>
+<span class="fc" id="L48">            return ConsolidateResponse.builder()</span>
+<span class="fc" id="L49">                    .deliveryDate(deliveryDate)</span>
+<span class="fc" id="L50">                    .tripDraftsCreatedOrUpdated(0)</span>
+<span class="fc" id="L51">                    .tripDrafts(Collections.emptyList())</span>
+<span class="fc" id="L52">                    .skippedRoutes(Collections.emptyList())</span>
+<span class="fc" id="L53">                    .build();</span>
+        }
+
+        // 2. Deduplicate orders (JOIN FETCH on items may produce duplicates)
+<span class="fc" id="L57">        acceptedOrders = new ArrayList&lt;&gt;(</span>
+<span class="fc" id="L58">                acceptedOrders.stream()</span>
+<span class="pc" id="L59">                        .collect(Collectors.toMap(Order::getId, o -&gt; o, (a, b) -&gt; a,</span>
+                                LinkedHashMap::new))
+<span class="fc" id="L61">                        .values());</span>
+
+        // 3. Build store → route mapping via route_stops table
+<span class="fc" id="L64">        Set&lt;Long&gt; storeIds = acceptedOrders.stream()</span>
+<span class="fc" id="L65">                .map(o -&gt; o.getStore().getId())</span>
+<span class="fc" id="L66">                .collect(Collectors.toSet());</span>
+
+<span class="fc" id="L68">        Map&lt;Long, RouteStop&gt; storeToRouteStop = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (Long storeId : storeIds) {</span>
+<span class="fc" id="L70">            routeStopRepository.findFirstByStoreId(storeId)</span>
+<span class="fc" id="L71">                    .ifPresent(rs -&gt; storeToRouteStop.put(storeId, rs));</span>
+<span class="fc" id="L72">        }</span>
+
+        // 4. Group orders by route_id
+<span class="fc" id="L75">        Map&lt;Long, List&lt;Order&gt;&gt; ordersByRoute = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc" id="L76">        List&lt;Order&gt; unmappedOrders = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (Order order : acceptedOrders) {</span>
+<span class="fc" id="L79">            RouteStop rs = storeToRouteStop.get(order.getStore().getId());</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (rs != null) {</span>
+<span class="fc" id="L81">                ordersByRoute.computeIfAbsent(rs.getRoute().getId(), k -&gt; new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L82">                        .add(order);</span>
+            } else {
+<span class="fc" id="L84">                unmappedOrders.add(order);</span>
+            }
+<span class="fc" id="L86">        }</span>
+
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (!unmappedOrders.isEmpty()) {</span>
+<span class="fc" id="L89">            log.warn(&quot;US-10: {} orders have stores not mapped to any route (skipped)&quot;,</span>
+<span class="fc" id="L90">                    unmappedOrders.size());</span>
+        }
+
+        // 5. Process each route
+<span class="fc" id="L94">        List&lt;TripDraftResponse&gt; results = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L95">        List&lt;ConsolidateResponse.SkippedRouteInfo&gt; skippedRoutes = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (Map.Entry&lt;Long, List&lt;Order&gt;&gt; entry : ordersByRoute.entrySet()) {</span>
+<span class="fc" id="L98">            Long routeId = entry.getKey();</span>
+<span class="fc" id="L99">            List&lt;Order&gt; routeOrders = entry.getValue();</span>
+
+<span class="fc" id="L101">            Route route = routeRepository.findById(routeId).orElse(null);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (route == null) {</span>
+<span class="fc" id="L103">                log.error(&quot;US-10: Route id={} not found in DB&quot;, routeId);</span>
+<span class="fc" id="L104">                continue;</span>
+            }
+
+            // 5a. Guard: route must have RouteStops (NAC-10a)
+<span class="fc" id="L108">            List&lt;RouteStop&gt; routeStops = routeStopRepository</span>
+<span class="fc" id="L109">                    .findByRouteIdOrderBySequenceOrderAsc(routeId);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            if (routeStops.isEmpty()) {</span>
+<span class="fc" id="L111">                log.warn(&quot;US-10 NAC-10a: Route {} has no RouteStops, skipping&quot;, route.getCode());</span>
+<span class="fc" id="L112">                skippedRoutes.add(ConsolidateResponse.SkippedRouteInfo.builder()</span>
+<span class="fc" id="L113">                        .routeId(routeId)</span>
+<span class="fc" id="L114">                        .routeCode(route.getCode())</span>
+<span class="fc" id="L115">                        .reason(&quot;Route reference data incomplete — no RouteStop defined&quot;)</span>
+<span class="fc" id="L116">                        .build());</span>
+<span class="fc" id="L117">                continue;</span>
+            }
+
+            // 5b. Guard: if TripDraft exists and status != DRAFT → block (NAC-10b)
+<span class="fc" id="L121">            TripDraft existing = tripDraftRepository</span>
+<span class="fc" id="L122">                    .findByRouteIdAndDeliveryDate(routeId, deliveryDate).orElse(null);</span>
+<span class="fc bfc" id="L123" title="All 4 branches covered.">            if (existing != null &amp;&amp; !&quot;DRAFT&quot;.equals(existing.getStatus())) {</span>
+<span class="fc" id="L124">                throw new BusinessException(</span>
+                        ErrorCode.TRIP_DRAFT_LOCKED,
+<span class="fc" id="L126">                        String.format(&quot;Trip Draft cho route %s ngày %s đã được xác nhận (status=%s), &quot; +</span>
+                                &quot;không thể tự động cập nhật lại. Vui lòng reset thủ công trước khi consolidate lại.&quot;,
+<span class="fc" id="L128">                                route.getCode(), deliveryDate, existing.getStatus()),</span>
+                        HttpStatus.CONFLICT);
+            }
+
+            // 5c. Calculate totals from pre-computed line values on OrderItem
+<span class="fc" id="L133">            BigDecimal totalVolume = BigDecimal.ZERO;</span>
+<span class="fc" id="L134">            BigDecimal totalWeight = BigDecimal.ZERO;</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            for (Order order : routeOrders) {</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">                for (OrderItem item : order.getItems()) {</span>
+<span class="fc" id="L137">                    totalVolume = totalVolume.add(item.getLineVolumeM3());</span>
+<span class="fc" id="L138">                    totalWeight = totalWeight.add(item.getLineWeightKg());</span>
+<span class="fc" id="L139">                }</span>
+<span class="fc" id="L140">            }</span>
+
+            // 5d. Determine active/skipped stops (BR-06)
+<span class="fc" id="L143">            Set&lt;Long&gt; storeIdsWithOrder = routeOrders.stream()</span>
+<span class="fc" id="L144">                    .map(o -&gt; o.getStore().getId())</span>
+<span class="fc" id="L145">                    .collect(Collectors.toSet());</span>
+
+<span class="fc" id="L147">            int activeCount = 0;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">            for (RouteStop rs : routeStops) {</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                if (storeIdsWithOrder.contains(rs.getStore().getId())) {</span>
+<span class="fc" id="L150">                    activeCount++;</span>
+                }
+<span class="fc" id="L152">            }</span>
+<span class="fc" id="L153">            int skippedCount = routeStops.size() - activeCount;</span>
+
+            // 5e. Upsert TripDraft
+<span class="fc bfc" id="L156" title="All 2 branches covered.">            TripDraft draft = (existing != null) ? existing : new TripDraft();</span>
+<span class="fc" id="L157">            draft.setRoute(route);</span>
+<span class="fc" id="L158">            draft.setDeliveryDate(deliveryDate);</span>
+<span class="fc" id="L159">            draft.setTotalVolumeM3(totalVolume);</span>
+<span class="fc" id="L160">            draft.setTotalWeightKg(totalWeight);</span>
+<span class="fc" id="L161">            draft.setActiveStopCount(activeCount);</span>
+<span class="fc" id="L162">            draft.setSkippedStopCount(skippedCount);</span>
+<span class="fc" id="L163">            draft.setStatus(&quot;DRAFT&quot;);</span>
+<span class="fc" id="L164">            tripDraftRepository.save(draft);</span>
+
+            // 5f. Refresh TripDraftStops (delete old, recreate — idempotent)
+<span class="fc" id="L167">            tripDraftStopRepository.deleteByTripDraftId(draft.getId());</span>
+<span class="fc" id="L168">            tripDraftRepository.flush();</span>
+
+<span class="fc bfc" id="L170" title="All 2 branches covered.">            for (RouteStop rs : routeStops) {</span>
+<span class="fc" id="L171">                boolean isActive = storeIdsWithOrder.contains(rs.getStore().getId());</span>
+<span class="fc" id="L172">                int orderCountAtStop = (int) routeOrders.stream()</span>
+<span class="fc" id="L173">                        .filter(o -&gt; o.getStore().getId().equals(rs.getStore().getId()))</span>
+<span class="fc" id="L174">                        .count();</span>
+
+<span class="fc" id="L176">                TripDraftStop stop = TripDraftStop.builder()</span>
+<span class="fc" id="L177">                        .tripDraft(draft)</span>
+<span class="fc" id="L178">                        .routeStop(rs)</span>
+<span class="fc" id="L179">                        .store(rs.getStore())</span>
+<span class="fc" id="L180">                        .sequenceNo(rs.getSequenceOrder())</span>
+<span class="fc" id="L181">                        .isActive(isActive)</span>
+<span class="fc" id="L182">                        .orderCount(orderCountAtStop)</span>
+<span class="fc" id="L183">                        .build();</span>
+<span class="fc" id="L184">                tripDraftStopRepository.save(stop);</span>
+<span class="fc" id="L185">            }</span>
+
+            // 5g. Link orders back to this TripDraft
+<span class="fc" id="L188">            List&lt;Long&gt; orderIds = routeOrders.stream().map(Order::getId).toList();</span>
+<span class="fc" id="L189">            orderRepository.updateTripDraftId(orderIds, draft.getId());</span>
+
+<span class="fc" id="L191">            results.add(toResponse(draft, null));</span>
+<span class="fc" id="L192">        }</span>
+
+<span class="fc" id="L194">        return ConsolidateResponse.builder()</span>
+<span class="fc" id="L195">                .deliveryDate(deliveryDate)</span>
+<span class="fc" id="L196">                .tripDraftsCreatedOrUpdated(results.size())</span>
+<span class="fc" id="L197">                .tripDrafts(results)</span>
+<span class="fc" id="L198">                .skippedRoutes(skippedRoutes)</span>
+<span class="fc" id="L199">                .build();</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ApiResponse&lt;List&lt;TripDraftResponse&gt;&gt; getTripDrafts(LocalDate deliveryDate, Pageable pageable) {
+<span class="fc" id="L205">        Page&lt;TripDraft&gt; page = tripDraftRepository.findByDeliveryDate(deliveryDate, pageable);</span>
+
+<span class="fc" id="L207">        List&lt;TripDraftResponse&gt; data = page.getContent().stream()</span>
+<span class="fc" id="L208">                .map(td -&gt; toResponse(td, null))</span>
+<span class="fc" id="L209">                .toList();</span>
+
+<span class="fc" id="L211">        return ApiResponse.&lt;List&lt;TripDraftResponse&gt;&gt;builder()</span>
+<span class="fc" id="L212">                .success(true)</span>
+<span class="fc" id="L213">                .data(data)</span>
+<span class="fc" id="L214">                .pagination(ApiResponse.PaginationInfo.builder()</span>
+<span class="fc" id="L215">                        .page(page.getNumber())</span>
+<span class="fc" id="L216">                        .size(page.getSize())</span>
+<span class="fc" id="L217">                        .totalElements(page.getTotalElements())</span>
+<span class="fc" id="L218">                        .totalPages(page.getTotalPages())</span>
+<span class="fc" id="L219">                        .build())</span>
+<span class="fc" id="L220">                .build();</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TripDraftResponse getTripDraftById(Long id) {
+<span class="fc" id="L226">        TripDraft draft = tripDraftRepository.findById(id)</span>
+<span class="fc" id="L227">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.TRIP_DRAFT_NOT_FOUND,
+                        &quot;Trip Draft not found with id: &quot; + id,
+                        HttpStatus.NOT_FOUND));
+
+<span class="fc" id="L232">        List&lt;TripDraftStopResponse&gt; stopResponses = draft.getStops().stream()</span>
+<span class="fc" id="L233">                .map(this::toStopResponse)</span>
+<span class="fc" id="L234">                .toList();</span>
+
+<span class="fc" id="L236">        return toResponse(draft, stopResponses);</span>
+    }
+
+    // ── US-11: Stop Filtering &amp; Manual Adjustment (TASK-02) ─────
+
+    @Override
+    @Transactional(readOnly = true)
+    public TripDraftResponse getStopsForReview(Long tripDraftId) {
+        // Reuse existing getTripDraftById — same logic, same response
+<span class="nc" id="L245">        return getTripDraftById(tripDraftId);</span>
+    }
+
+    @Override
+    @Transactional
+    public TripDraftStopResponse updateStop(Long tripDraftId, Long stopId, StopUpdateRequest request) {
+<span class="nc" id="L251">        TripDraft draft = findDraftOrThrow(tripDraftId);</span>
+
+        // DC-07: block changes after PLANNED
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        if (!&quot;DRAFT&quot;.equals(draft.getStatus())) {</span>
+<span class="nc" id="L255">            throw new BusinessException(</span>
+                    ErrorCode.TRIP_DRAFT_LOCKED,
+<span class="nc" id="L257">                    &quot;Trip Draft already confirmed (status=&quot; + draft.getStatus() + &quot;). Stop adjustment not allowed.&quot;,</span>
+                    HttpStatus.CONFLICT);
+        }
+
+<span class="nc" id="L261">        TripDraftStop stop = tripDraftStopRepository.findById(stopId)</span>
+<span class="nc" id="L262">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        &quot;TripDraftStop not found with id: &quot; + stopId,
+                        HttpStatus.NOT_FOUND));
+
+        // Verify stop belongs to this trip draft
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (!stop.getTripDraft().getId().equals(tripDraftId)) {</span>
+<span class="nc" id="L269">            throw new BusinessException(</span>
+                    ErrorCode.RESOURCE_NOT_FOUND,
+                    &quot;Stop &quot; + stopId + &quot; does not belong to Trip Draft &quot; + tripDraftId,
+                    HttpStatus.NOT_FOUND);
+        }
+
+        // [ASSUMPTION]: Cannot activate a stop with no orders
+<span class="nc bnc" id="L276" title="All 4 branches missed.">        if (Boolean.TRUE.equals(request.getIsActive()) &amp;&amp; stop.getOrderCount() == 0) {</span>
+<span class="nc" id="L277">            throw new BusinessException(</span>
+                    ErrorCode.CANNOT_ACTIVATE_EMPTY_STOP,
+<span class="nc" id="L279">                    &quot;Stop &quot; + stop.getStore().getCode() + &quot; has no orders for &quot; + draft.getDeliveryDate()</span>
+                            + &quot;. Cannot activate.&quot;,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // Update stop
+<span class="nc" id="L285">        stop.setIsActive(request.getIsActive());</span>
+<span class="nc" id="L286">        stop.setOverrideNote(request.getOverrideNote());</span>
+        // Clear planned_eta when stop status changes (needs recalculation)
+<span class="nc" id="L288">        stop.setPlannedEta(null);</span>
+<span class="nc" id="L289">        tripDraftStopRepository.save(stop);</span>
+
+        // Update counts on TripDraft
+<span class="nc" id="L292">        int activeCount = tripDraftStopRepository.countByTripDraftIdAndIsActiveTrue(tripDraftId);</span>
+<span class="nc" id="L293">        int totalStops = draft.getStops().size();</span>
+<span class="nc" id="L294">        draft.setActiveStopCount(activeCount);</span>
+<span class="nc" id="L295">        draft.setSkippedStopCount(totalStops - activeCount);</span>
+<span class="nc" id="L296">        tripDraftRepository.save(draft);</span>
+
+        // Clear all planned_eta for active stops (force recalculation)
+<span class="nc" id="L299">        List&lt;TripDraftStop&gt; activeStops = tripDraftStopRepository</span>
+<span class="nc" id="L300">                .findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        for (TripDraftStop activeStop : activeStops) {</span>
+<span class="nc" id="L302">            activeStop.setPlannedEta(null);</span>
+<span class="nc" id="L303">        }</span>
+<span class="nc" id="L304">        tripDraftStopRepository.saveAll(activeStops);</span>
+
+<span class="nc" id="L306">        log.info(&quot;US-11: Stop {} (store={}) updated to isActive={} for TripDraft {}&quot;,</span>
+<span class="nc" id="L307">                stopId, stop.getStore().getCode(), request.getIsActive(), tripDraftId);</span>
+
+<span class="nc" id="L309">        return toStopResponse(stop);</span>
+    }
+
+    // ── US-11: ETA Recalculation (TASK-03) ─────────────────────
+
+    @Override
+    @Transactional
+    public RecalculateEtaResponse recalculateEta(Long tripDraftId, RecalculateEtaRequest request) {
+        // Delegate to EtaCalculationService (Haversine implementation)
+<span class="nc" id="L318">        List&lt;StopEtaResponse&gt; results = etaCalculationService</span>
+<span class="nc" id="L319">                .calculateAndPersist(tripDraftId, request.getPlannedDepartureTime());</span>
+
+<span class="nc" id="L321">        return RecalculateEtaResponse.builder()</span>
+<span class="nc" id="L322">                .tripDraftId(tripDraftId)</span>
+<span class="nc" id="L323">                .message(&quot;ETA recalculated for &quot; + results.size() + &quot; active stops.&quot;)</span>
+<span class="nc" id="L324">                .stops(results)</span>
+<span class="nc" id="L325">                .build();</span>
+    }
+
+    // ── US-11: Dispatcher Confirm API — DC-07 Gate (TASK-04) ───
+
+    @Override
+    @Transactional
+    public ConfirmResponse confirmTripDraft(Long tripDraftId, String currentUsername) {
+<span class="nc" id="L333">        TripDraft draft = findDraftOrThrow(tripDraftId);</span>
+
+        // Pre-condition 1: status must be DRAFT
+<span class="nc bnc" id="L336" title="All 2 branches missed.">        if (!&quot;DRAFT&quot;.equals(draft.getStatus())) {</span>
+<span class="nc" id="L337">            throw new BusinessException(</span>
+                    ErrorCode.ALREADY_CONFIRMED,
+<span class="nc" id="L339">                    &quot;Trip Draft &quot; + tripDraftId + &quot; is already in &quot; + draft.getStatus() + &quot; status.&quot;,</span>
+                    HttpStatus.CONFLICT);
+        }
+
+        // Pre-condition 2: must have ≥1 active stop
+<span class="nc" id="L344">        int activeCount = tripDraftStopRepository.countByTripDraftIdAndIsActiveTrue(tripDraftId);</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        if (activeCount == 0) {</span>
+<span class="nc" id="L346">            throw new BusinessException(</span>
+                    ErrorCode.NO_ACTIVE_STOP,
+                    &quot;Trip Draft has no active stops. At least 1 active stop required before confirmation.&quot;,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // Pre-condition 3: all active stops must have planned_eta
+<span class="nc" id="L353">        int missingEtaCount = tripDraftStopRepository</span>
+<span class="nc" id="L354">                .countByTripDraftIdAndIsActiveTrueAndPlannedEtaIsNull(tripDraftId);</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        if (missingEtaCount &gt; 0) {</span>
+<span class="nc" id="L356">            throw new BusinessException(</span>
+                    ErrorCode.ETA_NOT_CALCULATED,
+                    &quot;All active stops must have ETA calculated before confirming. &quot;
+                            + missingEtaCount + &quot; stops missing ETA. Call POST /recalculate-eta first.&quot;,
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        // Resolve current user
+<span class="nc" id="L364">        User confirmer = userRepository.findByUsername(currentUsername)</span>
+<span class="nc" id="L365">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.RESOURCE_NOT_FOUND,
+                        &quot;User not found: &quot; + currentUsername,
+                        HttpStatus.NOT_FOUND));
+
+        // Execute state transition: DRAFT → PLANNED
+<span class="nc" id="L371">        LocalDateTime now = LocalDateTime.now();</span>
+<span class="nc" id="L372">        draft.setStatus(&quot;PLANNED&quot;);</span>
+<span class="nc" id="L373">        draft.setConfirmedAt(now);</span>
+<span class="nc" id="L374">        draft.setConfirmedBy(confirmer);</span>
+<span class="nc" id="L375">        tripDraftRepository.save(draft);</span>
+
+<span class="nc" id="L377">        log.info(&quot;US-11 DC-07: TripDraft id={} confirmed by {} at {}&quot;,</span>
+                tripDraftId, currentUsername, now);
+
+<span class="nc" id="L380">        return ConfirmResponse.builder()</span>
+<span class="nc" id="L381">                .tripDraftId(tripDraftId)</span>
+<span class="nc" id="L382">                .fixedRouteCode(draft.getRoute().getCode())</span>
+<span class="nc" id="L383">                .deliveryDate(draft.getDeliveryDate())</span>
+<span class="nc" id="L384">                .status(&quot;PLANNED&quot;)</span>
+<span class="nc" id="L385">                .confirmedAt(now)</span>
+<span class="nc" id="L386">                .confirmedBy(ConfirmedByDto.builder()</span>
+<span class="nc" id="L387">                        .userId(confirmer.getId())</span>
+<span class="nc" id="L388">                        .fullName(confirmer.getFullName())</span>
+<span class="nc" id="L389">                        .build())</span>
+<span class="nc" id="L390">                .activeStopCount(activeCount)</span>
+<span class="nc" id="L391">                .summary(&quot;Trip Draft confirmed. Capacity validation (US-12) is now unlocked.&quot;)</span>
+<span class="nc" id="L392">                .build();</span>
+    }
+
+    // ── Shared helpers ───────────────────────────────────────────
+
+    private TripDraft findDraftOrThrow(Long id) {
+<span class="nc" id="L398">        return tripDraftRepository.findById(id)</span>
+<span class="nc" id="L399">                .orElseThrow(() -&gt; new BusinessException(</span>
+                        ErrorCode.TRIP_DRAFT_NOT_FOUND,
+                        &quot;Trip Draft not found with id: &quot; + id,
+                        HttpStatus.NOT_FOUND));
+    }
+
+    // ── Mapping helpers ─────────────────────────────────────────
+
+    private TripDraftResponse toResponse(TripDraft draft, List&lt;TripDraftStopResponse&gt; stops) {
+<span class="fc" id="L408">        ConfirmedByDto confirmedByDto = null;</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">        if (draft.getConfirmedBy() != null) {</span>
+<span class="nc" id="L410">            confirmedByDto = ConfirmedByDto.builder()</span>
+<span class="nc" id="L411">                    .userId(draft.getConfirmedBy().getId())</span>
+<span class="nc" id="L412">                    .fullName(draft.getConfirmedBy().getFullName())</span>
+<span class="nc" id="L413">                    .build();</span>
+        }
+
+<span class="fc" id="L416">        return TripDraftResponse.builder()</span>
+<span class="fc" id="L417">                .id(draft.getId())</span>
+<span class="fc" id="L418">                .routeId(draft.getRoute().getId())</span>
+<span class="fc" id="L419">                .routeCode(draft.getRoute().getCode())</span>
+<span class="fc" id="L420">                .deliveryDate(draft.getDeliveryDate())</span>
+<span class="fc" id="L421">                .totalVolumeM3(draft.getTotalVolumeM3())</span>
+<span class="fc" id="L422">                .totalWeightKg(draft.getTotalWeightKg())</span>
+<span class="fc" id="L423">                .activeStopCount(draft.getActiveStopCount())</span>
+<span class="fc" id="L424">                .skippedStopCount(draft.getSkippedStopCount())</span>
+<span class="fc" id="L425">                .status(draft.getStatus())</span>
+<span class="fc" id="L426">                .plannedDepartureTime(draft.getPlannedDepartureTime())</span>
+<span class="fc" id="L427">                .confirmedAt(draft.getConfirmedAt())</span>
+<span class="fc" id="L428">                .confirmedBy(confirmedByDto)</span>
+<span class="fc" id="L429">                .stops(stops)</span>
+<span class="fc" id="L430">                .build();</span>
+    }
+    private TripDraftStopResponse toStopResponse(TripDraftStop stop) {
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">        Long draftId = (stop.getTripDraft() != null) ? stop.getTripDraft().getId() : null;</span>
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">        Long routeStopId = (stop.getRouteStop() != null) ? stop.getRouteStop().getId() : null;</span>
+        
+<span class="fc" id="L436">        BigDecimal stopWeight = BigDecimal.ZERO;</span>
+<span class="fc" id="L437">        BigDecimal stopVolume = BigDecimal.ZERO;</span>
+        
+<span class="pc bpc" id="L439" title="3 of 4 branches missed.">        if (draftId != null &amp;&amp; stop.getStore() != null) {</span>
+<span class="nc" id="L440">            List&lt;OrderItem&gt; items = orderItemRepository.findByStopForManifest(</span>
+<span class="nc" id="L441">                    stop.getStore().getId(), draftId);</span>
+<span class="nc bnc" id="L442" title="All 2 branches missed.">            if (items != null) {</span>
+<span class="nc" id="L443">                stopWeight = items.stream()</span>
+<span class="nc" id="L444">                        .map(OrderItem::getLineWeightKg)</span>
+<span class="nc" id="L445">                        .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+<span class="nc" id="L446">                stopVolume = items.stream()</span>
+<span class="nc" id="L447">                        .map(OrderItem::getLineVolumeM3)</span>
+<span class="nc" id="L448">                        .reduce(BigDecimal.ZERO, BigDecimal::add);</span>
+            }
+        }
+
+<span class="fc" id="L452">        return TripDraftStopResponse.builder()</span>
+<span class="fc" id="L453">                .tripDraftStopId(stop.getId())</span>
+<span class="fc" id="L454">                .sequenceNo(stop.getSequenceNo())</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">                .storeId(stop.getStore() != null ? stop.getStore().getId() : null)</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">                .storeCode(stop.getStore() != null ? stop.getStore().getCode() : null)</span>
+<span class="pc bpc" id="L457" title="1 of 2 branches missed.">                .storeName(stop.getStore() != null ? stop.getStore().getName() : null)</span>
+<span class="fc" id="L458">                .isActive(stop.getIsActive())</span>
+<span class="fc" id="L459">                .orderCount(stop.getOrderCount())</span>
+<span class="fc" id="L460">                .plannedEta(stop.getPlannedEta())</span>
+<span class="fc" id="L461">                .overrideNote(stop.getOverrideNote())</span>
+<span class="fc" id="L462">                .routeStopId(routeStopId)</span>
+<span class="fc" id="L463">                .stopVolumeM3(stopVolume)</span>
+<span class="fc" id="L464">                .stopWeightKg(stopWeight)</span>
+<span class="fc" id="L465">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

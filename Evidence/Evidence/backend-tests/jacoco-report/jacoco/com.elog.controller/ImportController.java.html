@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImportController.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.controller</a> &gt; <span class="el_source">ImportController.java</span></div><h1>ImportController.java</h1><pre class="source lang-java linenums">package com.elog.controller;
+
+import com.elog.dto.response.ApiResponse;
+import com.elog.dto.response.DuplicateBatchResponse;
+import com.elog.dto.response.ImportBatchResponse;
+import com.elog.dto.response.ImportErrorResponse;
+import com.elog.entity.User;
+import com.elog.repository.UserRepository;
+import com.elog.service.ImportService;
+import com.elog.service.impl.ImportServiceImpl;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@RestController
+@RequestMapping(&quot;/api/imports&quot;)
+@RequiredArgsConstructor
+@Tag(name = &quot;Import&quot;, description = &quot;Excel import APIs for order management&quot;)
+public class ImportController {
+
+    private final ImportService importService;
+    private final UserRepository userRepository;
+
+    @PostMapping(consumes = &quot;multipart/form-data&quot;)
+    @Operation(summary = &quot;Upload Excel file to import orders for a delivery date&quot;)
+    @PreAuthorize(&quot;hasRole('DISPATCHER')&quot;)
+    public ResponseEntity&lt;?&gt; importOrders(
+            @RequestParam(&quot;file&quot;) MultipartFile file,
+            @RequestParam(&quot;deliveryDate&quot;) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
+            @RequestParam(value = &quot;confirmReplace&quot;, required = false, defaultValue = &quot;false&quot;) boolean confirmReplace,
+            Authentication authentication) {
+
+        // Get user ID from authenticated username
+<span class="nc" id="L46">        String username = authentication.getName();</span>
+<span class="nc" id="L47">        User user = userRepository.findByUsername(username)</span>
+<span class="nc" id="L48">                .orElseThrow(() -&gt; new RuntimeException(&quot;Authenticated user not found&quot;));</span>
+<span class="nc" id="L49">        Long userId = user.getId();</span>
+
+        try {
+<span class="nc" id="L52">            ImportBatchResponse response = importService.importExcel(file, deliveryDate, confirmReplace, userId);</span>
+<span class="nc" id="L53">            return ResponseEntity.status(HttpStatus.CREATED)</span>
+<span class="nc" id="L54">                    .body(ApiResponse.success(response, &quot;Import hoàn tất&quot;));</span>
+<span class="nc" id="L55">        } catch (ImportServiceImpl.DuplicateBatchException e) {</span>
+<span class="nc" id="L56">            DuplicateBatchResponse body = DuplicateBatchResponse.builder()</span>
+<span class="nc" id="L57">                    .error(&quot;DUPLICATE_DELIVERY_DATE&quot;)</span>
+<span class="nc" id="L58">                    .message(&quot;Đã có dữ liệu nhập cho ngày &quot; + e.getDeliveryDate()</span>
+<span class="nc" id="L59">                            + &quot; (batch #&quot; + e.getExistingBatchId()</span>
+                            + &quot;). Gửi lại với confirmReplace=true để thay thế.&quot;)
+<span class="nc" id="L61">                    .existingBatchId(e.getExistingBatchId())</span>
+<span class="nc" id="L62">                    .build();</span>
+<span class="nc" id="L63">            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);</span>
+        }
+    }
+
+    @GetMapping
+    @Operation(summary = &quot;Get import batch history (paginated, optionally filter by date)&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;ImportBatchResponse&gt;&gt;&gt; getBatches(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate deliveryDate,
+            @PageableDefault(size = 20) Pageable pageable) {
+
+<span class="nc" id="L74">        ApiResponse&lt;List&lt;ImportBatchResponse&gt;&gt; response = importService.getBatches(deliveryDate, pageable);</span>
+<span class="nc" id="L75">        return ResponseEntity.ok(response);</span>
+    }
+
+    @GetMapping(&quot;/{batchId}&quot;)
+    @Operation(summary = &quot;Get import batch detail by ID&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER', 'SYSTEM_ADMIN')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;ImportBatchResponse&gt;&gt; getBatchById(@PathVariable Long batchId) {
+<span class="nc" id="L82">        ImportBatchResponse response = importService.getBatchById(batchId);</span>
+<span class="nc" id="L83">        return ResponseEntity.ok(ApiResponse.success(response));</span>
+    }
+
+    @GetMapping(&quot;/{batchId}/errors&quot;)
+    @Operation(summary = &quot;Get error list for a specific import batch (paginated &amp; filterable)&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')&quot;)
+    public ResponseEntity&lt;ApiResponse&lt;List&lt;ImportErrorResponse&gt;&gt;&gt; getBatchErrors(
+            @PathVariable Long batchId,
+            @RequestParam(value = &quot;errorCode&quot;, required = false) String errorCode,
+            @PageableDefault(size = 20) Pageable pageable) {
+<span class="nc" id="L93">        ApiResponse&lt;List&lt;ImportErrorResponse&gt;&gt; response = importService.getBatchErrors(batchId, errorCode, pageable);</span>
+<span class="nc" id="L94">        return ResponseEntity.ok(response);</span>
+    }
+
+    @GetMapping(&quot;/{batchId}/errors/export&quot;)
+    @Operation(summary = &quot;Export error list to Excel file&quot;)
+    @PreAuthorize(&quot;hasAnyRole('DISPATCHER', 'LOGISTICS_MANAGER')&quot;)
+    public ResponseEntity&lt;byte[]&gt; exportBatchErrors(@PathVariable Long batchId) {
+<span class="nc" id="L101">        byte[] content = importService.exportBatchErrors(batchId);</span>
+<span class="nc" id="L102">        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();</span>
+<span class="nc" id="L103">        headers.setContentType(org.springframework.http.MediaType.parseMediaType(&quot;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&quot;));</span>
+<span class="nc" id="L104">        headers.setContentDispositionFormData(&quot;attachment&quot;, &quot;import-errors-batch&quot; + batchId + &quot;.xlsx&quot;);</span>
+<span class="nc" id="L105">        headers.setCacheControl(&quot;must-revalidate, post-check=0, pre-check=0&quot;);</span>
+<span class="nc" id="L106">        return new ResponseEntity&lt;&gt;(content, headers, org.springframework.http.HttpStatus.OK);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ExceptionServiceImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">elog-backend</a> &gt; <a href="index.source.html" class="el_package">com.elog.service.impl</a> &gt; <span class="el_source">ExceptionServiceImpl.java</span></div><h1>ExceptionServiceImpl.java</h1><pre class="source lang-java linenums">package com.elog.service.impl;
+
+import com.elog.dto.request.RejectStopRequest;
+import com.elog.dto.request.ResolveExceptionRequest;
+import com.elog.dto.response.DeliveryExceptionResponse;
+import com.elog.dto.response.ExceptionListResponse;
+import com.elog.entity.*;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.*;
+import com.elog.service.ExceptionService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L26">@Slf4j</span>
+@Transactional
+public class ExceptionServiceImpl implements ExceptionService {
+
+<span class="fc" id="L30">    private static final Long   SYSTEM_USER_ID   = 1L;</span>
+    private static final String SYSTEM_USER_NAME  = &quot;System&quot;;
+<span class="fc" id="L32">    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ISO_LOCAL_DATE_TIME;</span>
+
+    private final TripStopRepository          tripStopRepo;
+    private final TripRepository              tripRepo;
+    private final UserRepository              userRepo;
+    private final DeliveryExceptionRepository deliveryExceptionRepo;
+
+    @Override
+    public DeliveryExceptionResponse rejectStop(Long tripStopId, RejectStopRequest request, String currentUsername) {
+<span class="fc" id="L41">        TripStop stop = tripStopRepo.findById(tripStopId)</span>
+<span class="fc" id="L42">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_STOP_NOT_FOUND,</span>
+                        &quot;TripStop &quot; + tripStopId + &quot; not found&quot;, HttpStatus.NOT_FOUND));
+
+<span class="fc" id="L45">        Trip trip = stop.getTrip();</span>
+
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        if (!trip.getDriver().getUsername().equals(currentUsername)) {</span>
+<span class="fc" id="L48">            throw new BusinessException(ErrorCode.NOT_YOUR_TRIP,</span>
+                    &quot;You are not the driver of this trip.&quot;, HttpStatus.FORBIDDEN);
+        }
+
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (stop.getStatus() != TripStopStatus.IN_PROGRESS) {</span>
+<span class="fc" id="L53">            throw new BusinessException(ErrorCode.STOP_NOT_IN_PROGRESS,</span>
+<span class="fc" id="L54">                    &quot;Please call /arrive first before recording a rejection. Current status: &quot; + stop.getStatus(),</span>
+                    HttpStatus.CONFLICT);
+        }
+
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (deliveryExceptionRepo.existsByTripStopIdAndExceptionTypeAndResolvedAtIsNull(</span>
+                tripStopId, ExceptionType.DELIVERY_REJECTION)) {
+<span class="fc" id="L60">            Long existingId = deliveryExceptionRepo.findByTripStopIdOrderByCreatedAtDesc(tripStopId).stream()</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">                    .filter(e -&gt; e.getExceptionType() == ExceptionType.DELIVERY_REJECTION)</span>
+<span class="fc" id="L62">                    .map(DeliveryException::getExceptionId)</span>
+<span class="fc" id="L63">                    .findFirst().orElse(null);</span>
+<span class="fc" id="L64">            throw new BusinessException(ErrorCode.REJECTION_ALREADY_RECORDED,</span>
+                    &quot;A rejection has already been recorded for this stop. Existing exception id: &quot; + existingId,
+                    HttpStatus.CONFLICT);
+        }
+
+<span class="fc" id="L69">        String rejectionType = request.getRejectionType().toUpperCase().trim();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (&quot;OTHER&quot;.equals(rejectionType) &amp;&amp;</span>
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">                (request.getDescription() == null || request.getDescription().isBlank())) {</span>
+<span class="fc" id="L72">            throw new BusinessException(ErrorCode.VALIDATION_FAILED,</span>
+                    &quot;description is required when rejectionType is OTHER&quot;, HttpStatus.BAD_REQUEST);
+        }
+
+<span class="fc" id="L76">        User driver = userRepo.findByUsername(currentUsername)</span>
+<span class="pc" id="L77">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.DRIVER_NOT_FOUND,</span>
+                        &quot;Driver not found: &quot; + currentUsername, HttpStatus.NOT_FOUND));
+
+<span class="fc" id="L80">        DeliveryException ex = DeliveryException.builder()</span>
+<span class="fc" id="L81">                .tripStopId(tripStopId)</span>
+<span class="fc" id="L82">                .exceptionType(ExceptionType.DELIVERY_REJECTION)</span>
+<span class="fc" id="L83">                .reportedBy(driver.getId())</span>
+<span class="fc" id="L84">                .description(buildDescription(rejectionType, request.getDescription()))</span>
+<span class="fc" id="L85">                .build();</span>
+<span class="fc" id="L86">        ex = deliveryExceptionRepo.save(ex);</span>
+
+<span class="fc" id="L88">        stop.setStatus(TripStopStatus.EXCEPTION);</span>
+<span class="fc" id="L89">        tripStopRepo.save(stop);</span>
+
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (allStopsDone(trip)) {</span>
+<span class="fc" id="L92">            trip.setStatus(TripStatus.COMPLETED);</span>
+<span class="fc" id="L93">            trip.setCompletedAt(LocalDateTime.now());</span>
+<span class="fc" id="L94">            tripRepo.save(trip);</span>
+<span class="fc" id="L95">            log.info(&quot;Trip {} auto-completed after DELIVERY_REJECTION on stop {}&quot;, trip.getTripId(), tripStopId);</span>
+        }
+
+<span class="fc" id="L98">        log.info(&quot;DELIVERY_REJECTION recorded (exceptionId={}) for TripStop {} by driver {}&quot;,</span>
+<span class="fc" id="L99">                ex.getExceptionId(), tripStopId, currentUsername);</span>
+
+<span class="fc" id="L101">        return buildDetailResponse(ex, stop, driver, null,</span>
+                &quot;Rejection recorded. Goods remain on truck for return to warehouse.&quot;);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExceptionListResponse listExceptions(LocalDate date, String type, String resolved) {
+<span class="fc" id="L108">        ExceptionType exceptionType = parseExceptionType(type);</span>
+<span class="fc" id="L109">        Boolean resolvedFlag = parseResolved(resolved);</span>
+
+<span class="fc" id="L111">        List&lt;DeliveryException&gt; exceptions = deliveryExceptionRepo.findByFilters(date, exceptionType, resolvedFlag);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        long unresolvedCount = exceptions.stream().filter(e -&gt; e.getResolvedAt() == null).count();</span>
+
+<span class="fc" id="L114">        return ExceptionListResponse.builder()</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">                .date(date != null ? date.toString() : LocalDate.now().toString())</span>
+<span class="fc" id="L116">                .totalCount(exceptions.size())</span>
+<span class="fc" id="L117">                .unresolvedCount((int) unresolvedCount)</span>
+<span class="fc" id="L118">                .exceptions(exceptions.stream().map(this::buildListItem).toList())</span>
+<span class="fc" id="L119">                .build();</span>
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DeliveryExceptionResponse getException(Long exceptionId) {
+<span class="fc" id="L125">        DeliveryException ex = findExceptionOrThrow(exceptionId);</span>
+<span class="fc" id="L126">        TripStop stop = tripStopRepo.findById(ex.getTripStopId())</span>
+<span class="fc" id="L127">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_STOP_NOT_FOUND,</span>
+                        &quot;TripStop not found for exception &quot; + exceptionId, HttpStatus.NOT_FOUND));
+<span class="fc" id="L129">        User reporter = resolveUser(ex.getReportedBy());</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        User resolver = ex.getResolvedBy() != null ? resolveUser(ex.getResolvedBy()) : null;</span>
+<span class="fc" id="L131">        return buildDetailResponse(ex, stop, reporter, resolver, null);</span>
+    }
+
+    @Override
+    public DeliveryExceptionResponse resolveException(Long exceptionId, ResolveExceptionRequest request, String currentUsername) {
+<span class="fc" id="L136">        DeliveryException ex = findExceptionOrThrow(exceptionId);</span>
+
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (ex.getResolvedAt() != null) {</span>
+<span class="fc" id="L139">            throw new BusinessException(ErrorCode.EXCEPTION_ALREADY_RESOLVED,</span>
+<span class="fc" id="L140">                    &quot;Exception &quot; + exceptionId + &quot; was already resolved at &quot; + ex.getResolvedAt().format(DT_FMT),</span>
+                    HttpStatus.CONFLICT);
+        }
+
+<span class="fc" id="L144">        User manager = userRepo.findByUsername(currentUsername)</span>
+<span class="fc" id="L145">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,</span>
+                        &quot;User not found: &quot; + currentUsername, HttpStatus.NOT_FOUND));
+
+<span class="fc" id="L148">        ex.setResolvedAt(LocalDateTime.now());</span>
+<span class="fc" id="L149">        ex.setResolvedBy(manager.getId());</span>
+<span class="fc" id="L150">        ex.setResolutionNotes(request.getResolutionNotes());</span>
+<span class="fc" id="L151">        deliveryExceptionRepo.save(ex);</span>
+
+<span class="fc" id="L153">        log.info(&quot;Exception {} resolved by {} at {}&quot;, exceptionId, currentUsername, ex.getResolvedAt().format(DT_FMT));</span>
+
+<span class="fc" id="L155">        TripStop stop = tripStopRepo.findById(ex.getTripStopId())</span>
+<span class="fc" id="L156">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.TRIP_STOP_NOT_FOUND,</span>
+                        &quot;TripStop not found for exception &quot; + exceptionId, HttpStatus.NOT_FOUND));
+
+<span class="fc" id="L159">        return buildDetailResponse(ex, stop, resolveUser(ex.getReportedBy()), manager, &quot;Exception resolved.&quot;);</span>
+    }
+
+    private DeliveryException findExceptionOrThrow(Long exceptionId) {
+<span class="fc" id="L163">        return deliveryExceptionRepo.findById(exceptionId)</span>
+<span class="fc" id="L164">                .orElseThrow(() -&gt; new BusinessException(ErrorCode.EXCEPTION_NOT_FOUND,</span>
+                        &quot;Exception &quot; + exceptionId + &quot; not found&quot;, HttpStatus.NOT_FOUND));
+    }
+
+    /** Format: &quot;[STORE_CLOSED] userDescription&quot; — prefix sẽ được parse lại khi response */
+    private String buildDescription(String rejectionType, String userDescription) {
+<span class="fc" id="L170">        String prefix = &quot;[&quot; + rejectionType + &quot;]&quot;;</span>
+<span class="pc bpc" id="L171" title="1 of 4 branches missed.">        return (userDescription != null &amp;&amp; !userDescription.isBlank())</span>
+<span class="fc" id="L172">                ? prefix + &quot; &quot; + userDescription.trim()</span>
+<span class="fc" id="L173">                : prefix;</span>
+    }
+
+    /** Parse &quot;[TYPE]&quot; prefix từ description — null nếu không phải DELIVERY_REJECTION */
+    private String parseRejectionType(DeliveryException ex) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (ex.getExceptionType() != ExceptionType.DELIVERY_REJECTION) return null;</span>
+<span class="fc" id="L179">        String desc = ex.getDescription();</span>
+<span class="pc bpc" id="L180" title="3 of 6 branches missed.">        if (desc != null &amp;&amp; desc.startsWith(&quot;[&quot;) &amp;&amp; desc.contains(&quot;]&quot;)) {</span>
+<span class="fc" id="L181">            return desc.substring(1, desc.indexOf(']'));</span>
+        }
+<span class="nc" id="L183">        return null;</span>
+    }
+
+    /** Trả về description sau khi bỏ prefix &quot;[TYPE] &quot; */
+    private String cleanDescription(DeliveryException ex) {
+<span class="fc" id="L188">        String desc = ex.getDescription();</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (desc == null) return null;</span>
+<span class="pc bpc" id="L190" title="1 of 4 branches missed.">        if (desc.startsWith(&quot;[&quot;) &amp;&amp; desc.contains(&quot;] &quot;)) {</span>
+<span class="fc" id="L191">            return desc.substring(desc.indexOf(&quot;] &quot;) + 2);</span>
+        }
+<span class="fc" id="L193">        return desc;</span>
+    }
+
+    private boolean allStopsDone(Trip trip) {
+<span class="fc" id="L197">        return trip.getStops().stream()</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">                .allMatch(s -&gt; s.getStatus() == TripStopStatus.COMPLETED</span>
+<span class="pc bpc" id="L199" title="1 of 2 branches missed.">                            || s.getStatus() == TripStopStatus.EXCEPTION);</span>
+    }
+
+    private ExceptionType parseExceptionType(String type) {
+<span class="pc bpc" id="L203" title="2 of 6 branches missed.">        if (type == null || type.isBlank() || &quot;ALL&quot;.equalsIgnoreCase(type)) return null;</span>
+        try {
+<span class="nc" id="L205">            return ExceptionType.valueOf(type.toUpperCase());</span>
+<span class="fc" id="L206">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L207">            throw new BusinessException(ErrorCode.VALIDATION_FAILED,</span>
+                    &quot;Invalid type filter: &quot; + type + &quot;. Use ALL, TIME_EXCEPTION, or DELIVERY_REJECTION&quot;,
+                    HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private Boolean parseResolved(String resolved) {
+<span class="pc bpc" id="L214" title="1 of 4 branches missed.">        if (resolved == null || &quot;all&quot;.equalsIgnoreCase(resolved)) return null;</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (&quot;true&quot;.equalsIgnoreCase(resolved))  return Boolean.TRUE;</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (&quot;false&quot;.equalsIgnoreCase(resolved)) return Boolean.FALSE;</span>
+<span class="fc" id="L217">        throw new BusinessException(ErrorCode.VALIDATION_FAILED,</span>
+                &quot;Invalid resolved filter: &quot; + resolved + &quot;. Use true, false, or all&quot;, HttpStatus.BAD_REQUEST);
+    }
+
+    private User resolveUser(Long userId) {
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (userId == null) return null;</span>
+<span class="fc" id="L223">        return userRepo.findById(userId).orElse(null);</span>
+    }
+
+    private String getStoreCode(TripStop stop) {
+<span class="pc bpc" id="L227" title="2 of 4 branches missed.">        return stop.getRouteStop() != null &amp;&amp; stop.getRouteStop().getStore() != null</span>
+<span class="fc" id="L228">                ? stop.getRouteStop().getStore().getCode()</span>
+<span class="nc" id="L229">                : &quot;STOP-&quot; + stop.getTripStopId();</span>
+    }
+
+    private String getStoreName(TripStop stop) {
+<span class="pc bpc" id="L233" title="2 of 4 branches missed.">        return stop.getRouteStop() != null &amp;&amp; stop.getRouteStop().getStore() != null</span>
+<span class="fc" id="L234">                ? stop.getRouteStop().getStore().getName()</span>
+<span class="nc" id="L235">                : null;</span>
+    }
+
+    private DeliveryExceptionResponse.ReporterInfo buildReporterInfo(User user) {
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (user == null) {</span>
+<span class="nc" id="L240">            return DeliveryExceptionResponse.ReporterInfo.builder()</span>
+<span class="nc" id="L241">                    .userId(SYSTEM_USER_ID).fullName(SYSTEM_USER_NAME).build();</span>
+        }
+<span class="fc" id="L243">        return DeliveryExceptionResponse.ReporterInfo.builder()</span>
+<span class="fc" id="L244">                .userId(user.getId()).fullName(user.getFullName()).build();</span>
+    }
+
+    private Long computeDelayMinutes(TripStop stop) {
+<span class="pc bpc" id="L248" title="3 of 4 branches missed.">        if (stop.getActualArrivalTime() == null || stop.getPlannedEta() == null) return null;</span>
+<span class="nc" id="L249">        long delay = ChronoUnit.MINUTES.between(stop.getPlannedEta(), stop.getActualArrivalTime());</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        return delay &gt; 0 ? delay : null;</span>
+    }
+
+    private DeliveryExceptionResponse buildDetailResponse(
+            DeliveryException ex, TripStop stop, User reporter, User resolver, String message) {
+<span class="fc" id="L255">        Trip trip = stop.getTrip();</span>
+<span class="fc" id="L256">        return DeliveryExceptionResponse.builder()</span>
+<span class="fc" id="L257">                .exceptionId(ex.getExceptionId())</span>
+<span class="fc" id="L258">                .exceptionType(ex.getExceptionType().name())</span>
+<span class="fc" id="L259">                .rejectionType(parseRejectionType(ex))</span>
+<span class="fc" id="L260">                .tripStopId(stop.getTripStopId())</span>
+<span class="fc" id="L261">                .storeCode(getStoreCode(stop))</span>
+<span class="fc" id="L262">                .storeName(getStoreName(stop))</span>
+<span class="fc" id="L263">                .tripStopStatus(stop.getStatus().name())</span>
+<span class="fc" id="L264">                .tripId(trip.getTripId())</span>
+<span class="fc" id="L265">                .fixedRouteCode(trip.getRoute().getCode())</span>
+<span class="fc" id="L266">                .vehicleCode(trip.getVehicle().getPlateNumber())</span>
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">                .plannedEta(stop.getPlannedEta() != null ? stop.getPlannedEta().format(DT_FMT) : null)</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">                .actualArrivalTime(stop.getActualArrivalTime() != null ? stop.getActualArrivalTime().format(DT_FMT) : null)</span>
+<span class="fc" id="L269">                .delayMinutes(computeDelayMinutes(stop))</span>
+<span class="fc" id="L270">                .description(cleanDescription(ex))</span>
+<span class="fc" id="L271">                .reportedBy(buildReporterInfo(reporter))</span>
+<span class="fc" id="L272">                .createdAt(ex.getCreatedAt().format(DT_FMT))</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">                .resolvedAt(ex.getResolvedAt() != null ? ex.getResolvedAt().format(DT_FMT) : null)</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">                .resolvedBy(resolver != null ? buildReporterInfo(resolver) : null)</span>
+<span class="fc" id="L275">                .resolutionNotes(ex.getResolutionNotes())</span>
+<span class="fc" id="L276">                .message(message)</span>
+<span class="fc" id="L277">                .build();</span>
+    }
+
+    private ExceptionListResponse.ExceptionItem buildListItem(DeliveryException ex) {
+<span class="fc" id="L281">        TripStop stop = tripStopRepo.findById(ex.getTripStopId()).orElse(null);</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (stop == null) {</span>
+<span class="nc" id="L283">            return ExceptionListResponse.ExceptionItem.builder()</span>
+<span class="nc" id="L284">                    .exceptionId(ex.getExceptionId())</span>
+<span class="nc" id="L285">                    .exceptionType(ex.getExceptionType().name())</span>
+<span class="nc" id="L286">                    .description(ex.getDescription())</span>
+<span class="nc" id="L287">                    .createdAt(ex.getCreatedAt().format(DT_FMT))</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">                    .resolvedAt(ex.getResolvedAt() != null ? ex.getResolvedAt().format(DT_FMT) : null)</span>
+<span class="nc" id="L289">                    .build();</span>
+        }
+
+<span class="fc" id="L292">        Trip trip = stop.getTrip();</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        String reporterName = SYSTEM_USER_ID.equals(ex.getReportedBy())</span>
+<span class="nc" id="L294">                ? SYSTEM_USER_NAME</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">                : (resolveUser(ex.getReportedBy()) != null ? resolveUser(ex.getReportedBy()).getFullName() : &quot;Unknown&quot;);</span>
+<span class="pc bpc" id="L296" title="1 of 2 branches missed.">        String resolverName = ex.getResolvedBy() != null</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                ? (resolveUser(ex.getResolvedBy()) != null ? resolveUser(ex.getResolvedBy()).getFullName() : &quot;Unknown&quot;)</span>
+<span class="fc" id="L298">                : null;</span>
+
+<span class="fc" id="L300">        return ExceptionListResponse.ExceptionItem.builder()</span>
+<span class="fc" id="L301">                .exceptionId(ex.getExceptionId())</span>
+<span class="fc" id="L302">                .exceptionType(ex.getExceptionType().name())</span>
+<span class="fc" id="L303">                .rejectionType(parseRejectionType(ex))</span>
+<span class="fc" id="L304">                .tripId(trip.getTripId())</span>
+<span class="fc" id="L305">                .fixedRouteCode(trip.getRoute().getCode())</span>
+<span class="fc" id="L306">                .vehicleCode(trip.getVehicle().getPlateNumber())</span>
+<span class="fc" id="L307">                .driverName(trip.getDriver().getFullName())</span>
+<span class="fc" id="L308">                .tripStopId(stop.getTripStopId())</span>
+<span class="fc" id="L309">                .storeCode(getStoreCode(stop))</span>
+<span class="fc" id="L310">                .storeName(getStoreName(stop))</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">                .plannedEta(stop.getPlannedEta() != null ? stop.getPlannedEta().format(DT_FMT) : null)</span>
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">                .actualArrivalTime(stop.getActualArrivalTime() != null ? stop.getActualArrivalTime().format(DT_FMT) : null)</span>
+<span class="fc" id="L313">                .delayMinutes(computeDelayMinutes(stop))</span>
+<span class="fc" id="L314">                .description(cleanDescription(ex))</span>
+<span class="fc" id="L315">                .reportedBy(reporterName)</span>
+<span class="fc" id="L316">                .createdAt(ex.getCreatedAt().format(DT_FMT))</span>
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">                .resolvedAt(ex.getResolvedAt() != null ? ex.getResolvedAt().format(DT_FMT) : null)</span>
+<span class="fc" id="L318">                .resolvedBy(resolverName)</span>
+<span class="fc" id="L319">                .resolutionNotes(ex.getResolutionNotes())</span>
+<span class="fc" id="L320">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
