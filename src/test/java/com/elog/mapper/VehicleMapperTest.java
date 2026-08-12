@@ -1,7 +1,7 @@
 package com.elog.mapper;
 
-import com.elog.dto.response.VehicleListItemResponse;
-import com.elog.dto.response.VehicleResponse;
+import com.elog.dto.response.vehicle.VehicleListItemResponse;
+import com.elog.dto.response.vehicle.VehicleResponse;
 import com.elog.entity.LicenseClass;
 import com.elog.entity.User;
 import com.elog.entity.Vehicle;

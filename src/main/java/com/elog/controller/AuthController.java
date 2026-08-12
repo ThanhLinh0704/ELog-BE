@@ -1,10 +1,10 @@
 package com.elog.controller;
 
-import com.elog.dto.request.LoginRequest;
-import com.elog.dto.request.TokenRefreshRequest;
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.TokenRefreshResponse;
-import com.elog.dto.response.TokenResponse;
+import com.elog.dto.request.auth.LoginRequest;
+import com.elog.dto.request.auth.TokenRefreshRequest;
+import com.elog.dto.response.auth.TokenRefreshResponse;
+import com.elog.dto.response.auth.TokenResponse;
+import com.elog.dto.response.common.ApiResponse;
 import com.elog.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

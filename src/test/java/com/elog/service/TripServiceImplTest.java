@@ -1,10 +1,11 @@
 package com.elog.service;
 
-import com.elog.dto.request.TripAssignRequest;
-import com.elog.dto.request.TripAssignmentPatchRequest;
-import com.elog.dto.response.AvailableDriverResponse;
-import com.elog.dto.response.EligibleVehiclesResponse;
-import com.elog.dto.response.TripResponse;
+import com.elog.dto.request.trip.TripAssignmentPatchRequest;
+import com.elog.dto.request.trip.TripAssignRequest;
+import com.elog.dto.response.trip.TripResponse;
+import com.elog.dto.response.user.AvailableDriverResponse;
+import com.elog.dto.response.user.DriverTripCalendarDayResponse;
+import com.elog.dto.response.vehicle.EligibleVehiclesResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -450,7 +451,7 @@ class TripServiceImplTest {
         when(tripRepository.findByDriverIdAndDeliveryDateBetween(eq(2L), any(), any()))
                 .thenReturn(List.of(trip1Completed, trip2Dispatched, trip3Completed));
 
-        List<com.elog.dto.response.DriverTripCalendarDayResponse> result =
+        List<com.elog.dto.response.user.DriverTripCalendarDayResponse> result =
                 tripService.getDriverTripCalendar("driver1", java.time.YearMonth.of(2026, 8));
 
         assertThat(result).hasSize(2);

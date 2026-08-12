@@ -1,10 +1,10 @@
 package com.elog.service.impl;
 
-import com.elog.dto.request.DriverStatusUpdateRequest;
-import com.elog.dto.response.ActiveTripWarningResponse;
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.DriverResponse;
-import com.elog.dto.response.DriverStatusHistoryResponse;
+import com.elog.dto.request.user.DriverStatusUpdateRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.trip.ActiveTripWarningResponse;
+import com.elog.dto.response.user.DriverResponse;
+import com.elog.dto.response.user.DriverStatusHistoryResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;

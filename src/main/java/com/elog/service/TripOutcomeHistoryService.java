@@ -1,7 +1,7 @@
 package com.elog.service;
 
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.TripOutcomeEventResponse;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.trip.TripOutcomeEventResponse;
 import com.elog.entity.PlanningActorType;
 import com.elog.entity.TripOutcomeEventType;
 import org.springframework.data.domain.Pageable;

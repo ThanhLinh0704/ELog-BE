@@ -1,8 +1,20 @@
 package com.elog.service.impl;
 
-import com.elog.dto.request.RecalculateEtaRequest;
-import com.elog.dto.request.StopUpdateRequest;
-import com.elog.dto.response.*;
+import com.elog.dto.response.common.ApiResponse.PaginationInfo;
+import com.elog.dto.response.trip.ConsolidateResponse.SkippedRouteInfo;
+import com.elog.dto.request.trip.AdjustDepartureTimeRequest;
+import com.elog.dto.request.trip.RecalculateEtaRequest;
+import com.elog.dto.request.trip.SettleDelayRequest;
+import com.elog.dto.request.trip.StopUpdateRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.common.ConfirmedByDto;
+import com.elog.dto.response.common.ConfirmResponse;
+import com.elog.dto.response.goong.RecalculateEtaResponse;
+import com.elog.dto.response.trip.ConsolidateResponse;
+import com.elog.dto.response.trip.StopEtaResponse;
+import com.elog.dto.response.trip.StopOrderItemResponse;
+import com.elog.dto.response.trip.TripDraftResponse;
+import com.elog.dto.response.trip.TripDraftStopResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -598,7 +610,7 @@ public class TripDraftServiceImpl implements TripDraftService {
 
     @Override
     @Transactional
-    public TripDraftResponse adjustDepartureTime(Long tripDraftId, com.elog.dto.request.AdjustDepartureTimeRequest request) {
+    public TripDraftResponse adjustDepartureTime(Long tripDraftId, com.elog.dto.request.trip.AdjustDepartureTimeRequest request) {
         TripDraft draft = findDraftOrThrow(tripDraftId);
         if ("CONFIRMED".equals(draft.getStatus()) || "CANCELLED".equals(draft.getStatus())) {
             throw new BusinessException(
@@ -624,7 +636,7 @@ public class TripDraftServiceImpl implements TripDraftService {
 
     @Override
     @Transactional
-    public void settleDelay(Long tripDraftId, Long orderId, com.elog.dto.request.SettleDelayRequest request, String username) {
+    public void settleDelay(Long tripDraftId, Long orderId, com.elog.dto.request.trip.SettleDelayRequest request, String username) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.RESOURCE_NOT_FOUND,

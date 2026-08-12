@@ -1,6 +1,9 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.*;
+import com.elog.dto.response.common.ConfirmedByDto;
+import com.elog.dto.response.vehicle.CapacityValidationResultResponse;
+import com.elog.dto.response.vehicle.EligibleVehicleDto;
+import com.elog.dto.response.vehicle.IneligibleVehicleDto;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;

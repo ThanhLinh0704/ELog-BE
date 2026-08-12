@@ -1,6 +1,6 @@
 package com.elog.service;
 
-import com.elog.dto.response.StopEtaResponse;
+import com.elog.dto.response.trip.StopEtaResponse;
 
 import java.time.LocalTime;
 import java.util.List;

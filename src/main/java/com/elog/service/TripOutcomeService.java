@@ -1,6 +1,6 @@
 package com.elog.service;
 
-import com.elog.dto.response.TripOutcomeResponse;
+import com.elog.dto.response.trip.TripOutcomeResponse;
 
 import java.util.List;
 

@@ -1,9 +1,10 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.ImportBatchResponse;
-import com.elog.dto.response.ImportErrorResponse;
-import com.elog.dto.response.ImportedOrderDetailResponse;
+import com.elog.dto.response.common.ApiResponse.PaginationInfo;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.importbatch.ImportBatchResponse;
+import com.elog.dto.response.importbatch.ImportedOrderDetailResponse;
+import com.elog.dto.response.importbatch.ImportErrorResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;

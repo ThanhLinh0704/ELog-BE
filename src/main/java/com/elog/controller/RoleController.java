@@ -1,9 +1,9 @@
 package com.elog.controller;
 
-import com.elog.dto.request.RolePermissionsUpdateRequest;
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.PermissionResponse;
-import com.elog.dto.response.RoleResponse;
+import com.elog.dto.request.user.RolePermissionsUpdateRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.user.PermissionResponse;
+import com.elog.dto.response.user.RoleResponse;
 import com.elog.service.RoleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

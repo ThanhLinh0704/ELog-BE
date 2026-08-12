@@ -1,9 +1,15 @@
 package com.elog.controller;
 
-import com.elog.dto.request.TripAssignRequest;
-import com.elog.dto.request.TripSplitAssignRequest;
-import com.elog.dto.request.TripAssignmentPatchRequest;
-import com.elog.dto.response.*;
+import com.elog.dto.request.trip.TripAssignmentPatchRequest;
+import com.elog.dto.request.trip.TripAssignRequest;
+import com.elog.dto.request.trip.TripSplitAssignRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.trip.TripResponse;
+import com.elog.dto.response.trip.TripSplitResponse;
+import com.elog.dto.response.user.AvailableDriverResponse;
+import com.elog.dto.response.user.DriverTripCalendarDayResponse;
+import com.elog.dto.response.vehicle.EligibleVehiclesResponse;
+import com.elog.dto.response.vehicle.FleetCapacityCheckResponse;
 import com.elog.service.TripService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

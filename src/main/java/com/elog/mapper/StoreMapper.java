@@ -1,9 +1,9 @@
 package com.elog.mapper;
 
-import com.elog.dto.request.StoreCreateRequest;
-import com.elog.dto.response.AssignedRouteDto;
-import com.elog.dto.response.StoreListItemResponse;
-import com.elog.dto.response.StoreResponse;
+import com.elog.dto.request.store.StoreCreateRequest;
+import com.elog.dto.response.route.AssignedRouteDto;
+import com.elog.dto.response.store.StoreListItemResponse;
+import com.elog.dto.response.store.StoreResponse;
 import com.elog.entity.Store;
 import org.springframework.stereotype.Component;
 

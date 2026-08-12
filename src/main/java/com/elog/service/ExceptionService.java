@@ -1,9 +1,9 @@
 package com.elog.service;
 
-import com.elog.dto.request.RejectStopRequest;
-import com.elog.dto.request.ResolveExceptionRequest;
-import com.elog.dto.response.DeliveryExceptionResponse;
-import com.elog.dto.response.ExceptionListResponse;
+import com.elog.dto.request.exception.RejectStopRequest;
+import com.elog.dto.request.exception.ResolveExceptionRequest;
+import com.elog.dto.response.exception.DeliveryExceptionResponse;
+import com.elog.dto.response.exception.ExceptionListResponse;
 
 import java.time.LocalDate;
 

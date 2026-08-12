@@ -1,6 +1,6 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.TripOutcomeResponse;
+import com.elog.dto.response.trip.TripOutcomeResponse;
 import com.elog.entity.Trip;
 import com.elog.entity.TripExecution;
 import com.elog.entity.TripOutcome;

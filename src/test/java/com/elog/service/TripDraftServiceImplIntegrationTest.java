@@ -1,6 +1,7 @@
 package com.elog.service;
 
-import com.elog.dto.response.*;
+import com.elog.dto.response.trip.ConsolidateResponse;
+import com.elog.dto.response.trip.TripDraftResponse;
 import com.elog.entity.*;
 import com.elog.repository.*;
 import jakarta.persistence.EntityManager;

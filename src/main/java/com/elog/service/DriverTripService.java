@@ -1,8 +1,9 @@
 package com.elog.service;
 
-import com.elog.dto.request.UpdateOrderResultRequest;
-import com.elog.dto.response.DriverTripResponse;
-import com.elog.dto.response.TripOutcomeResponse;
+import com.elog.dto.request.trip.AdminTripOverrideRequest;
+import com.elog.dto.request.trip.UpdateOrderResultRequest;
+import com.elog.dto.response.trip.TripOutcomeResponse;
+import com.elog.dto.response.user.DriverTripResponse;
 
 public interface DriverTripService {
 
@@ -46,5 +47,5 @@ public interface DriverTripService {
     /**
      * Admin / Dispatcher override for a trip execution (FORCE_RETURN or FORCE_COMPLETE_AND_RETURN).
      */
-    DriverTripResponse adminOverrideTripExecution(Long executionId, com.elog.dto.request.AdminTripOverrideRequest request, String adminUsername);
+    DriverTripResponse adminOverrideTripExecution(Long executionId, com.elog.dto.request.trip.AdminTripOverrideRequest request, String adminUsername);
 }

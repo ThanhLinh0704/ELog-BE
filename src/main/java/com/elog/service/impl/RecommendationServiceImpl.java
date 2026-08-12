@@ -1,9 +1,9 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.RecommendationResultResponse;
-import com.elog.dto.response.VehicleRecommendationResponse;
-import com.elog.dto.response.VehicleRecommendationResponse.RecommendedVehicleDto;
-import com.elog.dto.response.VehicleRecommendationResponse.SubTripDto;
+import com.elog.dto.response.vehicle.VehicleRecommendationResponse.RecommendedVehicleDto;
+import com.elog.dto.response.vehicle.VehicleRecommendationResponse.SubTripDto;
+import com.elog.dto.response.trip.RecommendationResultResponse;
+import com.elog.dto.response.vehicle.VehicleRecommendationResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
