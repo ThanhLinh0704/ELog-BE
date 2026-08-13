@@ -127,6 +127,35 @@
     <!-- ─── Build ─── -->
     <build>
         <plugins>
+            <!--
+              Quarantine legacy generated integration classes that contain
+              unconditional assertTrue(true). Real L2 evidence is selected
+              explicitly until those classes are replaced with DB assertions.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>**/integration/AddressServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/AuthServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/CapacityValidationServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/ConsolidationServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/ConstraintValidationServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/DriverTripServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/ExceptionServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/ImportServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/KpiServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/RouteServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/StoreServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/TripDraftServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/TripMonitoringServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/TripServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/UserServiceIntegrationTest.java</exclude>
+                        <exclude>**/integration/VehicleServiceIntegrationTest.java</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
