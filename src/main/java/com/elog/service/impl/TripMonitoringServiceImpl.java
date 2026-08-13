@@ -1,8 +1,5 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.trip.ActiveTripsResponse.ExceptionSummary;
-import com.elog.dto.response.trip.TripProgressResponse.ExceptionDetail;
-import com.elog.dto.response.trip.TripProgressResponse.StopProgress;
 import com.elog.dto.response.trip.ActiveTripsResponse;
 import com.elog.dto.response.trip.StopArriveResponse;
 import com.elog.dto.response.trip.StopCompleteResponse;

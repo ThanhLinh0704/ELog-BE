@@ -1,6 +1,5 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.common.ApiResponse.PaginationInfo;
 import com.elog.dto.request.route.RouteCreateRequest;
 import com.elog.dto.request.route.RouteStatusUpdateRequest;
 import com.elog.dto.request.route.RouteStopAddRequest;

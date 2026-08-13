@@ -1,6 +1,5 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.common.ApiResponse.PaginationInfo;
 import com.elog.dto.request.vehicle.VehicleCreateRequest;
 import com.elog.dto.request.vehicle.VehicleStatusUpdateRequest;
 import com.elog.dto.request.vehicle.VehicleUpdateRequest;

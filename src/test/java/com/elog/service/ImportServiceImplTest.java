@@ -2,7 +2,6 @@ package com.elog.service;
 
 import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.importbatch.ImportBatchResponse;
-import com.elog.dto.response.importbatch.ImportedOrderDetailResponse;
 import com.elog.dto.response.importbatch.ImportErrorResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
@@ -145,9 +144,10 @@ class ImportServiceImplTest {
 
     @Test
     void parseRow_nullBatchDeliveryDate_newOrder_usesRowDeliveryDate() throws IOException {
-        LocalDate rowDate = LocalDate.of(2026, 8, 4);
+        LocalDate rowDate = LocalDate.now().plusDays(1);
+        java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
         List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-99", "ST-BT-001", "REF-SAM-300", "2", "04/08/2026"});
+        rowsData.add(new String[]{"DH160325-99", "ST-BT-001", "REF-SAM-300", "2", rowDate.format(dtf)});
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
         when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
@@ -671,7 +671,7 @@ class ImportServiceImplTest {
         OrderItem orderItem = OrderItem.builder().id(500L).sku("REF-SAM-300").quantity(4).unitWeightKg(BigDecimal.ONE).unitVolumeM3(BigDecimal.ONE).lineWeightKg(BigDecimal.ONE).lineVolumeM3(BigDecimal.ONE).build();
         when(orderItemRepository.save(any(OrderItem.class))).thenReturn(orderItem);
 
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
+        ImportBatchResponse response = importService.importExcel(file, date, true, 1L);
 
         assertThat(response.getAcceptedRows()).isEqualTo(1);
         assertThat(response.getRejectedRows()).isEqualTo(0);
@@ -899,7 +899,7 @@ class ImportServiceImplTest {
                 .thenReturn(Optional.of(existingOrder));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        importService.importExcel(file, date, false, 1L);
+        importService.importExcel(file, date, true, 1L);
 
         verify(orderRepository).save(any(Order.class));
         verify(orderItemRepository).findByOrderId(100L);
@@ -1163,10 +1163,11 @@ class ImportServiceImplTest {
 
     @Test
     void importExcel_9ColumnMultiDate_success() throws Exception {
-        LocalDate fallbackDate = LocalDate.of(2026, 8, 1);
+        LocalDate d1 = LocalDate.now().plusDays(1);
+        LocalDate d2 = LocalDate.now().plusDays(2);
         List<String[]> rows = List.of(
-                new String[]{"DH-101", "ST-BT-001", "REF-SAM-300", "2", "2026-08-01", "08:00 - 12:00", "Nguyen A", "0901234567", "Note 1"},
-                new String[]{"DH-102", "ST-BT-001", "REF-SAM-300", "3", "2026-08-02", "13:00 - 17:00", "Nguyen B", "0907654321", "Note 2"}
+                new String[]{"DH-101", "ST-BT-001", "REF-SAM-300", "2", d1.toString(), "08:00 - 12:00", "Nguyen A", "0901234567", "Note 1"},
+                new String[]{"DH-102", "ST-BT-001", "REF-SAM-300", "3", d2.toString(), "13:00 - 17:00", "Nguyen B", "0907654321", "Note 2"}
         );
         MultipartFile file = createMockExcelFile("orders_multi_date.xlsx", rows);
 
@@ -1184,7 +1185,7 @@ class ImportServiceImplTest {
         });
         when(orderRepository.countByBatchId(10L)).thenReturn(2L);
 
-        ImportBatchResponse response = importService.importExcel(file, fallbackDate, false, 1L);
+        ImportBatchResponse response = importService.importExcel(file, d1, false, 1L);
 
         assertThat(response).isNotNull();
         assertThat(response.getBatchId()).isEqualTo(10L);
@@ -1194,9 +1195,9 @@ class ImportServiceImplTest {
 
     @Test
     void parseRow_deliveryDateHasLockedTripDraft_rejectsRow() throws Exception {
-        LocalDate date = LocalDate.of(2026, 8, 1);
+        LocalDate date = LocalDate.now().plusDays(1);
         List<String[]> rowsData = Collections.singletonList(
-                new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2", "2026-08-01"}
+                new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2", date.toString()}
         );
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
@@ -1223,9 +1224,9 @@ class ImportServiceImplTest {
 
     @Test
     void parseRow_deliveryDateNoLockedTripDraft_acceptsRow() throws Exception {
-        LocalDate date = LocalDate.of(2026, 8, 1);
+        LocalDate date = LocalDate.now().plusDays(1);
         List<String[]> rowsData = Collections.singletonList(
-                new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2", "2026-08-01"}
+                new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2", date.toString()}
         );
         MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
 
@@ -1250,5 +1251,65 @@ class ImportServiceImplTest {
         assertThat(response.getAcceptedRows()).isEqualTo(1);
         assertThat(response.getRejectedRows()).isEqualTo(0);
         verify(orderRepository).save(any(Order.class));
+    }
+
+    @Test
+    void parseRow_pastDeliveryDate_rejectsRow() throws Exception {
+        LocalDate pastDate = LocalDate.now().minusDays(1);
+        List<String[]> rowsData = Collections.singletonList(
+                new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2", pastDate.toString()}
+        );
+        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
+
+        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(i -> {
+            ImportBatch b = i.getArgument(0);
+            b.setId(1L);
+            return b;
+        });
+
+        ImportBatchResponse response = importService.importExcel(file, pastDate, false, 1L);
+
+        assertThat(response.getAcceptedRows()).isEqualTo(0);
+        assertThat(response.getRejectedRows()).isEqualTo(1);
+        verify(errorRepository).save(argThat(err -> "INVALID_DELIVERY_DATE".equals(err.getErrorCode())));
+    }
+
+    @Test
+    void parseRow_futureDeliveryDateBeyond7Days_rejectsRow() throws Exception {
+        LocalDate farFutureDate = LocalDate.now().plusDays(8);
+        List<String[]> rowsData = Collections.singletonList(
+                new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2", farFutureDate.toString()}
+        );
+        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
+
+        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(i -> {
+            ImportBatch b = i.getArgument(0);
+            b.setId(1L);
+            return b;
+        });
+
+        ImportBatchResponse response = importService.importExcel(file, farFutureDate, false, 1L);
+
+        assertThat(response.getAcceptedRows()).isEqualTo(0);
+        assertThat(response.getRejectedRows()).isEqualTo(1);
+        verify(errorRepository).save(argThat(err -> "INVALID_DELIVERY_DATE".equals(err.getErrorCode())));
+    }
+
+    @Test
+    void importExcel_duplicateOrdersExist_confirmReplaceFalse_throwsConflict() throws Exception {
+        LocalDate validDate = LocalDate.now().plusDays(1);
+        List<String[]> rowsData = Collections.singletonList(
+                new String[]{"DH-DUP-01", "ST-BT-001", "REF-SAM-300", "2", validDate.toString()}
+        );
+        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
+
+        Order existingOrder = Order.builder().id(99L).orderRef("DH-DUP-01").build();
+        when(orderRepository.findActiveByOrderRefAndDeliveryDate(eq("DH-DUP-01"), any(LocalDate.class)))
+                .thenReturn(Optional.of(existingOrder));
+
+        assertThatThrownBy(() -> importService.importExcel(file, validDate, false, 1L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DUPLICATE_ORDERS_EXIST)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.CONFLICT);
     }
 }

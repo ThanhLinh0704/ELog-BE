@@ -1,6 +1,5 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.common.ApiResponse.PaginationInfo;
 import com.elog.dto.request.product.ProductCreateRequest;
 import com.elog.dto.request.product.ProductStatusUpdateRequest;
 import com.elog.dto.request.product.ProductUpdateRequest;

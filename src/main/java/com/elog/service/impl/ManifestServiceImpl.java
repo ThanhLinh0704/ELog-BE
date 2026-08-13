@@ -1,6 +1,5 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.trip.ManifestByStopResponse.ManifestStopGroup;
 import com.elog.dto.response.common.ConfirmedByDto;
 import com.elog.dto.response.trip.ManifestByStopResponse;
 import com.elog.dto.response.trip.ManifestLineDto;

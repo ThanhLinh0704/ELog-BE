@@ -1,6 +1,5 @@
 package com.elog.service.impl;
 
-import com.elog.dto.request.trip.TripSplitAssignRequest.SplitAssignment;
 import com.elog.dto.request.trip.TripAssignmentPatchRequest;
 import com.elog.dto.request.trip.TripAssignRequest;
 import com.elog.dto.request.trip.TripSplitAssignRequest;
