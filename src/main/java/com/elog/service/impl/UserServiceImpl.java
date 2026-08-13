@@ -1,6 +1,5 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.common.ApiResponse.PaginationInfo;
 import com.elog.dto.request.user.UserCreateRequest;
 import com.elog.dto.request.user.UserRolesUpdateRequest;
 import com.elog.dto.request.user.UserStatusUpdateRequest;

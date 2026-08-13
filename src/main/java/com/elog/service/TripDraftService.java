@@ -1,8 +1,6 @@
 package com.elog.service;
 
-import com.elog.dto.request.trip.AdjustDepartureTimeRequest;
 import com.elog.dto.request.trip.RecalculateEtaRequest;
-import com.elog.dto.request.trip.SettleDelayRequest;
 import com.elog.dto.request.trip.StopUpdateRequest;
 import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.common.ConfirmResponse;

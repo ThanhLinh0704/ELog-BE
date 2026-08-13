@@ -4,7 +4,6 @@ import com.elog.dto.request.trip.TripAssignmentPatchRequest;
 import com.elog.dto.request.trip.TripAssignRequest;
 import com.elog.dto.response.trip.TripResponse;
 import com.elog.dto.response.user.AvailableDriverResponse;
-import com.elog.dto.response.user.DriverTripCalendarDayResponse;
 import com.elog.dto.response.vehicle.EligibleVehiclesResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;

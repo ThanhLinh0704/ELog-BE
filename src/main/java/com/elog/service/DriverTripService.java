@@ -1,6 +1,5 @@
 package com.elog.service;
 
-import com.elog.dto.request.trip.AdminTripOverrideRequest;
 import com.elog.dto.request.trip.UpdateOrderResultRequest;
 import com.elog.dto.response.trip.TripOutcomeResponse;
 import com.elog.dto.response.user.DriverTripResponse;

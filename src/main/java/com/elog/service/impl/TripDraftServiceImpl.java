@@ -1,10 +1,6 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.common.ApiResponse.PaginationInfo;
-import com.elog.dto.response.trip.ConsolidateResponse.SkippedRouteInfo;
-import com.elog.dto.request.trip.AdjustDepartureTimeRequest;
 import com.elog.dto.request.trip.RecalculateEtaRequest;
-import com.elog.dto.request.trip.SettleDelayRequest;
 import com.elog.dto.request.trip.StopUpdateRequest;
 import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.common.ConfirmedByDto;

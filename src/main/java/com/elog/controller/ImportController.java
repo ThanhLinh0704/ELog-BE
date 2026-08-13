@@ -33,7 +33,7 @@ public class ImportController {
     private final UserRepository userRepository;
 
     @PostMapping(consumes = "multipart/form-data")
-    @Operation(summary = "Upload Excel file to import orders for a delivery date")
+    @Operation(summary = "Upload Excel file to import orders")
     @PreAuthorize("hasAuthority('order:import')")
     public ResponseEntity<?> importOrders(
             @RequestParam("file") MultipartFile file,

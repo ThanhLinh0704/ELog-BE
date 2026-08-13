@@ -2,6 +2,7 @@ package com.elog.repository;
 
 import com.elog.entity.Order;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,7 +11,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
-public interface OrderRepository extends JpaRepository<Order, Long> {
+public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecificationExecutor<Order> {
 
     @Query("SELECT o FROM Order o WHERE o.importBatch.id = :batchId AND o.orderRef = :orderRef AND o.store.id = :storeId")
     Optional<Order> findByBatchAndOrderRefAndStore(

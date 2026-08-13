@@ -1,9 +1,7 @@
 package com.elog.controller;
 
-import com.elog.dto.request.trip.AdjustDepartureTimeRequest;
 import com.elog.dto.request.trip.ConsolidateRequest;
 import com.elog.dto.request.trip.RecalculateEtaRequest;
-import com.elog.dto.request.trip.SettleDelayRequest;
 import com.elog.dto.request.trip.StopUpdateRequest;
 import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.common.ConfirmResponse;
@@ -11,7 +9,6 @@ import com.elog.dto.response.goong.RecalculateEtaResponse;
 import com.elog.dto.response.trip.ConsolidateResponse;
 import com.elog.dto.response.trip.ManifestByStopResponse;
 import com.elog.dto.response.trip.ManifestResponse;
-import com.elog.dto.response.trip.PlanningEventResponse;
 import com.elog.dto.response.trip.RecommendationResultResponse;
 import com.elog.dto.response.trip.StopOrderItemResponse;
 import com.elog.dto.response.trip.TripDraftResponse;

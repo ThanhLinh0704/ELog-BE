@@ -1,8 +1,5 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.kpi.KpiByDriverResponse.DriverKpi;
-import com.elog.dto.response.kpi.KpiByRouteResponse.RouteKpi;
-import com.elog.dto.response.kpi.KpiByVehicleResponse.VehicleKpi;
 import com.elog.dto.response.kpi.KpiDailyTrendResponse.DailyDataPoint;
 import com.elog.dto.response.kpi.KpiSummaryResponse.ExceptionKpi;
 import com.elog.dto.response.kpi.KpiSummaryResponse.FleetUtilizationKpi;
