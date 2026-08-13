@@ -82,6 +82,16 @@ public class TripDraft {
     @JoinColumn(name = "validated_by")
     private User validatedBy;
 
+    @Column(name = "total_distance_km", precision = 10, scale = 2)
+    private BigDecimal totalDistanceKm;
+
+    @Column(name = "return_distance_km", precision = 10, scale = 2)
+    private BigDecimal returnDistanceKm;
+
+    @Column(name = "route_polyline", columnDefinition = "LONGTEXT")
+    private String routePolyline;
+
+
 
     @OneToMany(mappedBy = "tripDraft", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequenceNo ASC")

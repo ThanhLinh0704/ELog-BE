@@ -16,7 +16,7 @@ import java.util.Map;
  * GET /api/health → 200 { "status": "UP", "version": "v1" }
  */
 @RestController
-@RequestMapping("/api/health")
+@RequestMapping("/api/v1/health")
 @Tag(name = "Health", description = "Health check — no auth required")
 public class HealthController {
 

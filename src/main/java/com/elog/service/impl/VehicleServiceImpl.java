@@ -57,6 +57,12 @@ public class VehicleServiceImpl implements VehicleService {
             User driver = userRepository.findById(request.getAssignedDriverId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
                             "Driver not found: " + request.getAssignedDriverId(), HttpStatus.NOT_FOUND));
+            // Unassign driver from any other vehicle
+            List<Vehicle> currentlyAssigned = vehicleRepository.findByAssignedDriverId(driver.getId());
+            for (Vehicle otherV : currentlyAssigned) {
+                otherV.setAssignedDriver(null);
+                vehicleRepository.save(otherV);
+            }
             vehicle.setAssignedDriver(driver);
         }
         Vehicle saved = vehicleRepository.save(vehicle);
@@ -144,6 +150,14 @@ public class VehicleServiceImpl implements VehicleService {
             User driver = userRepository.findById(request.getAssignedDriverId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
                             "Driver not found: " + request.getAssignedDriverId(), HttpStatus.NOT_FOUND));
+            // Unassign driver from any other vehicle
+            List<Vehicle> currentlyAssigned = vehicleRepository.findByAssignedDriverId(driver.getId());
+            for (Vehicle otherV : currentlyAssigned) {
+                if (!otherV.getId().equals(vehicle.getId())) {
+                    otherV.setAssignedDriver(null);
+                    vehicleRepository.save(otherV);
+                }
+            }
             vehicle.setAssignedDriver(driver);
         } else {
             vehicle.setAssignedDriver(null);

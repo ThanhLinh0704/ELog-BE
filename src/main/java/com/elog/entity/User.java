@@ -51,6 +51,28 @@ public class User {
     @Column(name = "license_class", length = 10)
     private LicenseClass licenseClass;
 
+    @Column(name = "phone_number", length = 20)
+    private String phoneNumber;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "driver_status", nullable = false, length = 10)
+    @Builder.Default
+    private DriverStatus driverStatus = DriverStatus.ACTIVE;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "driver_inactive_reason_code", length = 30)
+    private DriverInactiveReasonCode driverInactiveReasonCode;
+
+    @Column(name = "driver_inactive_reason_note", length = 500)
+    private String driverInactiveReasonNote;
+
+    @Column(name = "driver_status_updated_at")
+    private LocalDateTime driverStatusUpdatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "driver_status_updated_by")
+    private User driverStatusUpdatedBy;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

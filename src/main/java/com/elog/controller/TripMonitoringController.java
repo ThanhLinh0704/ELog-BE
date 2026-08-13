@@ -21,7 +21,7 @@ public class TripMonitoringController {
      * Driver bấm "BẮT ĐẦU CHUYẾN"
      * Guard: Trip.driver == currentUser, Trip.status == DISPATCHED
      */
-    @PostMapping("/api/trips/{id}/start")
+    @PostMapping("/api/v1/trips/{id}/start")
     @Operation(summary = "Driver starts trip: DISPATCHED → IN_PROGRESS")
     @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<TripStartResponse>> startTrip(@PathVariable Long id) {
@@ -35,7 +35,7 @@ public class TripMonitoringController {
      * Guard: stop thuộc trip của driver, stop.status == PENDING, sequential order
      * Side-effect: tạo TIME_EXCEPTION nếu delay > threshold
      */
-    @PostMapping("/api/trip-stops/{id}/arrive")
+    @PostMapping("/api/v1/trip-stops/{id}/arrive")
     @Operation(summary = "Driver arrives at stop: PENDING → IN_PROGRESS. Auto-flags TIME_EXCEPTION if late (BR-09)")
     @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<StopArriveResponse>> arriveAtStop(@PathVariable Long id) {
@@ -49,7 +49,7 @@ public class TripMonitoringController {
      * Guard: stop.status == IN_PROGRESS, parent trip.driver == currentUser
      * Side-effect: nếu stop cuối → Trip auto-COMPLETED
      */
-    @PostMapping("/api/trip-stops/{id}/complete")
+    @PostMapping("/api/v1/trip-stops/{id}/complete")
     @Operation(summary = "Driver completes stop: IN_PROGRESS → COMPLETED. Trip auto-completes if last stop done")
     @PreAuthorize("hasAuthority('trip:execute')")
     public ResponseEntity<ApiResponse<StopCompleteResponse>> completeStop(@PathVariable Long id) {

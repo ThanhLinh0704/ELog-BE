@@ -14,6 +14,7 @@ import com.elog.repository.StoreRepository;
 import com.elog.repository.specification.RouteSpecification;
 import com.elog.service.RouteService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -26,12 +27,18 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RouteServiceImpl implements RouteService {
 
     private final RouteRepository routeRepository;
     private final RouteStopRepository routeStopRepository;
     private final StoreRepository storeRepository;
     private final RouteMapper routeMapper;
+    private final com.elog.repository.TripStopRepository tripStopRepository;
+    private final com.elog.repository.TripDraftStopRepository tripDraftStopRepository;
+    private final com.elog.repository.ManifestLineRepository manifestLineRepository;
+    private final com.elog.repository.DeliveryOrderResultRepository deliveryOrderResultRepository;
+    private final com.elog.service.GoongMapService goongMapService;
 
     // ── Route CRUD ──────────────────────────────────────────────
 
@@ -72,8 +79,20 @@ public class RouteServiceImpl implements RouteService {
                 .and(RouteSpecification.hasActiveStatus(isActive));
 
         Page<Route> page = routeRepository.findAll(spec, pageable);
+
+        List<Long> routeIds = page.getContent().stream().map(Route::getId).toList();
+        List<Object[]> rawCounts = routeIds.isEmpty()
+                ? java.util.Collections.emptyList()
+                : routeStopRepository.countStopsByRouteIdIn(routeIds);
+
+        java.util.Map<Long, Integer> countMap = rawCounts.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> ((Number) row[1]).intValue()
+                ));
+
         List<RouteResponse> content = page.getContent().stream()
-                .map(r -> routeMapper.toResponse(r, routeStopRepository.countByRouteId(r.getId())))
+                .map(r -> routeMapper.toResponse(r, countMap.getOrDefault(r.getId(), 0)))
                 .toList();
 
         ApiResponse.PaginationInfo pagination = ApiResponse.PaginationInfo.builder()
@@ -154,6 +173,9 @@ public class RouteServiceImpl implements RouteService {
                 .build();
         RouteStop saved = routeStopRepository.save(routeStop);
 
+        route.setRoutePolyline(null);
+        routeRepository.save(route);
+
         boolean hasCoords = store.getLatitude() != null && store.getLongitude() != null;
         return routeMapper.toStopResponse(saved, !hasCoords);
     }
@@ -200,6 +222,10 @@ public class RouteServiceImpl implements RouteService {
             result.add(routeMapper.toStopResponse(rs, !hasCoords));
         }
 
+        Route route = findRouteOrThrow(routeId);
+        route.setRoutePolyline(null);
+        routeRepository.save(route);
+
         return result;
     }
 
@@ -218,6 +244,14 @@ public class RouteServiceImpl implements RouteService {
                     HttpStatus.NOT_FOUND);
         }
 
+        // 1. Clean up references prior to deleting RouteStop so admin can remove any store
+        tripStopRepository.nullifyRouteStopId(stopId);
+        tripStopRepository.nullifyTripDraftStopIdByRouteStopId(stopId);
+        deliveryOrderResultRepository.deleteByRouteStopId(stopId);
+        manifestLineRepository.deleteByRouteStopId(stopId);
+        tripDraftStopRepository.deleteByRouteStopId(stopId);
+
+        // 2. Delete the route stop
         routeStopRepository.delete(stop);
 
         // Renumber remaining stops
@@ -227,6 +261,101 @@ public class RouteServiceImpl implements RouteService {
             rs.setSequenceOrder(seq++);
             routeStopRepository.save(rs);
         }
+
+        Route route = findRouteOrThrow(routeId);
+        route.setRoutePolyline(null);
+        routeRepository.save(route);
+    }
+
+    @Override
+    @Transactional
+    public RouteDirectionsResponse getRouteDirections(Long routeId) {
+        Route route = findRouteOrThrow(routeId);
+        List<RouteStop> stops = routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(routeId);
+
+        double warehouseLat = 21.032612;
+        double warehouseLng = 105.868367;
+
+        if (route.getRoutePolyline() != null && !route.getRoutePolyline().trim().isEmpty()) {
+            return RouteDirectionsResponse.builder()
+                    .routeId(route.getId())
+                    .routeCode(route.getCode())
+                    .routeName(route.getName())
+                    .routePolyline(route.getRoutePolyline())
+                    .totalDistanceKm(route.getTotalDistanceKm())
+                    .totalDurationMin(route.getTotalDurationMin())
+                    .warehouseLat(warehouseLat)
+                    .warehouseLng(warehouseLng)
+                    .build();
+        }
+
+        RouteDirectionsResponse.RouteDirectionsResponseBuilder builder = RouteDirectionsResponse.builder()
+                .routeId(route.getId())
+                .routeCode(route.getCode())
+                .routeName(route.getName())
+                .warehouseLat(warehouseLat)
+                .warehouseLng(warehouseLng);
+
+        List<RouteStop> validStops = stops.stream()
+                .filter(s -> s.getStore() != null && s.getStore().getLatitude() != null && s.getStore().getLongitude() != null)
+                .collect(Collectors.toList());
+
+        if (validStops.isEmpty()) {
+            return builder.totalDistanceKm(0.0).totalDurationMin(0).build();
+        }
+
+        List<double[]> coords = new ArrayList<>();
+        coords.add(new double[]{warehouseLat, warehouseLng});
+        for (RouteStop s : validStops) {
+            coords.add(new double[]{s.getStore().getLatitude(), s.getStore().getLongitude()});
+        }
+
+        if (goongMapService != null && goongMapService.isConfigured()) {
+            try {
+                String origin = coords.get(0)[0] + "," + coords.get(0)[1];
+                String destination = coords.get(coords.size() - 1)[0] + "," + coords.get(coords.size() - 1)[1];
+
+                String waypoints = null;
+                if (coords.size() > 2) {
+                    waypoints = coords.subList(1, coords.size() - 1).stream()
+                            .map(pt -> pt[0] + "," + pt[1])
+                            .collect(Collectors.joining("|"));
+                }
+
+                var goongRes = goongMapService.getDirections(origin, destination, waypoints);
+                if (goongRes != null && goongRes.getRoutes() != null && !goongRes.getRoutes().isEmpty()) {
+                    var r = goongRes.getRoutes().get(0);
+                    if (r.getOverviewPolyline() != null && r.getOverviewPolyline().getPoints() != null) {
+                        String polyline = r.getOverviewPolyline().getPoints();
+                        builder.routePolyline(polyline);
+                        route.setRoutePolyline(polyline);
+                    }
+                    if (r.getLegs() != null) {
+                        long totalMeters = r.getLegs().stream()
+                                .mapToLong(leg -> leg.getDistance() != null && leg.getDistance().getValue() != null ? leg.getDistance().getValue() : 0)
+                                .sum();
+                        long totalSecs = r.getLegs().stream()
+                                .mapToLong(leg -> leg.getDuration() != null && leg.getDuration().getValue() != null ? leg.getDuration().getValue() : 0)
+                                .sum();
+                        double distKm = totalMeters / 1000.0;
+                        int durMin = (int) (totalSecs / 60);
+
+                        builder.totalDistanceKm(distKm);
+                        builder.totalDurationMin(durMin);
+
+                        route.setTotalDistanceKm(distKm);
+                        route.setTotalDurationMin(durMin);
+                    }
+                    routeRepository.save(route);
+                } else {
+                    log.warn("Goong directions API returned no routes or rate-limited for routeId={}", routeId);
+                }
+            } catch (Exception e) {
+                log.error("Error building route directions: {}", e.getMessage(), e);
+            }
+        }
+
+        return builder.build();
     }
 
     // ── helpers ──────────────────────────────────────────────

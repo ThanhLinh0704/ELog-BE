@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Haversine-based ETA calculator.
@@ -106,7 +107,14 @@ public class HaversineEtaCalculator implements EtaCalculationService {
             long travelMinutes = Math.round((distanceKm / avgSpeedKmh) * 60);
             currentEta = currentEta.plusMinutes(travelMinutes);
 
+            java.math.BigDecimal distKmBd = java.math.BigDecimal.valueOf(distanceKm).setScale(2, java.math.RoundingMode.HALF_UP);
+            int travelMinInt = (int) travelMinutes;
+
+            stop.setDistanceFromPrevKm(distKmBd);
+            stop.setTravelTimeFromPrevMin(travelMinInt);
+
             // Time window calculation & waiting time check
+
             LocalTime twStart = store.getTimeWindowStart();
             LocalTime twEnd = store.getTimeWindowEnd();
 
@@ -151,16 +159,33 @@ public class HaversineEtaCalculator implements EtaCalculationService {
                     .sequenceNo(stop.getSequenceNo())
                     .storeCode(store.getCode())
                     .plannedEta(currentEta)
+                    .distanceFromPrevKm(distKmBd)
+                    .travelTimeFromPrevMin(travelMinInt)
+                    .estimatedDistanceKm(distKmBd)
+                    .estimatedTravelMin(travelMinInt)
                     .build());
+
 
             prevLat = stopLat;
             prevLng = stopLng;
         }
 
-        // 5. Persist all at once
+        // 5. Calculate return leg distance (last stop to warehouse) and update totalDistanceKm
+        double returnDistKm = haversine(prevLat, prevLng, warehouseLat, warehouseLng);
+        java.math.BigDecimal returnKmBd = java.math.BigDecimal.valueOf(returnDistKm).setScale(2, java.math.RoundingMode.HALF_UP);
+        draft.setReturnDistanceKm(returnKmBd);
+
+        java.math.BigDecimal totalKm = activeStops.stream()
+                .map(TripDraftStop::getDistanceFromPrevKm)
+                .filter(Objects::nonNull)
+                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                .add(returnKmBd);
+        draft.setTotalDistanceKm(totalKm);
+
+        // 6. Persist all at once
         stopRepo.saveAll(activeStops);
 
-        // 6. Update departure time on TripDraft
+        // 7. Update departure time on TripDraft
         draft.setPlannedDepartureTime(departureTime);
         tripDraftRepo.save(draft);
 

@@ -12,7 +12,7 @@ CREATE TABLE administrative_regions (
 	code_name varchar(255) NULL,
 	code_name_en varchar(255) NULL,
 	CONSTRAINT administrative_regions_pkey PRIMARY KEY (id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- CREATE administrative_units TABLE
@@ -25,7 +25,7 @@ CREATE TABLE administrative_units (
 	code_name varchar(255) NULL,
 	code_name_en varchar(255) NULL,
 	CONSTRAINT administrative_units_pkey PRIMARY KEY (id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- CREATE provinces TABLE
@@ -39,7 +39,7 @@ CREATE TABLE provinces (
 	administrative_unit_id integer NULL,
 	administrative_region_id integer NULL,
 	CONSTRAINT provinces_pkey PRIMARY KEY (code)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- provinces foreign keys
@@ -62,7 +62,7 @@ CREATE TABLE districts (
 	province_code varchar(20) NULL,
 	administrative_unit_id integer NULL,
 	CONSTRAINT districts_pkey PRIMARY KEY (code)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- districts foreign keys
@@ -85,7 +85,7 @@ CREATE TABLE wards (
 	district_code varchar(20) NULL,
 	administrative_unit_id integer NULL,
 	CONSTRAINT wards_pkey PRIMARY KEY (code)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- wards foreign keys

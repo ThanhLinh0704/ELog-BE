@@ -17,4 +17,7 @@ public interface RouteService {
     RouteStopResponse addStop(Long routeId, RouteStopAddRequest request);
     List<RouteStopResponse> reorderStops(Long routeId, RouteStopReorderRequest request);
     void removeStop(Long routeId, Long stopId);
+
+    // Road directions
+    RouteDirectionsResponse getRouteDirections(Long routeId);
 }

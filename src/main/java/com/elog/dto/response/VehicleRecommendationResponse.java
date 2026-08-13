@@ -36,6 +36,11 @@ public class VehicleRecommendationResponse {
      */
     private String explanation;
 
+    /**
+     * List of warnings associated with this recommendation plan.
+     */
+    private List<String> warnings;
+
     // ── Inner DTOs ────────────────────────────────────────────────────────
 
     @Data
@@ -70,6 +75,9 @@ public class VehicleRecommendationResponse {
         private List<Integer> stopSequenceNos; // which stops are assigned
         private BigDecimal subTotalVolumeM3;
         private BigDecimal subTotalWeightKg;
+        private BigDecimal volumeUtilizationPct;
+        private BigDecimal weightUtilizationPct;
         private BigDecimal subScore;
+        private List<String> warnings;
     }
 }

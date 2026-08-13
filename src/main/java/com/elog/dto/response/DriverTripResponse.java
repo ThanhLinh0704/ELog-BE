@@ -52,6 +52,8 @@ public class DriverTripResponse {
         private LocalTime plannedEta;
         private LocalTime closingTime;
         private String aggregatedStatus; // PENDING, DELIVERED, PARTIAL, FAILED
+        private String arrivalStatus; // PENDING, ARRIVED
+        private LocalDateTime actualArrivalTime;
         private List<DriverOrderDto> orders;
     }
 

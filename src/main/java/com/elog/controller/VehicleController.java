@@ -23,7 +23,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/vehicles")
+@RequestMapping("/api/v1/vehicles")
 @RequiredArgsConstructor
 @Tag(name = "Vehicles", description = "Vehicle fleet management APIs")
 public class VehicleController {

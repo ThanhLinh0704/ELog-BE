@@ -78,15 +78,38 @@ public class StoreServiceImpl implements StoreService {
     @Override
     @Transactional(readOnly = true)
     public ApiResponse<List<StoreListItemResponse>> getAllStores(
-            String keyword, Boolean isActive, Boolean hasRoute, Pageable pageable) {
+            String keyword, Boolean isActive, Boolean hasRoute, String routeCode, Pageable pageable) {
 
         Specification<Store> spec = Specification.where(StoreSpecification.hasKeyword(keyword))
                 .and(StoreSpecification.hasActiveStatus(isActive))
-                .and(StoreSpecification.hasRoute(hasRoute));
+                .and(StoreSpecification.hasRoute(hasRoute))
+                .and(StoreSpecification.belongsToRouteCode(routeCode));
 
         Page<Store> page = storeRepository.findAll(spec, pageable);
+
+        List<Long> storeIds = page.getContent().stream().map(Store::getId).toList();
+        List<com.elog.entity.RouteStop> allStops = storeIds.isEmpty()
+                ? java.util.Collections.emptyList()
+                : routeStopRepository.findByStoreIdIn(storeIds);
+
+        java.util.Map<Long, List<AssignedRouteDto>> routesByStoreId = allStops.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        rs -> rs.getStore().getId(),
+                        java.util.stream.Collectors.mapping(
+                                rs -> AssignedRouteDto.builder()
+                                        .id(rs.getRoute().getId())
+                                        .code(rs.getRoute().getCode())
+                                        .name(rs.getRoute().getName())
+                                        .build(),
+                                java.util.stream.Collectors.toList())
+                ));
+
         List<StoreListItemResponse> content = page.getContent().stream()
-                .map(s -> storeMapper.toListItem(s, resolveAssignedRoute(s.getId()), resolveAssignedRoutes(s.getId())))
+                .map(s -> {
+                    List<AssignedRouteDto> assignedRoutes = routesByStoreId.getOrDefault(s.getId(), java.util.Collections.emptyList());
+                    AssignedRouteDto primaryRoute = assignedRoutes.isEmpty() ? null : assignedRoutes.get(0);
+                    return storeMapper.toListItem(s, primaryRoute, assignedRoutes);
+                })
                 .toList();
 
         ApiResponse.PaginationInfo pagination = ApiResponse.PaginationInfo.builder()

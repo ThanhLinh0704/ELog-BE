@@ -31,4 +31,8 @@ public class VehicleListItemResponse {
     private String imageUrl;
     private String permitInfo;
     private String description;
+    private Long assignedDriverId;
+    private String assignedDriverName;
+    private String assignedDriverPhone;
+    private LicenseClass assignedDriverLicenseClass;
 }

@@ -40,6 +40,15 @@ public class Route {
     @Builder.Default
     private List<RouteStop> stops = new ArrayList<>();
 
+    @Column(name = "route_polyline", columnDefinition = "TEXT")
+    private String routePolyline;
+
+    @Column(name = "total_distance_km")
+    private Double totalDistanceKm;
+
+    @Column(name = "total_duration_min")
+    private Integer totalDurationMin;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

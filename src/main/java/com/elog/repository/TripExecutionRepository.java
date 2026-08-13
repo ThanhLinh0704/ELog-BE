@@ -25,4 +25,7 @@ public interface TripExecutionRepository extends JpaRepository<TripExecution, Lo
 
     @Query("SELECT te FROM TripExecution te WHERE te.driver.id = :driverId AND te.returnedToWarehouseAt IS NULL AND te.status != 'CANCELLED'")
     List<TripExecution> findUnreturnedByDriverId(@Param("driverId") Long driverId);
+
+    @Query("SELECT te FROM TripExecution te LEFT JOIN FETCH te.trip WHERE te.returnedToWarehouseAt IS NULL AND te.status != 'CANCELLED' AND te.driver.id IS NOT NULL")
+    List<TripExecution> findAllUnreturnedExecutions();
 }

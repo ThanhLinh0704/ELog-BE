@@ -38,4 +38,15 @@ public class StoreSpecification {
             return cb.exists(sub);
         };
     }
+
+    public static Specification<Store> belongsToRouteCode(String routeCode) {
+        return (root, query, cb) -> {
+            if (!StringUtils.hasText(routeCode)) return null;
+            Subquery<Long> sub = query.subquery(Long.class);
+            Root<RouteStop> rs = sub.from(RouteStop.class);
+            sub.select(rs.get("store").get("id"))
+               .where(cb.equal(cb.lower(rs.get("route").get("code")), routeCode.trim().toLowerCase()));
+            return root.get("id").in(sub);
+        };
+    }
 }

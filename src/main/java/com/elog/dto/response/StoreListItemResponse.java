@@ -20,5 +20,7 @@ public class StoreListItemResponse {
     private java.util.List<AssignedRouteDto> assignedRoutes;
     private String allowedDeliveryHours;
     private java.math.BigDecimal maxAllowedVehicleWeight;
+    private Double latitude;
+    private Double longitude;
     private String imageUrl;
 }

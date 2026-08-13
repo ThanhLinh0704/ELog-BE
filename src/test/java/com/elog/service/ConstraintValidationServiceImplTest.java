@@ -79,4 +79,29 @@ class ConstraintValidationServiceImplTest {
         assertFalse(violations.isEmpty());
         assertTrue(violations.get(0).contains("ERR_RESTRICTED_VEHICLE"));
     }
+
+    @Test
+    @DisplayName("Should validate order delivery time window correctly")
+    void testValidateStopEta_OrderDeliveryWindowViolation() {
+        Store store = Store.builder().id(1L).code("ST01").build();
+        com.elog.entity.Order order = com.elog.entity.Order.builder()
+                .id(10L)
+                .orderRef("DH-20260808-146A")
+                .store(store)
+                .deliveryTimeWindow("13:00 - 17:00")
+                .isDeliveryTimeOverridden(false)
+                .build();
+
+        com.elog.entity.TripDraftStop stop = com.elog.entity.TripDraftStop.builder()
+                .id(100L)
+                .store(store)
+                .plannedEta(java.time.LocalDateTime.of(2026, 8, 10, 8, 39))
+                .isActive(true)
+                .build();
+
+        String violation = validationService.validateStopEta(stop, List.of(order));
+        assertNotNull(violation);
+        assertTrue(violation.contains("violates delivery window (13:00 - 17:00) for order DH-20260808-146A"));
+    }
 }
+

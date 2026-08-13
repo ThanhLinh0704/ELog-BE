@@ -14,8 +14,11 @@ public class TripProgressResponse {
     private String fixedRouteCode;
     private String deliveryDate;
     private String status;
+    private java.math.BigDecimal totalDistanceKm;
+    private String routePolyline;
 
     private VehicleInfo vehicle;
+
     private DriverInfo driver;
 
     private List<StopProgress> stops;

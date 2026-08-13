@@ -19,10 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Recommendation Engine — FT-06 (Single-Vehicle) + FT-07 (Two-Vehicle Fallback).
@@ -36,7 +33,6 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     // ── Constants ─────────────────────────────────────────────────────────────
     private static final BigDecimal SAFETY_BUFFER = new BigDecimal("0.90");
-    private static final double EARTH_RADIUS_KM = 6371.0;
     private static final BigDecimal MULTI_VEHICLE_PENALTY = new BigDecimal("15.0");
     private static final int TOP_N = 3;
 
@@ -54,6 +50,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     private final SystemConfigRepository configRepo;
     private final ConstraintValidationService constraintValidationService;
     private final TripExecutionRepository tripExecutionRepo;
+    private final com.elog.service.PlanningHistoryService planningHistoryService;
 
     // ── Internal helper classes ───────────────────────────────────────────────
 
@@ -89,6 +86,12 @@ public class RecommendationServiceImpl implements RecommendationService {
                         "Trip Draft not found: " + tripDraftId,
                         HttpStatus.NOT_FOUND));
 
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.RECOMMENDATION_RUN,
+                com.elog.entity.PlanningActorType.RECOMMENDATION_ENGINE, null,
+                draft.getStatus(), draft.getStatus(), "Khởi chạy thuật toán đề xuất xe", null, null, null, null,
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
+
         List<TripDraftStop> activeStops = tripDraftStopRepo
                 .findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);
 
@@ -107,8 +110,14 @@ public class RecommendationServiceImpl implements RecommendationService {
         if (!singleResults.isEmpty()) {
             List<VehicleRecommendationResponse> top3 = singleResults.stream()
                     .limit(TOP_N)
-                    .map(sv -> toSingleVehicleResponse(sv))
+                    .map(sv -> toSingleVehicleResponse(sv, draft))
                     .toList();
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, null, com.elog.entity.PlanningEventType.RECOMMENDATION_LIST_GENERATED,
+                    com.elog.entity.PlanningActorType.RECOMMENDATION_ENGINE, null,
+                    draft.getStatus(), draft.getStatus(), "Sinh " + top3.size() + " phương án 1 xe đề xuất", top3, null, null, "SINGLE_VEHICLE",
+                    draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
 
             return RecommendationResultResponse.builder()
                     .tripDraftId(tripDraftId)
@@ -119,16 +128,27 @@ public class RecommendationServiceImpl implements RecommendationService {
                     .build();
         }
 
-        // ── Step 2: Fallback two-vehicle ──────────────────────────────────
-        log.warn("No single vehicle fits trip draft {}, triggering 2-vehicle fallback", tripDraftId);
+        // ── Step 2: Fallback to Two-Vehicle Engine (FT-07) ────────────────
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, null, com.elog.entity.PlanningEventType.TWO_VEHICLE_FALLBACK_TRIGGERED,
+                com.elog.entity.PlanningActorType.RECOMMENDATION_ENGINE, null,
+                draft.getStatus(), draft.getStatus(), "Không tìm thấy phương án 1 xe. Kích hoạt tìm phương án 2 xe", null, null, null, "TWO_VEHICLE",
+                draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
 
-        List<ScoredPair> pairResults = recommendTwoVehicles(draft, activeStops);
+        List<String> twoVehicleReasons = new ArrayList<>();
+        List<ScoredPair> pairResults = recommendTwoVehicles(draft, activeStops, twoVehicleReasons);
 
         if (!pairResults.isEmpty()) {
             List<VehicleRecommendationResponse> top3 = pairResults.stream()
                     .limit(TOP_N)
                     .map(sp -> toTwoVehicleResponse(sp))
                     .toList();
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, null, com.elog.entity.PlanningEventType.RECOMMENDATION_LIST_GENERATED,
+                    com.elog.entity.PlanningActorType.RECOMMENDATION_ENGINE, null,
+                    draft.getStatus(), draft.getStatus(), "Sinh " + top3.size() + " phương án 2 xe đề xuất", top3, null, null, "TWO_VEHICLE",
+                    draft.getRoute() != null ? draft.getRoute().getCode() : null, draft.getDeliveryDate()));
 
             return RecommendationResultResponse.builder()
                     .tripDraftId(tripDraftId)
@@ -141,6 +161,13 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         // ── Step 3: No feasible plan ──────────────────────────────────────
         List<String> reasons = collectInfeasibilityReasons(draft, activeStops);
+        boolean alreadyHasTimeWindowReason = reasons.stream().anyMatch(r -> r != null && r.contains("TIME_WINDOW"));
+        for (String r : twoVehicleReasons) {
+            if (alreadyHasTimeWindowReason && r != null && r.contains("TIME_WINDOW")) {
+                continue;
+            }
+            reasons.add(r);
+        }
         return RecommendationResultResponse.builder()
                 .tripDraftId(tripDraftId)
                 .planType("NO_PLAN")
@@ -148,6 +175,25 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .message("Không có phương án khả thi cho Trip Draft " + tripDraftId + ".")
                 .violatedConstraints(reasons)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isTwoVehicleFeasible(Long tripDraftId) {
+        TripDraft draft = tripDraftRepo.findById(tripDraftId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.TRIP_DRAFT_NOT_FOUND,
+                        "Trip Draft not found: " + tripDraftId,
+                        HttpStatus.NOT_FOUND));
+
+        List<TripDraftStop> activeStops = tripDraftStopRepo
+                .findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);
+        if (activeStops.isEmpty()) {
+            return false;
+        }
+
+        List<String> ignoredReasons = new ArrayList<>();
+        return !recommendTwoVehicles(draft, activeStops, ignoredReasons).isEmpty();
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -207,7 +253,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     // TWO-VEHICLE ENGINE (FT-07)
     // ══════════════════════════════════════════════════════════════════════════
 
-    private List<ScoredPair> recommendTwoVehicles(TripDraft draft, List<TripDraftStop> stops) {
+    private List<ScoredPair> recommendTwoVehicles(TripDraft draft, List<TripDraftStop> stops, List<String> outReasons) {
         // Build per-stop cargo data
         List<StopCargo> stopCargos = buildStopCargos(draft.getId(), stops);
 
@@ -216,6 +262,8 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         if (validSplitPoints.isEmpty()) {
             log.warn("No valid split points for trip draft {}", draft.getId());
+            outReasons.add("Không thể phân chia đơn hàng cho tối đa 2 xe mà không vi phạm tính toàn vẹn của cửa hàng "
+                    + "(1 cửa hàng phải nằm trọn trong 1 xe).");
             return List.of();
         }
 
@@ -223,6 +271,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         LocalDate deliveryDate = draft.getDeliveryDate();
         List<User> allDrivers = findActiveDrivers();
         List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+        List<Order> draftOrders = orderRepo.findByTripDraftId(draft.getId());
 
         // Normalization params
         double maxCostPerKm = allVehicles.stream()
@@ -233,6 +282,10 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .mapToDouble(BigDecimal::doubleValue).max().orElse(1.0);
 
         List<ScoredPair> allPairs = new ArrayList<>();
+        boolean everyPointLacksVehicleForA = true;
+        boolean everyPointLacksVehicleForB = true;
+        boolean foundVehiclePairButNoDriver = false;
+        boolean foundVehiclePairButSameDriverOnly = false;
 
         for (int k : validSplitPoints) {
             List<StopCargo> subA = stopCargos.subList(0, k);
@@ -251,7 +304,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             // Find vehicles that pass hard constraints for subA
             List<Vehicle> candidatesA = new ArrayList<>();
             for (Vehicle v : allVehicles) {
-                if (passesHardConstraintsForSub(v, subAVolume, subAWeight, stopsA, storesA, deliveryDate, busyStatuses)) {
+                if (passesHardConstraintsForSub(v, subAVolume, subAWeight, stopsA, storesA, draftOrders, deliveryDate, busyStatuses)) {
                     candidatesA.add(v);
                 }
             }
@@ -259,24 +312,33 @@ public class RecommendationServiceImpl implements RecommendationService {
             // Find vehicles that pass hard constraints for subB
             List<Vehicle> candidatesB = new ArrayList<>();
             for (Vehicle v : allVehicles) {
-                if (passesHardConstraintsForSub(v, subBVolume, subBWeight, stopsB, storesB, deliveryDate, busyStatuses)) {
+                if (passesHardConstraintsForSub(v, subBVolume, subBWeight, stopsB, storesB, draftOrders, deliveryDate, busyStatuses)) {
                     candidatesB.add(v);
                 }
             }
 
+            if (!candidatesA.isEmpty()) everyPointLacksVehicleForA = false;
+            if (!candidatesB.isEmpty()) everyPointLacksVehicleForB = false;
+
             // Pair up VA != VB, both must have eligible drivers
             for (Vehicle va : candidatesA) {
                 PairedDriverInfo driverInfoA = resolveDriverForVehicle(va, deliveryDate, allDrivers, busyStatuses);
-                if (driverInfoA == null) continue;
 
                 for (Vehicle vb : candidatesB) {
                     if (va.getId().equals(vb.getId())) continue;
 
                     PairedDriverInfo driverInfoB = resolveDriverForVehicle(vb, deliveryDate, allDrivers, busyStatuses);
-                    if (driverInfoB == null) continue;
+
+                    if (driverInfoA == null || driverInfoB == null) {
+                        foundVehiclePairButNoDriver = true;
+                        continue;
+                    }
 
                     // Cannot assign same driver to both sub-trips
-                    if (driverInfoA.driver().getId().equals(driverInfoB.driver().getId())) continue;
+                    if (driverInfoA.driver().getId().equals(driverInfoB.driver().getId())) {
+                        foundVehiclePairButSameDriverOnly = true;
+                        continue;
+                    }
 
                     // Score each sub-trip
                     BigDecimal scoreA = calculateSoftScoreForSub(va, subAVolume, subAWeight, stopsA,
@@ -295,6 +357,31 @@ public class RecommendationServiceImpl implements RecommendationService {
                             scoreA.doubleValue(), scoreB.doubleValue(), MULTI_VEHICLE_PENALTY.doubleValue());
 
                     allPairs.add(new ScoredPair(va, vb, driverInfoA, driverInfoB, k, subA, subB, scoreA, scoreB, pairScore, explanation));
+                }
+            }
+        }
+
+        if (allPairs.isEmpty()) {
+            long etaViolations = stops.stream()
+                    .filter(s -> constraintValidationService.validateStopEta(s, draftOrders) != null)
+                    .count();
+
+            if (everyPointLacksVehicleForA || everyPointLacksVehicleForB) {
+                if (etaViolations > 0) {
+                    outReasons.add(etaViolations + " điểm dừng vi phạm khung giờ giao hàng của đơn hàng (TIME_WINDOW) — cần điều chỉnh giờ xuất phát hoặc thứ tự điểm dừng, không phải đổi/thêm xe.");
+                } else {
+                    outReasons.add("Không có xe nào đủ tải trọng/thể tích cho ít nhất 1 trong 2 nửa tuyến, ở cả "
+                            + validSplitPoints.size() + " điểm chia thử được — cần xe lớn hơn hoặc tách bớt đơn sang đợt khác.");
+                }
+            } else if (foundVehiclePairButSameDriverOnly && !foundVehiclePairButNoDriver) {
+                outReasons.add("Có xe phù hợp cho cả 2 nửa tuyến, nhưng chỉ có 1 tài xế đang rảnh đáp ứng được cả 2 xe — cần thêm ít nhất 1 tài xế khả dụng nữa.");
+            } else if (foundVehiclePairButNoDriver) {
+                outReasons.add("Có cặp xe phù hợp cho cả 2 nửa tuyến nhưng không tìm được tài xế khả dụng tương ứng — kiểm tra lại danh sách tài xế đang rảnh (Active, không bận, đã xác nhận về kho).");
+            } else {
+                if (etaViolations > 0) {
+                    outReasons.add(etaViolations + " điểm dừng vi phạm khung giờ giao hàng của đơn hàng (TIME_WINDOW) — cần điều chỉnh giờ xuất phát hoặc thứ tự điểm dừng.");
+                } else {
+                    outReasons.add("Có " + validSplitPoints.size() + " cách chia hợp lệ nhưng không tổ hợp 2 xe nào đáp ứng đồng thời tất cả ràng buộc.");
                 }
             }
         }
@@ -325,22 +412,23 @@ public class RecommendationServiceImpl implements RecommendationService {
             return fails;
         }
 
-        if (!tripExecutionRepo.findUnreturnedByVehicleId(v.getId()).isEmpty()) {
+        if (hasUnreturnedVehicleConflict(v.getId(), deliveryDate)) {
             fails.add("Vehicle is IN_USE and has not confirmed return to warehouse yet");
             return fails;
         }
 
-        // HC-3: Dual capacity with safety buffer (90%)
-        BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(SAFETY_BUFFER);
-        BigDecimal effectiveWeight = v.getPayloadKg().multiply(SAFETY_BUFFER);
+        // HC-3: Dual capacity with safety buffer
+        BigDecimal safetyBuffer = getSafetyBufferRatio();
+        BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(safetyBuffer);
+        BigDecimal effectiveWeight = v.getPayloadKg().multiply(safetyBuffer);
 
         if (draft.getTotalVolumeM3().compareTo(effectiveVolume) > 0) {
             fails.add("Volume " + draft.getTotalVolumeM3() + " m³ > effective capacity "
-                    + effectiveVolume + " m³ (90% of " + v.getMaxVolumeM3() + ")");
+                    + effectiveVolume + " m³ (" + safetyBuffer.multiply(BigDecimal.valueOf(100)) + "% of " + v.getMaxVolumeM3() + ")");
         }
         if (draft.getTotalWeightKg().compareTo(effectiveWeight) > 0) {
             fails.add("Weight " + draft.getTotalWeightKg() + " kg > effective capacity "
-                    + effectiveWeight + " kg (90% of " + v.getPayloadKg() + ")");
+                    + effectiveWeight + " kg (" + safetyBuffer.multiply(BigDecimal.valueOf(100)) + "% of " + v.getPayloadKg() + ")");
         }
         if (!fails.isEmpty()) return fails;
 
@@ -351,15 +439,12 @@ public class RecommendationServiceImpl implements RecommendationService {
             return fails;
         }
 
-        // HC-5: Time window check (ETA_i <= store_i.closingTime)
+        // HC-5: Time window & order delivery time window check
+        List<Order> draftOrders = orderRepo.findByTripDraftId(draft.getId());
         for (TripDraftStop stop : stops) {
-            if (stop.getPlannedEta() != null && stop.getStore().getTimeWindowEnd() != null) {
-                LocalTime eta = stop.getPlannedEta().toLocalTime();
-                LocalTime closing = stop.getStore().getTimeWindowEnd();
-                if (eta.isAfter(closing)) {
-                    fails.add("ETA " + eta + " exceeds closing time " + closing
-                            + " at store " + stop.getStore().getCode());
-                }
+            String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+            if (violation != null) {
+                fails.add(violation);
             }
         }
 
@@ -371,25 +456,26 @@ public class RecommendationServiceImpl implements RecommendationService {
      */
     private boolean passesHardConstraintsForSub(Vehicle v, BigDecimal subVolume, BigDecimal subWeight,
                                                  List<TripDraftStop> subStops, List<Store> subStores,
+                                                 List<Order> draftOrders,
                                                  LocalDate deliveryDate, List<TripStatus> busyStatuses) {
         if (v.getStatus() != VehicleStatus.AVAILABLE) return false;
         if (tripRepo.existsByVehicleIdAndDeliveryDateAndStatusIn(v.getId(), deliveryDate, busyStatuses)) return false;
-        if (!tripExecutionRepo.findUnreturnedByVehicleId(v.getId()).isEmpty()) return false;
+        if (hasUnreturnedVehicleConflict(v.getId(), deliveryDate)) return false;
 
-        BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(SAFETY_BUFFER);
-        BigDecimal effectiveWeight = v.getPayloadKg().multiply(SAFETY_BUFFER);
+        BigDecimal safetyBuffer = getSafetyBufferRatio();
+        BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(safetyBuffer);
+        BigDecimal effectiveWeight = v.getPayloadKg().multiply(safetyBuffer);
         if (subVolume.compareTo(effectiveVolume) > 0) return false;
         if (subWeight.compareTo(effectiveWeight) > 0) return false;
 
         List<String> storeViolations = constraintValidationService.validateTripVehicleStops(subStores, v);
         if (!storeViolations.isEmpty()) return false;
 
-        // Time window check for sub-stops
+        // Time window check for sub-stops (store allowed hours, store closing time, and order delivery windows)
         for (TripDraftStop stop : subStops) {
-            if (stop.getPlannedEta() != null && stop.getStore().getTimeWindowEnd() != null) {
-                if (stop.getPlannedEta().toLocalTime().isAfter(stop.getStore().getTimeWindowEnd())) {
-                    return false;
-                }
+            String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+            if (violation != null) {
+                return false;
             }
         }
 
@@ -421,41 +507,9 @@ public class RecommendationServiceImpl implements RecommendationService {
         double costPerKm = v.getCostPerKm() != null ? v.getCostPerKm().doubleValue() : maxCostPerKm;
         double sCost = maxCostPerKm > 0 ? (1.0 - costPerKm / maxCostPerKm) * 100.0 : 50.0;
 
-        // S_speed: faster is better. Normalized.
-        double speedKmh = v.getAverageSpeedKmh() != null ? v.getAverageSpeedKmh().doubleValue() : 0;
-        double sSpeed = maxSpeedKmh > 0 ? (speedKmh / maxSpeedKmh) * 100.0 : 50.0;
-
-        // S_driver: has eligible driver = 100, else 0 (already filtered, so always 100 here)
-        double sDriver = eligibleDrivers.isEmpty() ? 0.0 : 100.0;
-
-        // S_time: slack time between last stop ETA and closing time (more slack = better)
-        double sTime = calculateSlackScore(stops);
-
         double totalScore = W_CAPACITY * sCapacity + W_COST * sCost;
 
         return BigDecimal.valueOf(totalScore).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private double calculateSlackScore(List<TripDraftStop> stops) {
-        if (stops.isEmpty()) return 50.0;
-
-        double totalSlackMinutes = 0;
-        int countWithWindow = 0;
-
-        for (TripDraftStop stop : stops) {
-            if (stop.getPlannedEta() != null && stop.getStore().getTimeWindowEnd() != null) {
-                LocalTime eta = stop.getPlannedEta().toLocalTime();
-                LocalTime closing = stop.getStore().getTimeWindowEnd();
-                long slackMin = java.time.Duration.between(eta, closing).toMinutes();
-                totalSlackMinutes += Math.max(0, slackMin);
-                countWithWindow++;
-            }
-        }
-
-        if (countWithWindow == 0) return 50.0; // neutral if no time windows
-        double avgSlack = totalSlackMinutes / countWithWindow;
-        // Normalize: 0 min slack → 0 score, 120+ min → 100
-        return Math.min(100.0, (avgSlack / 120.0) * 100.0);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -465,6 +519,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     private List<User> findActiveDrivers() {
         return userRepo.findAll().stream()
                 .filter(u -> Boolean.TRUE.equals(u.getIsActive())
+                        && u.getDriverStatus() == DriverStatus.ACTIVE
                         && u.getRoles().stream().anyMatch(r -> "DRIVER".equals(r.getName())))
                 .toList();
     }
@@ -480,8 +535,10 @@ public class RecommendationServiceImpl implements RecommendationService {
                             return false;
                         }
                     }
-                    // Schedule check
-                    return !tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(d.getId(), date, busyStatuses);
+                    // Schedule check: not busy on date AND has returned to warehouse from all past executions
+                    boolean busyOnDate = tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(d.getId(), date, busyStatuses);
+                    boolean unreturned = hasUnreturnedDriverConflict(d.getId(), date);
+                    return !busyOnDate && !unreturned;
                 })
                 .toList();
     }
@@ -585,12 +642,13 @@ public class RecommendationServiceImpl implements RecommendationService {
                     + maxFleetWeight + " kg @ 90% buffer).");
         }
 
-        // Check time window violations
-        long lateStops = stops.stream()
-                .filter(s -> "TIME_WINDOW_LATE".equals(s.getViolationCode()))
+        // Check time window violations (both store operating hours & order delivery time window)
+        List<Order> draftOrders = orderRepo.findByTripDraftId(draft.getId());
+        long etaViolations = stops.stream()
+                .filter(s -> constraintValidationService.validateStopEta(s, draftOrders) != null)
                 .count();
-        if (lateStops > 0) {
-            reasons.add(lateStops + " điểm dừng có ETA vượt quá giờ đóng cửa (TIME_WINDOW_LATE).");
+        if (etaViolations > 0) {
+            reasons.add(etaViolations + " điểm dừng vi phạm khung giờ giao hàng (TIME_WINDOW) — cần điều chỉnh giờ xuất phát hoặc thứ tự điểm dừng, không phải đổi/thêm xe.");
         }
 
         // Check driver availability
@@ -617,7 +675,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             boolean licenseOk = (v.getRequiredLicense() == null) ||
                     (assigned.getLicenseClass() != null && assigned.getLicenseClass().ordinal() >= v.getRequiredLicense().ordinal());
             boolean busy = tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(assigned.getId(), date, busyStatuses)
-                    || !tripExecutionRepo.findUnreturnedByDriverId(assigned.getId()).isEmpty();
+                    || hasUnreturnedDriverConflict(assigned.getId(), date);
 
             if (licenseOk && !busy) {
                 return new PairedDriverInfo(assigned, false);
@@ -633,29 +691,76 @@ public class RecommendationServiceImpl implements RecommendationService {
         return null;
     }
 
+    private boolean hasUnreturnedVehicleConflict(Long vehicleId, LocalDate targetDate) {
+        List<TripExecution> unreturned = tripExecutionRepo.findUnreturnedByVehicleId(vehicleId);
+        return unreturned.stream().anyMatch(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(targetDate));
+    }
+
+    private boolean hasUnreturnedDriverConflict(Long driverId, LocalDate targetDate) {
+        List<TripExecution> unreturned = tripExecutionRepo.findUnreturnedByDriverId(driverId);
+        return unreturned.stream().anyMatch(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(targetDate));
+    }
+
     // ══════════════════════════════════════════════════════════════════════════
     // RESPONSE BUILDERS
     // ══════════════════════════════════════════════════════════════════════════
 
-    private VehicleRecommendationResponse toSingleVehicleResponse(ScoredVehicle sv) {
+    private VehicleRecommendationResponse toSingleVehicleResponse(ScoredVehicle sv, TripDraft draft) {
+        BigDecimal volPct = BigDecimal.valueOf(safeDiv(draft.getTotalVolumeM3(), sv.vehicle().getMaxVolumeM3()) * 100).setScale(1, RoundingMode.HALF_UP);
+        BigDecimal wgtPct = BigDecimal.valueOf(safeDiv(draft.getTotalWeightKg(), sv.vehicle().getPayloadKg()) * 100).setScale(1, RoundingMode.HALF_UP);
+
+        List<String> warnings = new ArrayList<>();
+        if (Boolean.TRUE.equals(sv.driverInfo().isTemporary())) {
+            warnings.add("Tài xế " + sv.driverInfo().driver().getFullName() + " là tài xế thay thế tạm thời cho xe " + sv.vehicle().getPlateNumber() + ".");
+        }
+        if (volPct.doubleValue() < 30.0 || wgtPct.doubleValue() < 30.0) {
+            warnings.add("Tỷ lệ lấp đầy thấp (<30%).");
+        }
+
         return VehicleRecommendationResponse.builder()
                 .planType("SINGLE_VEHICLE")
                 .vehicles(List.of(toVehicleDto(sv.vehicle(), sv.driverInfo())))
                 .subTrips(null)
                 .totalScore(sv.score())
                 .explanation(sv.explanation())
+                .warnings(warnings.isEmpty() ? null : warnings)
                 .build();
     }
 
     private VehicleRecommendationResponse toTwoVehicleResponse(ScoredPair sp) {
+        BigDecimal volPctA = BigDecimal.valueOf(safeDiv(sumVolume(sp.subA()), sp.vehicleA().getMaxVolumeM3()) * 100).setScale(1, RoundingMode.HALF_UP);
+        BigDecimal wgtPctA = BigDecimal.valueOf(safeDiv(sumWeight(sp.subA()), sp.vehicleA().getPayloadKg()) * 100).setScale(1, RoundingMode.HALF_UP);
+
+        List<String> warningsA = new ArrayList<>();
+        if (Boolean.TRUE.equals(sp.driverInfoA().isTemporary())) {
+            warningsA.add("Tài xế " + sp.driverInfoA().driver().getFullName() + " là tài xế thay thế tạm thời cho xe " + sp.vehicleA().getPlateNumber() + ".");
+        }
+        if (volPctA.doubleValue() < 30.0 || wgtPctA.doubleValue() < 30.0) {
+            warningsA.add("Tỷ lệ lấp đầy thấp (<30%).");
+        }
+
         SubTripDto subTripA = SubTripDto.builder()
                 .label("Sub-trip A")
                 .vehicleId(sp.vehicleA().getId())
                 .stopSequenceNos(sp.subA().stream().map(sc -> sc.stop().getSequenceNo()).toList())
                 .subTotalVolumeM3(sumVolume(sp.subA()))
                 .subTotalWeightKg(sumWeight(sp.subA()))
+                .volumeUtilizationPct(volPctA)
+                .weightUtilizationPct(wgtPctA)
                 .subScore(sp.scoreA())
+                .warnings(warningsA.isEmpty() ? null : warningsA)
                 .build();
+
+        BigDecimal volPctB = BigDecimal.valueOf(safeDiv(sumVolume(sp.subB()), sp.vehicleB().getMaxVolumeM3()) * 100).setScale(1, RoundingMode.HALF_UP);
+        BigDecimal wgtPctB = BigDecimal.valueOf(safeDiv(sumWeight(sp.subB()), sp.vehicleB().getPayloadKg()) * 100).setScale(1, RoundingMode.HALF_UP);
+
+        List<String> warningsB = new ArrayList<>();
+        if (Boolean.TRUE.equals(sp.driverInfoB().isTemporary())) {
+            warningsB.add("Tài xế " + sp.driverInfoB().driver().getFullName() + " là tài xế thay thế tạm thời cho xe " + sp.vehicleB().getPlateNumber() + ".");
+        }
+        if (volPctB.doubleValue() < 30.0 || wgtPctB.doubleValue() < 30.0) {
+            warningsB.add("Tỷ lệ lấp đầy thấp (<30%).");
+        }
 
         SubTripDto subTripB = SubTripDto.builder()
                 .label("Sub-trip B")
@@ -663,8 +768,15 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .stopSequenceNos(sp.subB().stream().map(sc -> sc.stop().getSequenceNo()).toList())
                 .subTotalVolumeM3(sumVolume(sp.subB()))
                 .subTotalWeightKg(sumWeight(sp.subB()))
+                .volumeUtilizationPct(volPctB)
+                .weightUtilizationPct(wgtPctB)
                 .subScore(sp.scoreB())
+                .warnings(warningsB.isEmpty() ? null : warningsB)
                 .build();
+
+        List<String> planWarnings = new ArrayList<>();
+        if (!warningsA.isEmpty()) planWarnings.addAll(warningsA);
+        if (!warningsB.isEmpty()) planWarnings.addAll(warningsB);
 
         return VehicleRecommendationResponse.builder()
                 .planType("TWO_VEHICLE")
@@ -672,6 +784,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .subTrips(List.of(subTripA, subTripB))
                 .totalScore(sp.pairScore())
                 .explanation(sp.explanation())
+                .warnings(planWarnings.isEmpty() ? null : planWarnings)
                 .build();
     }
 
@@ -718,5 +831,17 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     private BigDecimal sumWeight(List<StopCargo> cargos) {
         return cargos.stream().map(StopCargo::weightKg).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal getSafetyBufferRatio() {
+        return configRepo.findByConfigKey("CAPACITY_SAFETY_BUFFER_RATIO")
+                .map(c -> {
+                    try {
+                        return new BigDecimal(c.getConfigValue());
+                    } catch (Exception e) {
+                        return new BigDecimal("0.90");
+                    }
+                })
+                .orElse(new BigDecimal("0.90"));
     }
 }

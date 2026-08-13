@@ -7,7 +7,6 @@ import com.elog.dto.response.ImportedOrderDetailResponse;
 import com.elog.entity.User;
 import com.elog.repository.UserRepository;
 import com.elog.service.ImportService;
-import com.elog.service.impl.ImportServiceImpl;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +24,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/imports")
+@RequestMapping("/api/v1/imports")
 @RequiredArgsConstructor
 @Tag(name = "Import", description = "Excel import APIs for order management")
 public class ImportController {

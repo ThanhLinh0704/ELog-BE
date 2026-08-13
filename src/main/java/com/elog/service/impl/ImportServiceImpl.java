@@ -13,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -42,9 +41,7 @@ public class ImportServiceImpl implements ImportService {
     private final TripDraftRepository tripDraftRepository;
 
     // Auto-pipeline dependencies
-    private final com.elog.service.TripDraftService tripDraftService;
-    private final com.elog.service.EtaCalculationService etaCalculationService;
-    private final com.elog.service.RecommendationService recommendationService;
+    private final AutoPipelineRunner autoPipelineRunner;
 
     // ── POST /api/imports ─────────────────────────────────────────────────────
 
@@ -58,38 +55,15 @@ public class ImportServiceImpl implements ImportService {
         // Step 2: Parse Excel rows (so size check throws BEFORE creating db batch)
         List<RowData> rows = parseExcelFile(file);
 
-        // Step 3: Handle existing active batches for this delivery date if replacing
-        List<ImportBatch> existingActiveBatches = batchRepository.findAllActiveByDate(deliveryDate);
-        if (!existingActiveBatches.isEmpty()) {
-            log.info("Found {} existing active batch(es) for date {}", existingActiveBatches.size(), deliveryDate);
-        }
-
-        if (confirmReplace) {
-            for (ImportBatch oldBatch : existingActiveBatches) {
-                oldBatch.setIsActive(false);
-                batchRepository.save(oldBatch);
-            }
-            batchRepository.flush(); // Force update to DB before inserting new active batch to prevent UNIQUE constraint violation
-        }
 
         // Step 4: Create new batch
-        ImportBatch batch;
-        try {
-            batch = ImportBatch.builder()
-                    .deliveryDate(deliveryDate)
-                    .fileName(file.getOriginalFilename())
-                    .uploadedBy(uploadedBy)
-                    .status("PROCESSING")
-                    .build();
-            batch = batchRepository.save(batch);
-            batchRepository.flush(); // force unique constraint check
-        } catch (DataIntegrityViolationException e) {
-            // Race condition: another request created a batch for this date concurrently
-            log.warn("Concurrent batch creation for date {}: {}", deliveryDate, e.getMessage());
-            throw new BusinessException(ErrorCode.EXCEL_PARSE_ERROR,
-                    "Đã có dữ liệu nhập cho ngày " + deliveryDate + ". Vui lòng thử lại.",
-                    HttpStatus.CONFLICT);
-        }
+        ImportBatch batch = ImportBatch.builder()
+                .deliveryDate(deliveryDate)
+                .fileName(file.getOriginalFilename())
+                .uploadedBy(uploadedBy)
+                .status("PROCESSING")
+                .build();
+        batch = batchRepository.save(batch);
 
         int totalRows = rows.size();
         int acceptedRows = 0;
@@ -109,6 +83,7 @@ public class ImportServiceImpl implements ImportService {
         // Cache for tracking locked trip draft per delivery date
         Map<LocalDate, Boolean> lockedDateCache = new HashMap<>();
 
+        List<ImportError> pendingErrors = new ArrayList<>();
         for (RowData row : rows) {
             try {
                 processRow(row, batch, deliveryDate, storeCache, productCache, orderCache, orderRefStoreCache, orderRefFirstRow, orderItemCache, lockedDateCache);
@@ -123,8 +98,13 @@ public class ImportServiceImpl implements ImportService {
                         .fieldName(ex.getFieldName())
                         .errorReason(ex.getMessage())
                         .build();
-                errorRepository.save(error);
+                pendingErrors.add(error);
             }
+        }
+        if (pendingErrors.size() == 1) {
+            errorRepository.save(pendingErrors.get(0));
+        } else if (pendingErrors.size() > 1) {
+            errorRepository.saveAll(pendingErrors);
         }
 
         // Step 5: Update batch summary
@@ -166,45 +146,9 @@ public class ImportServiceImpl implements ImportService {
 
     private void triggerAutoPipeline(LocalDate deliveryDate) {
         try {
-            log.info("Auto-Pipeline: starting for deliveryDate={}", deliveryDate);
-
-            // 6a. Consolidate orders into TripDrafts
-            var consolidateResult = tripDraftService.consolidate(deliveryDate);
-            log.info("Auto-Pipeline: consolidated {} trip drafts",
-                    consolidateResult.getTripDraftsCreatedOrUpdated());
-
-            if (consolidateResult.getTripDrafts() == null || consolidateResult.getTripDrafts().isEmpty()) {
-                log.info("Auto-Pipeline: no trip drafts created, skipping ETA and recommendation");
-                return;
-            }
-
-            // Default departure time from config, fallback 07:00
-            java.time.LocalTime defaultDeparture = java.time.LocalTime.of(7, 0);
-
-            // 6b + 6c. For each trip draft: calculate ETA → run recommendation
-            for (var draftResponse : consolidateResult.getTripDrafts()) {
-                try {
-                    if (draftResponse.getActiveStopCount() == null || draftResponse.getActiveStopCount() == 0) {
-                        continue;
-                    }
-                    // ETA calculation
-                    etaCalculationService.calculateAndPersist(draftResponse.getId(), defaultDeparture);
-                    log.info("Auto-Pipeline: ETA calculated for TripDraft id={}", draftResponse.getId());
-
-                    // Recommendation
-                    var recommendation = recommendationService.recommendTop3(draftResponse.getId());
-                    log.info("Auto-Pipeline: recommendation for TripDraft id={}: planType={}, count={}",
-                            draftResponse.getId(), recommendation.getPlanType(),
-                            recommendation.getRecommendations() != null ? recommendation.getRecommendations().size() : 0);
-                } catch (Exception ex) {
-                    log.warn("Auto-Pipeline: failed for TripDraft id={}: {}",
-                            draftResponse.getId(), ex.getMessage(), ex);
-                }
-            }
-
-            log.info("Auto-Pipeline: completed for deliveryDate={}", deliveryDate);
+            autoPipelineRunner.runForDate(deliveryDate);
         } catch (Exception ex) {
-            log.error("Auto-Pipeline: critical error for deliveryDate={}: {}",
+            log.error("Auto-Pipeline: isolated error for deliveryDate={}: {}",
                     deliveryDate, ex.getMessage(), ex);
         }
     }
@@ -438,8 +382,9 @@ public class ImportServiceImpl implements ImportService {
             if (deliveryDateRaw.isEmpty()) {
                 throw new RowRejectedException("Ngày giao hàng không được để trống", "MISSING_FIELD", "delivery_date");
             } else {
-                throw new RowRejectedException("Ngày giao hàng không đúng định dạng YYYY-MM-DD hoặc DD/MM/YYYY (giá trị: '" + row.deliveryDateRaw + "')", "INVALID_DATE_FORMAT", "delivery_date");
+                throw new RowRejectedException("Ngày giao hàng không đúng định dạng DD/MM/YYYY (ví dụ: 02/08/2026) (giá trị: '" + row.deliveryDateRaw + "')", "INVALID_DATE_FORMAT", "delivery_date");
             }
+
         }
 
         // Reject rows targeting a delivery date whose TripDraft is already locked (status != DRAFT)
@@ -517,8 +462,14 @@ public class ImportServiceImpl implements ImportService {
                 existingOrder.setRecipientPhone(row.recipientPhone);
                 existingOrder.setNotes(row.notes);
                 order = orderRepository.save(existingOrder);
-                
-                orderItemRepository.deleteByOrderId(order.getId());
+
+                // Populate existing order items into cache for cross-batch SKU accumulation
+                for (OrderItem existingItem : orderItemRepository.findByOrderId(order.getId())) {
+                    if (existingItem.getProduct() != null) {
+                        String key = order.getId() + "|" + existingItem.getProduct().getId();
+                        orderItemCache.put(key, existingItem);
+                    }
+                }
             } else {
                 Order newOrder = Order.builder()
                         .importBatch(batch)
@@ -588,6 +539,14 @@ public class ImportServiceImpl implements ImportService {
             case NUMERIC -> {
                 if (DateUtil.isCellDateFormatted(cell)) {
                     try {
+                        org.apache.poi.ss.usermodel.DataFormatter formatter = new org.apache.poi.ss.usermodel.DataFormatter();
+                        String formatted = formatter.formatCellValue(cell);
+                        if (formatted != null && !formatted.isBlank()) {
+                            yield formatted.trim();
+                        }
+                    } catch (Exception ignored) {}
+
+                    try {
                         java.time.LocalDateTime ldt = cell.getLocalDateTimeCellValue();
                         if (ldt != null) {
                             yield ldt.toLocalDate().toString();
@@ -600,6 +559,7 @@ public class ImportServiceImpl implements ImportService {
                 }
                 yield String.valueOf(d);
             }
+
             case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
             case FORMULA -> {
                 try {
@@ -707,25 +667,29 @@ public class ImportServiceImpl implements ImportService {
 
     // ── Inner class for parsed row data ───────────────────────────────────────
 
+    private static final java.time.format.DateTimeFormatter[] IMPORT_DATE_FORMATTERS = new java.time.format.DateTimeFormatter[]{
+            java.time.format.DateTimeFormatter.ofPattern("d/M/yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("d/M/yy"),
+            java.time.format.DateTimeFormatter.ofPattern("d-M-yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("d-M-yy"),
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+            java.time.format.DateTimeFormatter.ofPattern("yyyy/MM/dd")
+    };
+
     private LocalDate parseRowDate(String dateStr) {
         if (dateStr == null || dateStr.isBlank()) return null;
         dateStr = dateStr.trim();
-        try {
-            return LocalDate.parse(dateStr);
-        } catch (Exception ignored) {}
 
-        try {
-            java.time.format.DateTimeFormatter dmy = java.time.format.DateTimeFormatter.ofPattern("d/M/yyyy");
-            return LocalDate.parse(dateStr, dmy);
-        } catch (Exception ignored) {}
-
-        try {
-            java.time.format.DateTimeFormatter dmy2 = java.time.format.DateTimeFormatter.ofPattern("d-M-yyyy");
-            return LocalDate.parse(dateStr, dmy2);
-        } catch (Exception ignored) {}
+        for (java.time.format.DateTimeFormatter formatter : IMPORT_DATE_FORMATTERS) {
+            try {
+                return LocalDate.parse(dateStr, formatter);
+            } catch (Exception ignored) {}
+        }
 
         return null;
     }
+
+
 
     private static class RowData {
         int rowNumber;

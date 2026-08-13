@@ -13,20 +13,26 @@ import com.elog.service.TripStateMachine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class TripServiceImpl implements TripService {
+
+    private static final BigDecimal SAFETY_BUFFER = BigDecimal.valueOf(0.90);
 
     private final TripRepository tripRepository;
     private final TripStopRepository tripStopRepository;
@@ -39,56 +45,188 @@ public class TripServiceImpl implements TripService {
     private final OrderRepository orderRepository;
     private final TripStateMachine tripStateMachine;
     private final TripExecutionRepository tripExecutionRepository;
+    private final com.elog.service.PlanningHistoryService planningHistoryService;
+    private final com.elog.service.TripOutcomeHistoryService tripOutcomeHistoryService;
+    private final com.elog.service.ConstraintValidationService constraintValidationService;
+    private final SystemConfigRepository systemConfigRepository;
 
     // ── US-15 TASK-02 ──────────────────────────────────────────────
+
+    private void validateAssignmentEligibility(TripDraft td) {
+        boolean isValidated = "VALIDATED".equals(td.getStatus());
+        boolean isPlannedAndChecked = "PLANNED".equals(td.getStatus())
+                && td.getVolumeCheckResult() != ConstraintResult.NOT_CHECKED
+                && !tripRepository.existsByTripDraftId(td.getId());
+
+        if (!isValidated && !isPlannedAndChecked) {
+            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
+                    "Trip Draft must be VALIDATED or PLANNED (with volume check completed) before assignment.", HttpStatus.BAD_REQUEST);
+        }
+    }
 
     @Override
     @Transactional(readOnly = true)
     public EligibleVehiclesResponse getEligibleVehicles(Long tripDraftId) {
         TripDraft td = findTripDraftOrThrow(tripDraftId);
-        if (!"VALIDATED".equals(td.getStatus())) {
-            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
-                    "Trip Draft must be VALIDATED before assignment.", HttpStatus.BAD_REQUEST);
+        validateAssignmentEligibility(td);
+
+        return evaluateVehiclesForVolumeAndWeight(
+                td.getTotalVolumeM3(), td.getTotalWeightKg(), td.getStops(), td.getDeliveryDate());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EligibleVehiclesResponse getEligibleVehiclesForStops(Long tripDraftId, List<Long> stopIds) {
+        TripDraft td = findTripDraftOrThrow(tripDraftId);
+        validateAssignmentEligibility(td);
+
+        if (stopIds == null || stopIds.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,
+                    "stopIds không được để trống.", HttpStatus.BAD_REQUEST);
         }
 
+        List<TripDraftStop> selectedStops = td.getStops().stream()
+                .filter(s -> stopIds.contains(s.getId()))
+                .toList();
+
+        if (selectedStops.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED,
+                    "stopIds không hợp lệ hoặc không thuộc Trip Draft này.", HttpStatus.BAD_REQUEST);
+        }
+
+        BigDecimal groupVolume = BigDecimal.ZERO;
+        BigDecimal groupWeight = BigDecimal.ZERO;
+        for (TripDraftStop stop : selectedStops) {
+            List<OrderItem> items = orderItemRepository.findByStopForManifest(
+                    stop.getStore().getId(), tripDraftId);
+            BigDecimal stopVolume = items.stream()
+                    .map(OrderItem::getLineVolumeM3)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal stopWeight = items.stream()
+                    .map(OrderItem::getLineWeightKg)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            groupVolume = groupVolume.add(stopVolume);
+            groupWeight = groupWeight.add(stopWeight);
+        }
+
+        List<TripDraftStop> recalculatedStops = calculateGroupEtas(td, selectedStops, td.getPlannedDepartureTime());
+        return evaluateVehiclesForVolumeAndWeight(groupVolume, groupWeight, recalculatedStops, td.getDeliveryDate());
+    }
+
+    private EligibleVehiclesResponse evaluateVehiclesForVolumeAndWeight(
+            BigDecimal totalVolume, BigDecimal totalWeight, List<TripDraftStop> stops, LocalDate deliveryDate) {
         List<Vehicle> activeVehicles = vehicleRepository.findByIsActiveTrue();
         List<EligibleVehicleDto> eligibleVehicles = new ArrayList<>();
         List<IneligibleVehicleDto> ineligibleVehicles = new ArrayList<>();
+
+        List<Order> draftOrders = Collections.emptyList();
+        if (stops != null && !stops.isEmpty()) {
+            Long draftId = stops.get(0).getTripDraft() != null ? stops.get(0).getTripDraft().getId() : null;
+            if (draftId != null) {
+                draftOrders = orderRepository.findByTripDraftId(draftId);
+            }
+        }
+
+        List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+        java.util.Set<Long> busyDriverIdsOnDate = (deliveryDate != null)
+                ? new java.util.HashSet<>(tripRepository.findBusyDriverIdsOnDate(deliveryDate, busyStatuses))
+                : java.util.Collections.emptySet();
+
+        List<TripExecution> allUnreturned = tripExecutionRepository.findAllUnreturnedExecutions();
+        java.util.Map<Long, List<TripExecution>> unreturnedByDriverId = allUnreturned.stream()
+                .filter(te -> te.getDriver() != null && (te.getTrip() == null || te.getTrip().getDeliveryDate() == null || deliveryDate == null || !te.getTrip().getDeliveryDate().isAfter(deliveryDate)))
+                .collect(java.util.stream.Collectors.groupingBy(te -> te.getDriver().getId()));
 
         for (Vehicle v : activeVehicles) {
             if (v.getMaxVolumeM3() == null || v.getPayloadKg() == null) {
                 continue;
             }
 
-            boolean volumeOk = v.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) >= 0;
-            boolean weightOk = v.getPayloadKg().compareTo(td.getTotalWeightKg()) >= 0;
-            String storeWeightViolationReason = validateVehicleStoreWeight(v, td.getStops());
+            BigDecimal effectiveMaxVolume = v.getMaxVolumeM3().multiply(SAFETY_BUFFER);
+            BigDecimal effectiveMaxWeight = v.getPayloadKg().multiply(SAFETY_BUFFER);
+
+            boolean volumeOk = totalVolume.compareTo(effectiveMaxVolume) <= 0;
+            boolean weightOk = totalWeight.compareTo(effectiveMaxWeight) <= 0;
+            String storeWeightViolationReason = validateVehicleStoreWeight(v, stops);
             boolean routeWeightOk = (storeWeightViolationReason == null);
 
-            if (volumeOk && weightOk && routeWeightOk) {
+            boolean etaAllowed = true;
+            String etaViolationReason = null;
+            if (stops != null) {
+                for (TripDraftStop stop : stops) {
+                    String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+                    if (violation != null) {
+                        etaAllowed = false;
+                        etaViolationReason = violation;
+                        break;
+                    }
+                }
+            }
+
+            Long assignedDriverId = null;
+            String assignedDriverName = null;
+            Boolean assignedDriverAvailable = null;
+            String assignedDriverBusyReason = null;
+
+            if (v.getAssignedDriver() != null) {
+                User driver = v.getAssignedDriver();
+                assignedDriverId = driver.getId();
+                assignedDriverName = driver.getFullName() != null ? driver.getFullName() : driver.getUsername();
+
+                if (!Boolean.TRUE.equals(driver.getIsActive()) || driver.getDriverStatus() != DriverStatus.ACTIVE) {
+                    assignedDriverAvailable = false;
+                    assignedDriverBusyReason = "Tài xế cố định (" + assignedDriverName + ") hiện đang nghỉ/không hoạt động";
+                } else {
+                    boolean busyOnDate = busyDriverIdsOnDate.contains(driver.getId());
+                    List<TripExecution> unreturned = unreturnedByDriverId.getOrDefault(driver.getId(), Collections.emptyList());
+
+                    if (busyOnDate) {
+                        assignedDriverAvailable = false;
+                        assignedDriverBusyReason = "Tài xế cố định (" + assignedDriverName + ") đã được gán chuyến bận ngày " + deliveryDate;
+                    } else if (!unreturned.isEmpty()) {
+                        assignedDriverAvailable = false;
+                        assignedDriverBusyReason = "Tài xế cố định (" + assignedDriverName + ") chưa xác nhận về kho cho chuyến trước";
+                    } else {
+                        assignedDriverAvailable = true;
+                        assignedDriverBusyReason = null;
+                    }
+                }
+            }
+
+            if (volumeOk && weightOk && routeWeightOk && etaAllowed) {
                 eligibleVehicles.add(EligibleVehicleDto.builder()
                         .vehicleId(v.getId())
                         .plateNumber(v.getPlateNumber())
                         .vehicleType(v.getVehicleType())
                         .maxVolumeM3(v.getMaxVolumeM3())
                         .maxWeightKg(v.getPayloadKg())
-                        .remainingVolumeM3(v.getMaxVolumeM3().subtract(td.getTotalVolumeM3()))
-                        .remainingWeightKg(v.getPayloadKg().subtract(td.getTotalWeightKg()))
+                        .remainingVolumeM3(v.getMaxVolumeM3().subtract(totalVolume))
+                        .remainingWeightKg(v.getPayloadKg().subtract(totalWeight))
+                        .assignedDriverId(assignedDriverId)
+                        .assignedDriverName(assignedDriverName)
+                        .assignedDriverAvailable(assignedDriverAvailable)
+                        .assignedDriverBusyReason(assignedDriverBusyReason)
                         .build());
             } else {
                 StringBuilder reason = new StringBuilder();
                 if (!volumeOk) {
-                    reason.append("Volume exceeds capacity (")
-                          .append(td.getTotalVolumeM3()).append(" m³ > ").append(v.getMaxVolumeM3()).append(" m³)");
+                    reason.append("Volume exceeds safety limit (")
+                          .append(totalVolume).append(" m³ > ")
+                          .append(effectiveMaxVolume.setScale(3, RoundingMode.HALF_UP)).append(" m³)");
                 }
                 if (!weightOk) {
                     if (reason.length() > 0) reason.append(" and ");
-                    reason.append("Weight exceeds capacity (")
-                          .append(td.getTotalWeightKg()).append(" kg > ").append(v.getPayloadKg()).append(" kg)");
+                    reason.append("Weight exceeds safety limit (")
+                          .append(totalWeight).append(" kg > ")
+                          .append(effectiveMaxWeight.setScale(2, RoundingMode.HALF_UP)).append(" kg)");
                 }
                 if (!routeWeightOk) {
                     if (reason.length() > 0) reason.append(" and ");
                     reason.append(storeWeightViolationReason);
+                }
+                if (!etaAllowed) {
+                    if (reason.length() > 0) reason.append(" and ");
+                    reason.append(etaViolationReason);
                 }
 
                 ineligibleVehicles.add(IneligibleVehicleDto.builder()
@@ -98,7 +236,7 @@ public class TripServiceImpl implements TripService {
                         .maxVolumeM3(v.getMaxVolumeM3())
                         .maxWeightKg(v.getPayloadKg())
                         .volumeCheckResult(volumeOk ? ConstraintResult.PASS : ConstraintResult.FAIL)
-                        .weightCheckResult((weightOk && routeWeightOk) ? ConstraintResult.PASS : ConstraintResult.FAIL)
+                        .weightCheckResult((weightOk && routeWeightOk && etaAllowed) ? ConstraintResult.PASS : ConstraintResult.FAIL)
                         .failureReason(reason.toString())
                         .build());
             }
@@ -116,21 +254,46 @@ public class TripServiceImpl implements TripService {
     @Transactional(readOnly = true)
     public List<AvailableDriverResponse> getAvailableDrivers(LocalDate date) {
         List<User> drivers = userRepository.findAll().stream()
-                .filter(u -> u.getIsActive() && u.getRoles().stream()
+                .filter(u -> u.getIsActive() && u.getDriverStatus() == DriverStatus.ACTIVE && u.getRoles().stream()
                         .anyMatch(r -> "DRIVER".equals(r.getName())))
                 .toList();
 
         List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
 
+        // 1. Batch fetch busy driver IDs on target date
+        java.util.Set<Long> busyDriverIdsOnDate = new java.util.HashSet<>(
+                tripRepository.findBusyDriverIdsOnDate(date, busyStatuses)
+        );
+
+        // 2. Batch fetch unreturned executions and group by driverId
+        List<TripExecution> allUnreturned = tripExecutionRepository.findAllUnreturnedExecutions();
+        java.util.Map<Long, List<TripExecution>> unreturnedByDriverId = allUnreturned.stream()
+                .filter(te -> te.getDriver() != null && (te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(date)))
+                .collect(java.util.stream.Collectors.groupingBy(te -> te.getDriver().getId()));
+
         return drivers.stream().map(d -> {
-            boolean busy = tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(
-                    d.getId(), date, busyStatuses);
+            boolean busyOnDate = busyDriverIdsOnDate.contains(d.getId());
+            List<TripExecution> unreturned = unreturnedByDriverId.getOrDefault(d.getId(), java.util.Collections.emptyList());
+
+            boolean busy = busyOnDate || !unreturned.isEmpty();
+            String busyReason;
+            if (busyOnDate) {
+                busyReason = "Already assigned to an active trip on " + date;
+            } else if (!unreturned.isEmpty()) {
+                TripExecution te = unreturned.get(0);
+                Long conflictTripId = te.getTrip() != null ? te.getTrip().getTripId() : te.getId();
+                busyReason = "Currently active on trip #" + conflictTripId
+                        + " and has not confirmed return to warehouse yet.";
+            } else {
+                busyReason = null;
+            }
+
             return AvailableDriverResponse.builder()
                     .userId(d.getId())
                     .fullName(d.getFullName())
                     .email(d.getEmail())
                     .available(!busy)
-                    .busyReason(busy ? "Already assigned to an active trip on " + date : null)
+                    .busyReason(busyReason)
                     .build();
         }).toList();
     }
@@ -146,11 +309,8 @@ public class TripServiceImpl implements TripService {
                     "Trip Draft has already been assigned.", HttpStatus.CONFLICT);
         }
 
-        // Guard 1: TripDraft must be VALIDATED
-        if (!"VALIDATED".equals(td.getStatus())) {
-            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
-                    "Trip Draft must be VALIDATED before assignment.", HttpStatus.BAD_REQUEST);
-        }
+        // Guard 1: TripDraft must be VALIDATED or PLANNED (with volume check completed)
+        validateAssignmentEligibility(td);
 
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.VEHICLE_NOT_FOUND,
@@ -169,12 +329,28 @@ public class TripServiceImpl implements TripService {
         User driver = findDriverOrThrow(driverId);
         User dispatcher = findUserByUsernameOrThrow(currentUsername);
 
-        // Guard 2: Vehicle must be eligible (dual-constraint & route weight limit)
-        if (vehicle.getMaxVolumeM3().compareTo(td.getTotalVolumeM3()) < 0
-                || vehicle.getPayloadKg().compareTo(td.getTotalWeightKg()) < 0) {
+        if ("PLANNED".equals(td.getStatus())) {
+            td.setStatus("VALIDATED");
+            td.setValidatedAt(LocalDateTime.now());
+            td.setValidatedBy(dispatcher);
+            tripDraftRepository.save(td);
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, null, com.elog.entity.PlanningEventType.OPTION_SELECTED,
+                    com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                    "PLANNED", "VALIDATED", "Dispatcher xác nhận tải trọng thủ công (auto 1-xe/2-xe không khả thi) và phân xe cho tuyến",
+                    null, null, null, null,
+                    td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
+        }
+
+        // Guard 2: Vehicle must be eligible (dual-constraint with 90% safety buffer, route weight limit, & stop ETA)
+        BigDecimal effectiveMaxVolume = vehicle.getMaxVolumeM3().multiply(SAFETY_BUFFER);
+        BigDecimal effectiveMaxWeight = vehicle.getPayloadKg().multiply(SAFETY_BUFFER);
+        if (effectiveMaxVolume.compareTo(td.getTotalVolumeM3()) < 0
+                || effectiveMaxWeight.compareTo(td.getTotalWeightKg()) < 0) {
             throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
                     "Vehicle " + vehicle.getPlateNumber()
-                            + " does not meet dual-constraint requirements for this trip.",
+                            + " does not meet dual-constraint requirements (90% safety buffer) for this trip.",
                     HttpStatus.BAD_REQUEST);
         }
         String storeWeightViolation = validateVehicleStoreWeight(vehicle, td.getStops());
@@ -182,6 +358,17 @@ public class TripServiceImpl implements TripService {
             throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
                     "Vehicle " + vehicle.getPlateNumber() + " violates route constraints: " + storeWeightViolation,
                     HttpStatus.BAD_REQUEST);
+        }
+        List<Order> draftOrders = orderRepository.findByTripDraftId(tripDraftId);
+        if (td.getStops() != null) {
+            for (TripDraftStop stop : td.getStops()) {
+                String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+                if (violation != null) {
+                    throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
+                            "Vehicle " + vehicle.getPlateNumber() + " violates time window constraint: " + violation,
+                            HttpStatus.BAD_REQUEST);
+                }
+            }
         }
 
         // Guard 2.5: Driver license class must be compatible with vehicle's required license
@@ -201,6 +388,20 @@ public class TripServiceImpl implements TripService {
         Trip trip = buildTrip(td, vehicle, driver, dispatcher,
                 td.getTotalWeightKg(), td.getTotalVolumeM3());
         trip = tripRepository.save(trip);
+
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, trip.getTripId(), com.elog.entity.PlanningEventType.OPTION_SELECTED,
+                com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                td.getStatus(), td.getStatus(), "Phân công xe " + vehicle.getPlateNumber() + " cho Trip " + trip.getTripId(),
+                vehicle.getPlateNumber(), null, null, null,
+                td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
+
+        planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                tripDraftId, trip.getTripId(), com.elog.entity.PlanningEventType.DRIVER_ASSIGNED,
+                com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                td.getStatus(), td.getStatus(), "Phân công tài xế " + driver.getFullName() + " cho Trip " + trip.getTripId(),
+                null, null, null, null,
+                td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
 
         // Create TripStops from active TripDraftStops
         List<TripDraftStop> activeStops =
@@ -238,31 +439,94 @@ public class TripServiceImpl implements TripService {
                     "Trip Draft has already been assigned.", HttpStatus.CONFLICT);
         }
 
-        if (!"VALIDATED".equals(td.getStatus())) {
-            throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
-                    "Trip Draft must be VALIDATED before assignment.", HttpStatus.BAD_REQUEST);
-        }
+        validateAssignmentEligibility(td);
 
         User dispatcher = findUserByUsernameOrThrow(currentUsername);
+
+        if ("PLANNED".equals(td.getStatus())) {
+            td.setStatus("VALIDATED");
+            td.setValidatedAt(LocalDateTime.now());
+            td.setValidatedBy(dispatcher);
+            tripDraftRepository.save(td);
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, null, com.elog.entity.PlanningEventType.OPTION_SELECTED,
+                    com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                    "PLANNED", "VALIDATED", "Dispatcher xác nhận tải trọng thủ công (auto 1-xe/2-xe không khả thi) và phân N xe cho tuyến",
+                    null, null, null, null,
+                    td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
+        }
+
         List<TripSplitResponse.TripSummary> summaries = new ArrayList<>();
-        List<TripStatus> busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+
+        // BR-PLAN-03: Validate complete, non-duplicate, non-extraneous stop coverage for this trip draft
+        List<TripDraftStop> allActiveStops = tripDraftStopRepository.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(tripDraftId);
+        Set<Long> expectedStopIds = allActiveStops.stream().map(TripDraftStop::getId).collect(java.util.stream.Collectors.toSet());
+
+        List<Long> requestedStopIds = request.getAssignments().stream()
+                .flatMap(a -> a.getStopIds().stream())
+                .toList();
+        Set<Long> requestedStopIdSet = new HashSet<>(requestedStopIds);
+
+        if (requestedStopIds.size() != requestedStopIdSet.size()) {
+            throw new BusinessException(ErrorCode.SPLIT_PLAN_STOP_DUPLICATED,
+                    "One or more stops are assigned to more than one vehicle in this split plan.", HttpStatus.BAD_REQUEST);
+        }
+
+        if (!requestedStopIdSet.equals(expectedStopIds)) {
+            throw new BusinessException(ErrorCode.SPLIT_PLAN_STOP_INCOMPLETE,
+                    "Split plan must cover exactly all active stops of the Trip Draft — no stop may be missing or extraneous.", HttpStatus.BAD_REQUEST);
+        }
 
         for (TripSplitAssignRequest.SplitAssignment assignment : request.getAssignments()) {
             Vehicle vehicle = vehicleRepository.findById(assignment.getVehicleId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.VEHICLE_NOT_FOUND,
                             "Vehicle not found.", HttpStatus.NOT_FOUND));
-            User driver = findDriverOrThrow(assignment.getDriverId());
+
+            Long driverId = assignment.getDriverId();
+            User driver;
+            if (driverId != null) {
+                driver = findDriverOrThrow(driverId);
+            } else {
+                if (vehicle.getAssignedDriver() != null) {
+                    driver = vehicle.getAssignedDriver();
+                    if (!Boolean.TRUE.equals(driver.getIsActive()) || driver.getDriverStatus() != DriverStatus.ACTIVE) {
+                        throw new BusinessException(ErrorCode.FIELD_REQUIRED,
+                                "Tài xế cố định (" + (driver.getFullName() != null ? driver.getFullName() : driver.getUsername())
+                                        + ") của xe " + vehicle.getPlateNumber() + " hiện đang nghỉ/không hoạt động. Vui lòng chọn tài xế khác.",
+                                HttpStatus.BAD_REQUEST);
+                    }
+                    List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+                    boolean busyOnDate = tripRepository.existsByDriverIdAndDeliveryDateAndStatusIn(driver.getId(), td.getDeliveryDate(), busyStatuses);
+                    List<TripExecution> unreturned = tripExecutionRepository.findUnreturnedByDriverId(driver.getId()).stream()
+                            .filter(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(td.getDeliveryDate()))
+                            .toList();
+                    if (busyOnDate || !unreturned.isEmpty()) {
+                        String reason = busyOnDate ? "đã được gán chuyến bận ngày " + td.getDeliveryDate() : "chưa xác nhận về kho cho chuyến trước";
+                        throw new BusinessException(ErrorCode.FIELD_REQUIRED,
+                                "Tài xế cố định (" + (driver.getFullName() != null ? driver.getFullName() : driver.getUsername())
+                                        + ") của xe " + vehicle.getPlateNumber() + " " + reason + ". Vui lòng chọn tài xế khác.",
+                                HttpStatus.BAD_REQUEST);
+                    }
+                } else {
+                    throw new BusinessException(ErrorCode.FIELD_REQUIRED,
+                            "Xe " + vehicle.getPlateNumber() + " không có tài xế cố định. Vui lòng chọn tài xế cho chuyến.",
+                            HttpStatus.BAD_REQUEST);
+                }
+            }
 
             // Vehicle & driver availability check (unreturned, active trip, time overlap)
             validateVehicleAndDriverAvailability(vehicle, driver, td.getDeliveryDate(), td.getPlannedDepartureTime(), null);
 
-            // Get the specific stops for this split group
-            List<TripDraftStop> groupStops = assignment.getStopIds().stream()
+            // Get the specific stops for this split group and recalculate group ETAs from warehouse
+            List<TripDraftStop> rawGroupStops = assignment.getStopIds().stream()
                     .map(stopId -> tripDraftStopRepository.findById(stopId)
                             .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
                                     "TripDraftStop " + stopId + " not found.", HttpStatus.NOT_FOUND)))
                     .sorted(Comparator.comparing(TripDraftStop::getSequenceNo))
                     .toList();
+
+            List<TripDraftStop> groupStops = calculateGroupEtas(td, rawGroupStops, td.getPlannedDepartureTime());
 
             // Calculate group totals
             BigDecimal groupWeight = BigDecimal.ZERO;
@@ -276,14 +540,33 @@ public class TripServiceImpl implements TripService {
                 }
             }
 
-            // Validate vehicle capacity for this group
-            if (vehicle.getMaxVolumeM3().compareTo(groupVolume) < 0
-                    || vehicle.getPayloadKg().compareTo(groupWeight) < 0) {
+            // Validate vehicle capacity for this group (dual-constraint with 90% safety buffer, store weight limit & stop ETA)
+            BigDecimal effectiveMaxVolume = vehicle.getMaxVolumeM3().multiply(SAFETY_BUFFER);
+            BigDecimal effectiveMaxWeight = vehicle.getPayloadKg().multiply(SAFETY_BUFFER);
+            if (effectiveMaxVolume.compareTo(groupVolume) < 0
+                    || effectiveMaxWeight.compareTo(groupWeight) < 0) {
                 throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
                         "Vehicle " + vehicle.getPlateNumber()
-                                + " cannot carry the assigned stops (volume: " + groupVolume
+                                + " cannot carry the assigned stops under 90% safety buffer (volume: " + groupVolume
                                 + " m³, weight: " + groupWeight + " kg).",
                         HttpStatus.BAD_REQUEST);
+            }
+
+            String storeWeightViolation = validateVehicleStoreWeight(vehicle, groupStops);
+            if (storeWeightViolation != null) {
+                throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
+                        "Vehicle " + vehicle.getPlateNumber() + " violates route constraints for group stops: " + storeWeightViolation,
+                        HttpStatus.BAD_REQUEST);
+            }
+
+            List<Order> draftOrders = orderRepository.findByTripDraftId(tripDraftId);
+            for (TripDraftStop stop : groupStops) {
+                String violation = constraintValidationService.validateStopEta(stop, draftOrders);
+                if (violation != null) {
+                    throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
+                            "Vehicle " + vehicle.getPlateNumber() + " violates time window constraint: " + violation,
+                            HttpStatus.BAD_REQUEST);
+                }
             }
 
             // Driver license class compatibility check
@@ -299,6 +582,20 @@ public class TripServiceImpl implements TripService {
             Trip trip = buildTrip(td, vehicle, driver, dispatcher, groupWeight, groupVolume);
             trip = tripRepository.save(trip);
             createTripStops(trip, groupStops);
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, trip.getTripId(), com.elog.entity.PlanningEventType.OPTION_SELECTED,
+                    com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                    td.getStatus(), td.getStatus(), "Phân công " + request.getAssignments().size() + " xe: Xe " + vehicle.getPlateNumber() + " cho sub-trip " + trip.getTripId(),
+                    vehicle.getPlateNumber(), null, null, null,
+                    td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
+
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    tripDraftId, trip.getTripId(), com.elog.entity.PlanningEventType.DRIVER_ASSIGNED,
+                    com.elog.entity.PlanningActorType.USER, dispatcher.getUsername(),
+                    td.getStatus(), td.getStatus(), "Phân công tài xế " + driver.getFullName() + " cho sub-trip " + trip.getTripId(),
+                    null, null, null, null,
+                    td.getRoute() != null ? td.getRoute().getCode() : null, td.getDeliveryDate()));
 
             summaries.add(TripSplitResponse.TripSummary.builder()
                     .tripId(trip.getTripId())
@@ -398,39 +695,72 @@ public class TripServiceImpl implements TripService {
                     .build();
 
             if (trip.getTripDraft() != null) {
-                List<TripDraftStop> draftStops = tripDraftStopRepository.findByTripDraftIdOrderBySequenceNoAsc(trip.getTripDraft().getId());
-                Map<Long, TripDraftStop> storeToStopMap = new HashMap<>();
-                for (TripDraftStop s : draftStops) {
-                    if (s.getStore() != null) {
-                        storeToStopMap.putIfAbsent(s.getStore().getId(), s);
-                    }
-                }
+                List<TripStop> myTripStops = tripStopRepository.findByTripTripIdOrderBySequenceOrderAsc(trip.getTripId());
+                List<Order> draftOrders = orderRepository.findByTripDraftId(trip.getTripDraft().getId());
 
-                List<Order> orders = orderRepository.findByTripDraftId(trip.getTripDraft().getId());
-                for (Order order : orders) {
-                    TripDraftStop stop = (order.getStore() != null) ? storeToStopMap.get(order.getStore().getId()) : null;
-                    if (stop == null && !draftStops.isEmpty()) {
-                        stop = draftStops.get(0);
+                if (!myTripStops.isEmpty()) {
+                    Map<Long, TripDraftStop> storeToStopMap = new HashMap<>();
+                    for (TripStop ts : myTripStops) {
+                        TripDraftStop ds = ts.getTripDraftStop();
+                        if (ds != null && ds.getStore() != null) {
+                            storeToStopMap.putIfAbsent(ds.getStore().getId(), ds);
+                        }
                     }
-                    if (stop != null) {
-                        execution.getOrderResults().add(DeliveryOrderResult.builder()
-                                .tripExecution(execution)
-                                .order(order)
-                                .stop(stop)
-                                .status("PENDING")
-                                .build());
+                    for (Order order : draftOrders) {
+                        TripDraftStop stop = (order.getStore() != null) ? storeToStopMap.get(order.getStore().getId()) : null;
+                        if (stop != null) {
+                            execution.getOrderResults().add(DeliveryOrderResult.builder()
+                                    .tripExecution(execution)
+                                    .order(order)
+                                    .stop(stop)
+                                    .status("PENDING")
+                                    .build());
+                        }
+                    }
+                } else {
+                    List<TripDraftStop> draftStops = tripDraftStopRepository.findByTripDraftIdOrderBySequenceNoAsc(trip.getTripDraft().getId());
+                    Map<Long, TripDraftStop> storeToStopMap = new HashMap<>();
+                    for (TripDraftStop s : draftStops) {
+                        if (s.getStore() != null) {
+                            storeToStopMap.putIfAbsent(s.getStore().getId(), s);
+                        }
+                    }
+                    for (Order order : draftOrders) {
+                        TripDraftStop stop = (order.getStore() != null) ? storeToStopMap.get(order.getStore().getId()) : null;
+                        if (stop == null && !draftStops.isEmpty()) {
+                            stop = draftStops.get(0);
+                        }
+                        if (stop != null) {
+                            execution.getOrderResults().add(DeliveryOrderResult.builder()
+                                    .tripExecution(execution)
+                                    .order(order)
+                                    .stop(stop)
+                                    .status("PENDING")
+                                    .build());
+                        }
                     }
                 }
             }
 
             tripExecutionRepository.save(execution);
+
+            tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                    execution.getId(), trip.getTripId(),
+                    com.elog.entity.TripOutcomeEventType.TRIP_EXECUTION_CREATED,
+                    com.elog.entity.PlanningActorType.SYSTEM, currentUsername,
+                    null, "ASSIGNED",
+                    null, null, null, null, null, null, null, null,
+                    trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                    trip.getDeliveryDate(),
+                    trip.getDriver() != null ? trip.getDriver().getUsername() : null
+            ));
         }
 
         log.info("Trip {} dispatched by {}", tripId, currentUsername);
 
         TripResponse response = buildTripResponse(trip,
                 "Trip dispatched and locked. Handover slip ready.");
-        response.setHandoverSlipUrl("/api/trips/" + tripId + "/handover-slip");
+        response.setHandoverSlipUrl("/api/v1/trips/" + tripId + "/handover-slip");
         return response;
     }
 
@@ -477,18 +807,15 @@ public class TripServiceImpl implements TripService {
                 .append(trip.getPlannedDepartureTime() != null
                         ? trip.getPlannedDepartureTime().format(timeFmt) : "N/A")
                 .append("</td>");
-        html.append("<td><b>Dispatch lúc:</b> ")
+        html.append("<td><b>Điều phối lúc:</b> ")
                 .append(trip.getLockedAt() != null ? trip.getLockedAt().format(dtTimeFmt) : "N/A")
                 .append("</td></tr></table>");
 
         html.append("<h3>DANH SÁCH ĐIỂM GIAO (theo thứ tự tuyến)</h3>");
-        html.append("<table><tr><th>#</th><th>Điểm giao</th><th>ETA</th><th>Trạng thái</th></tr>");
+        html.append("<table><tr><th>#</th><th>Điểm giao</th></tr>");
         for (TripStop stop : stops) {
             html.append("<tr><td>").append(stop.getSequenceOrder()).append("</td>");
-            html.append("<td>").append(stop.getRouteStop().getStore().getName()).append("</td>");
-            html.append("<td>").append(stop.getPlannedEta() != null
-                    ? stop.getPlannedEta().format(timeFmt) : "N/A").append("</td>");
-            html.append("<td>").append(stop.getStatus()).append("</td></tr>");
+            html.append("<td>").append(stop.getRouteStop().getStore().getName()).append("</td></tr>");
         }
         html.append("</table>");
 
@@ -525,6 +852,25 @@ public class TripServiceImpl implements TripService {
         return trips.stream().map(t -> buildTripResponse(t, null)).toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<DriverTripCalendarDayResponse> getDriverTripCalendar(String username, YearMonth month) {
+        User driver = findUserByUsernameOrThrow(username);
+        LocalDate start = month.atDay(1);
+        LocalDate end = month.atEndOfMonth();
+
+        List<Trip> trips = tripRepository.findByDriverIdAndDeliveryDateBetween(driver.getId(), start, end);
+
+        return trips.stream()
+                .collect(Collectors.groupingBy(Trip::getDeliveryDate))
+                .entrySet().stream()
+                .map(e -> new DriverTripCalendarDayResponse(
+                        e.getKey(),
+                        e.getValue().stream().allMatch(t -> t.getStatus() == TripStatus.COMPLETED)))
+                .sorted(Comparator.comparing(DriverTripCalendarDayResponse::getDate))
+                .toList();
+    }
+
 
     // ── Private helpers ────────────────────────────────────────────
 
@@ -543,6 +889,10 @@ public class TripServiceImpl implements TripService {
         if (!isDriver) {
             throw new BusinessException(ErrorCode.DRIVER_NOT_FOUND,
                     "User " + driverId + " is not a driver.", HttpStatus.BAD_REQUEST);
+        }
+        if (driver.getDriverStatus() == DriverStatus.INACTIVE) {
+            throw new BusinessException(ErrorCode.DRIVER_INACTIVE,
+                    "Driver " + driver.getFullName() + " is currently INACTIVE and cannot be assigned to trips.", HttpStatus.BAD_REQUEST);
         }
         return driver;
     }
@@ -564,6 +914,8 @@ public class TripServiceImpl implements TripService {
                 .status(TripStatus.VALIDATED)
                 .totalWeightKg(totalWeight)
                 .totalVolumeM3(totalVolume)
+                .totalDistanceKm(td.getTotalDistanceKm())
+                .routePolyline(td.getRoutePolyline())
                 .plannedDepartureTime(td.getPlannedDepartureTime())
                 .createdBy(dispatcher)
                 .createdAt(LocalDateTime.now())
@@ -589,6 +941,8 @@ public class TripServiceImpl implements TripService {
                     .tripDraftStop(ds)
                     .sequenceOrder(ds.getSequenceNo())
                     .plannedEta(ds.getPlannedEta())
+                    .distanceFromPrevKm(ds.getDistanceFromPrevKm())
+                    .travelTimeFromPrevMin(ds.getTravelTimeFromPrevMin())
                     .stopWeightKg(stopWeight)
                     .stopVolumeM3(stopVolume)
                     .status(TripStopStatus.PENDING)
@@ -635,6 +989,8 @@ public class TripServiceImpl implements TripService {
                         .build())
                 .totalWeightKg(trip.getTotalWeightKg())
                 .totalVolumeM3(trip.getTotalVolumeM3())
+                .totalDistanceKm(trip.getTotalDistanceKm())
+                .routePolyline(trip.getRoutePolyline())
                 .plannedDepartureTime(trip.getPlannedDepartureTime())
                 .lockedAt(trip.getLockedAt())
                 .lockedBy(trip.getLockedBy() != null
@@ -664,9 +1020,12 @@ public class TripServiceImpl implements TripService {
                 .status(ts.getStatus().name())
                 .stopWeightKg(ts.getStopWeightKg())
                 .stopVolumeM3(ts.getStopVolumeM3())
+                .distanceFromPrevKm(ts.getDistanceFromPrevKm())
+                .travelTimeFromPrevMin(ts.getTravelTimeFromPrevMin())
                 .notes(ts.getNotes())
                 .build();
     }
+
 
     @Override
     @Transactional(readOnly = true)
@@ -674,6 +1033,20 @@ public class TripServiceImpl implements TripService {
         Trip trip = tripRepository.findById(tripId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_NOT_FOUND,
                         "Trip not found with id: " + tripId, HttpStatus.NOT_FOUND));
+
+        if (SecurityContextHolder.getContext().getAuthentication() != null) {
+            String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+            boolean isDriver = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                    .anyMatch(a -> "ROLE_DRIVER".equals(a.getAuthority()) || "trip:execute".equals(a.getAuthority()));
+
+            if (isDriver && currentUsername != null && !"anonymousUser".equals(currentUsername)) {
+                if (trip.getDriver() == null || !currentUsername.equals(trip.getDriver().getUsername())) {
+                    throw new BusinessException(ErrorCode.NOT_YOUR_TRIP,
+                            "Bạn không có quyền xem thông tin chuyến xe của tài xế khác", HttpStatus.FORBIDDEN);
+                }
+            }
+        }
+
         return buildTripResponse(trip, null);
     }
 
@@ -705,7 +1078,11 @@ public class TripServiceImpl implements TripService {
                 .anyMatch(r -> "ROLE_DRIVER".equals(r.getName()) || "DRIVER".equals(r.getName()));
         if (!isDriver) {
             throw new BusinessException(ErrorCode.DRIVER_NOT_FOUND,
-                    "User " + driver.getFullName() + " is not a driver.", HttpStatus.BAD_REQUEST);
+                    "User " + request.getDriverId() + " is not a driver.", HttpStatus.BAD_REQUEST);
+        }
+        if (driver.getDriverStatus() == DriverStatus.INACTIVE) {
+            throw new BusinessException(ErrorCode.DRIVER_INACTIVE,
+                    "Driver " + driver.getFullName() + " is currently INACTIVE and cannot be assigned to trips.", HttpStatus.BAD_REQUEST);
         }
 
         // Guard 2: Capacity check & store weight limit
@@ -737,10 +1114,35 @@ public class TripServiceImpl implements TripService {
         // Guard 3 & 4: Comprehensive vehicle & driver availability check (excluding current trip)
         validateVehicleAndDriverAvailability(vehicle, driver, trip.getDeliveryDate(), trip.getPlannedDepartureTime(), tripId);
 
+        String oldPlate = trip.getVehicle() != null ? trip.getVehicle().getPlateNumber() : null;
+        String oldDriverName = trip.getDriver() != null ? trip.getDriver().getFullName() : null;
+
         // Update and save
         trip.setVehicle(vehicle);
         trip.setDriver(driver);
         tripRepository.save(trip);
+
+        if (oldPlate != null && !oldPlate.equals(vehicle.getPlateNumber())) {
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    trip.getTripDraft() != null ? trip.getTripDraft().getId() : null, trip.getTripId(),
+                    com.elog.entity.PlanningEventType.OPTION_CHANGED,
+                    com.elog.entity.PlanningActorType.USER, currentUsername,
+                    trip.getStatus().name(), trip.getStatus().name(),
+                    "Đổi xe từ " + oldPlate + " sang " + vehicle.getPlateNumber() + " cho Trip " + tripId,
+                    vehicle.getPlateNumber(), null, null, null,
+                    trip.getRoute() != null ? trip.getRoute().getCode() : null, trip.getDeliveryDate()));
+        }
+
+        if (oldDriverName != null && !oldDriverName.equals(driver.getFullName())) {
+            planningHistoryService.record(new com.elog.service.PlanningHistoryService.PlanningEventInput(
+                    trip.getTripDraft() != null ? trip.getTripDraft().getId() : null, trip.getTripId(),
+                    com.elog.entity.PlanningEventType.DRIVER_CHANGED,
+                    com.elog.entity.PlanningActorType.USER, currentUsername,
+                    trip.getStatus().name(), trip.getStatus().name(),
+                    "Đổi tài xế từ " + oldDriverName + " sang " + driver.getFullName() + " cho Trip " + tripId,
+                    null, null, null, null,
+                    trip.getRoute() != null ? trip.getRoute().getCode() : null, trip.getDeliveryDate()));
+        }
 
         log.info("Trip {} assignment updated by {}: Vehicle={}, Driver={}",
                 tripId, currentUsername, vehicle.getPlateNumber(), driver.getFullName());
@@ -787,6 +1189,9 @@ public class TripServiceImpl implements TripService {
             if (excludeTripId != null && te.getTrip() != null && te.getTrip().getTripId().equals(excludeTripId)) {
                 continue;
             }
+            if (te.getTrip() != null && te.getTrip().getDeliveryDate() != null && te.getTrip().getDeliveryDate().isAfter(deliveryDate)) {
+                continue;
+            }
             throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,
                     "Vehicle " + vehicle.getPlateNumber() + " is currently IN_USE on trip #" 
                             + (te.getTrip() != null ? te.getTrip().getTripId() : te.getId()) 
@@ -798,6 +1203,9 @@ public class TripServiceImpl implements TripService {
         List<TripExecution> unreturnedDrivers = tripExecutionRepository.findUnreturnedByDriverId(driver.getId());
         for (TripExecution te : unreturnedDrivers) {
             if (excludeTripId != null && te.getTrip() != null && te.getTrip().getTripId().equals(excludeTripId)) {
+                continue;
+            }
+            if (te.getTrip() != null && te.getTrip().getDeliveryDate() != null && te.getTrip().getDeliveryDate().isAfter(deliveryDate)) {
                 continue;
             }
             throw new BusinessException(ErrorCode.DRIVER_CONFLICT,
@@ -858,6 +1266,118 @@ public class TripServiceImpl implements TripService {
             }
         }
         return null;
+    }
+
+    private List<TripDraftStop> calculateGroupEtas(TripDraft draft, List<TripDraftStop> groupStops, LocalTime departureTime) {
+        if (groupStops == null || groupStops.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<TripDraftStop> sortedGroup = new ArrayList<>(groupStops);
+        sortedGroup.sort(Comparator.comparingInt(TripDraftStop::getSequenceNo));
+
+        LocalDate deliveryDate = draft.getDeliveryDate() != null ? draft.getDeliveryDate() : LocalDate.now();
+        LocalTime depTime = departureTime != null ? departureTime : (draft.getPlannedDepartureTime() != null ? draft.getPlannedDepartureTime() : LocalTime.of(7, 0));
+        LocalDateTime currentEta = LocalDateTime.of(deliveryDate, depTime);
+
+        double warehouseLat = getSystemConfigDouble("WAREHOUSE_LAT", 21.028511);
+        double warehouseLng = getSystemConfigDouble("WAREHOUSE_LNG", 105.804817);
+        double avgSpeedKmh = getSystemConfigDouble("AVERAGE_SPEED_KMH", 30.0);
+
+        double prevLat = warehouseLat;
+        double prevLng = warehouseLng;
+
+        List<TripDraftStop> recalculatedStops = new ArrayList<>();
+        List<Order> groupDraftOrders = orderRepository.findByTripDraftId(draft.getId());
+
+        for (int i = 0; i < sortedGroup.size(); i++) {
+            TripDraftStop original = sortedGroup.get(i);
+            Store store = original.getStore();
+
+            double stopLat = (store != null && store.getLatitude() != null) ? store.getLatitude() : prevLat;
+            double stopLng = (store != null && store.getLongitude() != null) ? store.getLongitude() : prevLng;
+
+            if (i > 0) {
+                TripDraftStop prev = sortedGroup.get(i - 1);
+                int prevServiceMin = (prev.getRouteStop() != null && prev.getRouteStop().getAvgServiceTimeMin() != null)
+                        ? prev.getRouteStop().getAvgServiceTimeMin() : 15;
+                currentEta = currentEta.plusMinutes(prevServiceMin);
+            }
+
+            double distanceKm = haversineDistance(prevLat, prevLng, stopLat, stopLng);
+            long travelMinutes = Math.round((distanceKm / avgSpeedKmh) * 60);
+            currentEta = currentEta.plusMinutes(travelMinutes);
+
+            BigDecimal distKmBd = BigDecimal.valueOf(distanceKm).setScale(2, RoundingMode.HALF_UP);
+            int travelMinInt = (int) travelMinutes;
+
+            LocalTime twStart = store != null ? store.getTimeWindowStart() : null;
+            int waitingTimeMin = 0;
+            LocalTime arrivalTime = currentEta.toLocalTime();
+            if (twStart != null && arrivalTime.isBefore(twStart)) {
+                long waitMin = java.time.temporal.ChronoUnit.MINUTES.between(arrivalTime, twStart);
+                waitingTimeMin = (int) waitMin;
+                if (waitMin <= 30) {
+                    currentEta = LocalDateTime.of(currentEta.toLocalDate(), twStart);
+                }
+            }
+
+            String violationCode = constraintValidationService.validateStopEta(
+                    TripDraftStop.builder()
+                            .id(original.getId())
+                            .store(store)
+                            .routeStop(original.getRouteStop())
+                            .sequenceNo(original.getSequenceNo())
+                            .plannedEta(currentEta)
+                            .plannedWaitingTimeMin(waitingTimeMin)
+                            .build(),
+                    groupDraftOrders
+            );
+
+            TripDraftStop recalculated = TripDraftStop.builder()
+                    .id(original.getId())
+                    .tripDraft(original.getTripDraft())
+                    .store(original.getStore())
+                    .routeStop(original.getRouteStop())
+                    .sequenceNo(original.getSequenceNo())
+                    .orderCount(original.getOrderCount())
+                    .isActive(original.getIsActive())
+                    .overrideNote(original.getOverrideNote())
+                    .plannedEta(currentEta)
+                    .distanceFromPrevKm(distKmBd)
+                    .travelTimeFromPrevMin(travelMinInt)
+                    .plannedWaitingTimeMin(waitingTimeMin)
+                    .violationCode(violationCode)
+                    .build();
+
+            recalculatedStops.add(recalculated);
+
+            prevLat = stopLat;
+            prevLng = stopLng;
+        }
+
+        return recalculatedStops;
+    }
+
+    private double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371;
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    private double getSystemConfigDouble(String key, double defaultValue) {
+        try {
+            return systemConfigRepository.findByConfigKey(key)
+                    .map(sc -> Double.parseDouble(sc.getConfigValue()))
+                    .orElse(defaultValue);
+        } catch (Exception e) {
+            return defaultValue;
+        }
     }
 }
 

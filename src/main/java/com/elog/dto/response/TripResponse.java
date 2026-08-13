@@ -3,7 +3,6 @@ package com.elog.dto.response;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -25,7 +24,10 @@ public class TripResponse {
     private DriverInfo driver;
     private BigDecimal totalWeightKg;
     private BigDecimal totalVolumeM3;
+    private BigDecimal totalDistanceKm;
+    private String routePolyline;
     private LocalTime plannedDepartureTime;
+
     private LocalDateTime lockedAt;
     private DriverInfo lockedBy;
     private LocalDateTime completedAt;

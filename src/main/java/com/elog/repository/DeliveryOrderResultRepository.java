@@ -15,4 +15,8 @@ public interface DeliveryOrderResultRepository extends JpaRepository<DeliveryOrd
     long countByTripExecutionIdAndStatus(Long tripExecutionId, String status);
 
     long countByTripExecutionId(Long tripExecutionId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM DeliveryOrderResult dor WHERE dor.stop.id IN (SELECT tds.id FROM TripDraftStop tds WHERE tds.routeStop.id = :routeStopId)")
+    void deleteByRouteStopId(@org.springframework.data.repository.query.Param("routeStopId") Long routeStopId);
 }

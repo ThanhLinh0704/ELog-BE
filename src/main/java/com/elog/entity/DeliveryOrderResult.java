@@ -38,6 +38,12 @@ public class DeliveryOrderResult {
     @Builder.Default
     private String status = "PENDING";
 
+    @Column(name = "reason_code", length = 50)
+    private String reasonCode;
+
+    @Column(name = "exception_text", length = 1000)
+    private String exceptionText;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }

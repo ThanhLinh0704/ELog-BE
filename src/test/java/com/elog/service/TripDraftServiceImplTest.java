@@ -36,6 +36,8 @@ class TripDraftServiceImplTest {
     private RouteRepository routeRepository;
     @Mock
     private OrderItemRepository orderItemRepository;
+    @Mock
+    private PlanningHistoryService planningHistoryService;
 
     @InjectMocks
     private TripDraftServiceImpl tripDraftService;
@@ -175,11 +177,12 @@ class TripDraftServiceImplTest {
         when(tripDraftRepository.findByRouteIdAndDeliveryDate(10L, deliveryDate))
                 .thenReturn(Optional.empty());
 
-        when(tripDraftRepository.save(any(TripDraft.class))).thenAnswer(invocation -> {
+        when(tripDraftRepository.saveAndFlush(any(TripDraft.class))).thenAnswer(invocation -> {
             TripDraft td = invocation.getArgument(0);
             td.setId(50L);
             return td;
         });
+        when(tripDraftRepository.save(any(TripDraft.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ConsolidateResponse response = tripDraftService.consolidate(deliveryDate);
 
@@ -195,9 +198,8 @@ class TripDraftServiceImplTest {
         assertThat(draftResponse.getActiveStopCount()).isEqualTo(1);
         assertThat(draftResponse.getSkippedStopCount()).isEqualTo(1);
 
+        verify(tripDraftRepository).saveAndFlush(any(TripDraft.class));
         verify(tripDraftRepository).save(any(TripDraft.class));
-        verify(tripDraftStopRepository).deleteByTripDraftId(50L);
-        verify(tripDraftStopRepository, times(2)).save(any(TripDraftStop.class));
         verify(orderRepository).updateTripDraftId(List.of(100L), 50L);
     }
 
@@ -260,6 +262,7 @@ class TripDraftServiceImplTest {
         when(tripDraftRepository.findByRouteIdAndDeliveryDate(10L, deliveryDate))
                 .thenReturn(Optional.of(existingDraft));
 
+        when(tripDraftRepository.saveAndFlush(any(TripDraft.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(tripDraftRepository.save(any(TripDraft.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ConsolidateResponse response = tripDraftService.consolidate(deliveryDate);

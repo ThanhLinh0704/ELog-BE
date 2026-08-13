@@ -22,5 +22,11 @@ public interface RouteStopRepository extends JpaRepository<RouteStop, Long> {
     @Query("SELECT COUNT(rs) FROM RouteStop rs WHERE rs.route.id = :routeId " +
            "AND (rs.store.latitude IS NULL OR rs.store.longitude IS NULL)")
     int countStopsWithoutCoordinatesByRouteId(Long routeId);
+
+    @Query("SELECT rs FROM RouteStop rs JOIN FETCH rs.route WHERE rs.store.id IN :storeIds")
+    List<RouteStop> findByStoreIdIn(@org.springframework.data.repository.query.Param("storeIds") List<Long> storeIds);
+
+    @Query("SELECT rs.route.id, COUNT(rs) FROM RouteStop rs WHERE rs.route.id IN :routeIds GROUP BY rs.route.id")
+    List<Object[]> countStopsByRouteIdIn(@org.springframework.data.repository.query.Param("routeIds") List<Long> routeIds);
 }
 

@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/routes")
+@RequestMapping("/api/v1/routes")
 @RequiredArgsConstructor
 @Tag(name = "Routes", description = "Route management APIs")
 public class RouteController {
@@ -107,5 +107,14 @@ public class RouteController {
             @PathVariable Long stopId) {
         routeService.removeStop(id, stopId);
         return ResponseEntity.ok(ApiResponse.success(null, "Stop removed successfully"));
+    }
+
+    @GetMapping("/{id}/directions")
+    @Operation(summary = "Get route road directions polyline and warehouse location")
+    @PreAuthorize("hasAuthority('route:read')")
+    public ResponseEntity<ApiResponse<RouteDirectionsResponse>> getRouteDirections(
+            @PathVariable Long id) {
+        RouteDirectionsResponse response = routeService.getRouteDirections(id);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

@@ -13,6 +13,8 @@ public interface TripService {
     // US-15 TASK-02 — Vehicle Assignment
     EligibleVehiclesResponse getEligibleVehicles(Long tripDraftId);
 
+    EligibleVehiclesResponse getEligibleVehiclesForStops(Long tripDraftId, List<Long> stopIds);
+
     List<AvailableDriverResponse> getAvailableDrivers(LocalDate date);
 
     TripResponse assignVehicleAndDriver(Long tripDraftId, TripAssignRequest request, String currentUsername);
@@ -36,5 +38,7 @@ public interface TripService {
     TripResponse getTripById(Long tripId);
 
     TripResponse updateAssignment(Long tripId, TripAssignmentPatchRequest request, String currentUsername);
+
+    List<DriverTripCalendarDayResponse> getDriverTripCalendar(String username, java.time.YearMonth month);
 }
 

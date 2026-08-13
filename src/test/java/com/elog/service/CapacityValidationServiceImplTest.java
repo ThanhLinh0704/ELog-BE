@@ -39,6 +39,12 @@ class CapacityValidationServiceImplTest {
     @Mock
     private OrderRepository orderRepository;
 
+    @Mock
+    private RecommendationService recommendationService;
+
+    @org.mockito.Spy
+    private ConstraintValidationService constraintValidationService = new com.elog.service.impl.ConstraintValidationServiceImpl();
+
     @InjectMocks
     private CapacityValidationServiceImpl capacityValidationService;
 
@@ -188,5 +194,55 @@ class CapacityValidationServiceImplTest {
         assertThat(response.getEligibleVehicles()).isEmpty();
         assertThat(response.getIneligibleVehicles()).hasSize(1);
         assertThat(response.getIneligibleVehicles().get(0).getFailureReason()).contains("violates delivery window (Trước 9h) for order ORD-999");
+    }
+
+    @Test
+    void validate_success_viaTwoVehicleFallback_whenNoSingleVehicleFitsButPairDoes() {
+        // 9.5 m³ exceeds safety buffer of single vehicle (10.0 * 0.9 = 9.0) -> no single vehicle fits,
+        // but Recommendation Engine confirms a two-vehicle split is feasible (BR-07).
+        testDraft.setTotalVolumeM3(BigDecimal.valueOf(9.5));
+
+        when(tripDraftRepo.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepo.findByIsActiveTrue()).thenReturn(Collections.singletonList(testVehicle));
+        when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.of(testUser));
+        when(orderRepository.findByTripDraftId(1L)).thenReturn(Collections.emptyList());
+        when(recommendationService.isTwoVehicleFeasible(1L)).thenReturn(true);
+
+        CapacityValidationResultResponse response = capacityValidationService.validate(1L, "dispatcher");
+
+        assertThat(response.isValidationPassed()).isTrue();
+        assertThat(response.getNewStatus()).isEqualTo("VALIDATED");
+        assertThat(response.getEligibleVehicles()).isEmpty();
+        assertThat(response.getIneligibleVehicles()).hasSize(1);
+        assertThat(response.getSuggestion()).contains("two-vehicle split is feasible");
+        assertThat(response.getMessage()).contains("two-vehicle split");
+        assertThat(testDraft.getStatus()).isEqualTo("VALIDATED");
+        assertThat(testDraft.getValidatedAt()).isNotNull();
+
+        verify(recommendationService).isTwoVehicleFeasible(1L);
+        verify(tripDraftRepo).save(testDraft);
+    }
+
+    @Test
+    void validate_fails_whenNeitherSingleNorTwoVehicleFits() {
+        // Same draft exceeding single vehicle limit, but this time Recommendation Engine also says
+        // no two-vehicle pair fits -> must stay at PLANNED, must NOT accidentally pass.
+        testDraft.setTotalVolumeM3(BigDecimal.valueOf(9.5));
+
+        when(tripDraftRepo.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepo.findByIsActiveTrue()).thenReturn(Collections.singletonList(testVehicle));
+        when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.of(testUser));
+        when(orderRepository.findByTripDraftId(1L)).thenReturn(Collections.emptyList());
+        when(recommendationService.isTwoVehicleFeasible(1L)).thenReturn(false);
+
+        CapacityValidationResultResponse response = capacityValidationService.validate(1L, "dispatcher");
+
+        assertThat(response.isValidationPassed()).isFalse();
+        assertThat(response.getNewStatus()).isEqualTo("PLANNED");
+        assertThat(response.getBindingConstraint()).isEqualTo("VOLUME");
+        assertThat(response.getSuggestion()).contains("no two-vehicle split is feasible either");
+        assertThat(testDraft.getStatus()).isEqualTo("PLANNED");
+
+        verify(recommendationService).isTwoVehicleFeasible(1L);
     }
 }
