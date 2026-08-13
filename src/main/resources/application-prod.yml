@@ -1,0 +1,60 @@
+# ── PROD Profile Configuration ──
+# Active when spring.profiles.active=prod or SPRING_PROFILES_ACTIVE=prod
+
+spring:
+  # ── Database Connection (MySQL Production) ──
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/elog_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  # ── JPA / Hibernate Settings ──
+  jpa:
+    show-sql: false              # Disable SQL logging in prod to avoid log pollution and performance impact
+    hibernate:
+      ddl-auto: validate        # Schema is strictly managed by Flyway
+    properties:
+      hibernate:
+        format_sql: false
+
+  # ── Flyway Database Migration ──
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+# ── Server Settings ──
+server:
+  port: ${PORT:8080}
+  error:
+    include-stacktrace: never    # Hide exception stack trace from HTTP response for security
+
+# ── Swagger / SpringDoc ──
+springdoc:
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}   # Disabled by default in production for security
+
+# ── Application Specific Configuration ──
+elog:
+  jwt:
+    secret: ${JWT_SECRET:nVVNS34zCpcCgPTlOwN3qj3te0Lzf8AT}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}                 # 24 hours
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000} # 7 days
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost,https://yourdomain.com}
+  goong:
+    api-key: ${GOONG_API_KEY:66VHUZVYkINm140kfOtXvdNVlO9UzZByASkqMh5q}
+    maptiles-key: ${GOONG_MAPTILES_KEY:guupij6M2CP187auekESO0H69QrLGFMVNF1Yi8eF}
+    base-url: ${GOONG_BASE_URL:https://rsapi.goong.io}
+    vehicle: ${GOONG_VEHICLE:truck}
+
+# ── Logging Level in Production ──
+logging:
+  level:
+    root: INFO
+    com.elog: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.hibernate: WARN
+    org.flywaydb: INFO
