@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import {
   classifyResult,
   createXlsxFixture,
@@ -19,6 +20,12 @@ const driverPassword = process.env.ELOG_DRIVER_PASSWORD ?? 'Dev@2025';
 const catalogPath = process.env.ELOG_L3_CATALOG ?? path.join(repoRoot, 'test-execution/catalog/l3.json');
 const evidencePath = process.env.ELOG_L3_OUTPUT ?? path.join(repoRoot, 'test-execution/evidence/l3-rerun-results.json');
 const ledgerPath = process.env.ELOG_L3_LEDGER ?? path.join(repoRoot, 'test-execution/results/l3.json');
+const mysqlExe = process.env.ELOG_MYSQL_EXE ?? 'C:\\Program Files\\MySQL\\MySQL Server 9.7\\bin\\mysql.exe';
+const mysqlHost = process.env.ELOG_MYSQL_HOST ?? '127.0.0.1';
+const mysqlPort = process.env.ELOG_MYSQL_PORT ?? '3307';
+const mysqlUser = process.env.ELOG_MYSQL_USER ?? 'root';
+const mysqlPassword = process.env.ELOG_MYSQL_PASSWORD ?? 'root';
+const mysqlDatabase = process.env.ELOG_MYSQL_DATABASE;
 
 if (!username || !password) throw new Error('Set ELOG_TEST_USERNAME and ELOG_TEST_PASSWORD before running L3.');
 
@@ -103,17 +110,21 @@ function displayDate(isoDate) {
 function workbookRows(orderPrefix, stores, sku, deliveryDate) {
   return [
     ['order_ref', 'store_code', 'sku', 'quantity', 'delivery_date', 'window', 'recipient', 'phone', 'notes'],
-    ...stores.map((store, index) => [
+    ...stores.map((entry, index) => {
+      const store = Array.isArray(entry) ? entry[0] : entry;
+      const quantity = Array.isArray(entry) ? String(entry[1]) : '1';
+      return [
       `${orderPrefix}-${index + 1}`,
       store.storeCode ?? store.code,
       sku,
-      '1',
+      quantity,
       displayDate(deliveryDate),
       '08:00-18:00',
       'L3 QA Fixture',
       '0900000000',
       runKey,
-    ]),
+      ];
+    }),
   ];
 }
 function multipartFixture(filePath, deliveryDate) {
@@ -137,20 +148,54 @@ async function bootstrapRequest(method, requestPath, body, requestToken = token)
   bootstrapRequests.push({ method, path: requestPath, status: result.status, response: result.body });
   return result;
 }
+function sqlString(value) {
+  return String(value).replaceAll('\\', '\\\\').replaceAll("'", "''");
+}
+function execMysql(sql) {
+  if (!mysqlDatabase || !fs.existsSync(mysqlExe)) return false;
+  execFileSync(mysqlExe, [
+    '-h', mysqlHost,
+    '-P', mysqlPort,
+    '-u', mysqlUser,
+    `-p${mysqlPassword}`,
+    '-D', mysqlDatabase,
+    '-e', sql,
+  ], { windowsHide: true, stdio: 'pipe' });
+  return true;
+}
+function seedExpiredRefreshToken(refreshToken, userId) {
+  if (!mysqlDatabase || !fs.existsSync(mysqlExe) || !userId) return null;
+  const sql = `
+    INSERT INTO refresh_tokens (token, user_id, expiry_date, created_at)
+    VALUES ('${sqlString(refreshToken)}', ${Number(userId)}, TIMESTAMPADD(SECOND, -60, UTC_TIMESTAMP()), UTC_TIMESTAMP())
+    ON DUPLICATE KEY UPDATE expiry_date = TIMESTAMPADD(SECOND, -60, UTC_TIMESTAMP());
+  `;
+  execMysql(sql);
+  return refreshToken;
+}
 
 const allStores = contentOf(await get('/api/v1/stores?page=0&size=250', token));
 const allVehicles = contentOf(await get('/api/v1/vehicles?page=0&size=100', token));
-const storeGroups = [...allStores.reduce((groups, store) => {
+const primaryFixtureDate = process.env.ELOG_L3_DELIVERY_DATE ?? localDatePlus(0);
+const lockedRouteIdsForPrimaryDate = new Set(
+  contentOf(await get(`/api/v1/trip-drafts?deliveryDate=${primaryFixtureDate}&page=0&size=100`, token))
+    .filter(draft => draft.status && draft.status !== 'DRAFT')
+    .map(draft => draft.routeId)
+    .filter(routeId => routeId != null),
+);
+let storeGroups = [...allStores.reduce((groups, store) => {
   const routeId = store.assignedRoute?.id;
+  if (lockedRouteIdsForPrimaryDate.has(routeId)) return groups;
   if (routeId) groups.set(routeId, [...(groups.get(routeId) ?? []), store]);
   return groups;
 }, new Map()).entries()].filter(([, stores]) => stores.length >= 1);
-const primaryGroupIndex = storeGroups.findIndex(([, stores]) => stores.length >= 2);
-if (primaryGroupIndex > 0) storeGroups.unshift(storeGroups.splice(primaryGroupIndex, 1)[0]);
+const multiStopGroups = storeGroups.filter(([, stores]) => stores.length >= 2);
+const singleStopGroups = storeGroups.filter(([, stores]) => stores.length < 2);
+storeGroups = [...multiStopGroups, ...singleStopGroups];
 const assignmentVehicles = [];
 const seenDrivers = new Set();
 for (const vehicle of allVehicles) {
-  if (vehicle.assignedDriverId && !seenDrivers.has(vehicle.assignedDriverId)) {
+  if (vehicle.status === 'AVAILABLE' && vehicle.assignedDriverId && !seenDrivers.has(vehicle.assignedDriverId)) {
     assignmentVehicles.push(vehicle);
     seenDrivers.add(vehicle.assignedDriverId);
   }
@@ -167,10 +212,23 @@ if (!refs.product?.sku || !(refs.store?.storeCode ?? refs.store?.code)) {
   throw new Error('L3 bootstrap requires at least one seeded product and store.');
 }
 
-if (storeGroups.length < 6 || assignmentVehicles.length < 4) {
-  throw new Error('L3 bootstrap requires six routed store groups and four vehicles with distinct fixed drivers.');
+if (storeGroups.length < 6 || multiStopGroups.length < 2 || assignmentVehicles.length < 6) {
+  throw new Error('L3 bootstrap requires six routed store groups, two multi-stop routed groups, and six vehicles with distinct fixed drivers.');
 }
-const primaryFixtureDate = process.env.ELOG_L3_DELIVERY_DATE ?? await chooseUnlockedFixtureDate(1);
+const fixtureProductResult = await bootstrapRequest('POST', '/api/v1/products', {
+  sku: `${runKey}-FX`,
+  productName: 'L3 QA Fixture Product',
+  weightKg: 5,
+  lengthM: 0.5,
+  widthM: 0.3,
+  heightM: 0.2,
+  shape: 'BOX',
+  isFragile: false,
+  description: runKey,
+});
+refs.fixtureProduct = fixtureProductResult.status === 201 ? dataOf(fixtureProductResult) : refs.product;
+refs.expiredRefreshToken = seedExpiredRefreshToken(`${runKey}-expired-refresh-token`, resourceId(refs.user));
+const splitAssignmentVehicles = [assignmentVehicles[4], assignmentVehicles[5]];
 const secondaryFixtureDate = process.env.ELOG_L3_SECONDARY_DELIVERY_DATE
   ?? await chooseUnlockedFixtureDate(2, new Set([primaryFixtureDate]));
 const fixtureDates = [
@@ -183,18 +241,22 @@ const fixtureDates = [
 ];
 const fixtureSpecs = [
   [validFixturePath, [
-    ...storeGroups[0][1].slice(0, 2),
-    ...storeGroups.slice(1, 5).flatMap(([, stores]) => stores.slice(0, 1)),
+    ...storeGroups[0][1].slice(0, 2).map(store => [store, '1']),
+    // Split fixture: two stops on one route, each stop fits a 10m³ truck
+    // individually (200 * 0.03m³ = 6m³), but the route total exceeds one
+    // truck (12m³), forcing a real TWO_VEHICLE recommendation.
+    ...storeGroups[1][1].slice(0, 2).map(store => [store, '200']),
+    ...storeGroups.slice(2, 5).flatMap(([, stores]) => stores.slice(0, 1).map(store => [store, '1'])),
   ], `${runKey}-A`],
-  [primaryUploadFixturePath, storeGroups[5][1].slice(0, 1), `${runKey}-D`],
+  [primaryUploadFixturePath, storeGroups[5][1].slice(0, 1).map(store => [store, '1']), `${runKey}-D`],
 ];
 fixtureSpecs.forEach(([fixturePath, stores, orderPrefix], index) => {
-  createXlsxFixture(fixturePath, workbookRows(orderPrefix, stores, refs.product.sku, fixtureDates[index]));
+  createXlsxFixture(fixturePath, workbookRows(orderPrefix, stores, refs.fixtureProduct.sku, fixtureDates[index]));
 });
 const storeCode = refs.store.storeCode ?? refs.store.code;
 const oversizedRows = [['order_ref', 'store_code', 'sku', 'quantity', 'delivery_date', 'window', 'recipient', 'phone', 'notes']];
 for (let index = 0; index < 5001; index += 1) {
-  oversizedRows.push([`${runKey}-OVER-${index}`, storeCode, refs.product.sku, '1', displayDate(fixtureDates[3]), '', '', '', '']);
+  oversizedRows.push([`${runKey}-OVER-${index}`, storeCode, refs.fixtureProduct.sku, '1', displayDate(fixtureDates[3]), '', '', '', '']);
 }
 createXlsxFixture(oversizedFixturePath, oversizedRows);
 
@@ -328,7 +390,6 @@ refs.permissionIds = contentOf(await get('/api/v1/permissions', token))
 function caseDraft(testCase) {
   if (testCase.id === 'L3-PLANNING-066') return refs.splitDraft;
   if (testCase.id === 'L3-PLANNING-081') return refs.revertDraft;
-  if (testCase.id === 'L3-PLANNING-076' || testCase.id === 'L3-PLANNING-077') return refs.revertDraft;
   return refs.tripDraft;
 }
 
@@ -350,7 +411,7 @@ function materializePath(testCase) {
     batchId: resourceId(refs.importBatch),
     executionId: resourceId(refs.driverExecution ?? refs.execution ?? refs.trip),
     orderId: template.includes('/trip-drafts/')
-      ? resourceId((testCase.id === 'L3-PLANNING-076' || testCase.id === 'L3-PLANNING-077') ? refs.revertOrderItem : refs.orderItem)
+      ? resourceId(refs.orderItem)
       : resourceId(refs.driverOrder ?? refs.orderItem),
     stopId: template.includes('/routes/')
       ? resourceId(refs.routeStop)
@@ -421,9 +482,16 @@ function jsonBody(testCase) {
   if (p.endsWith('/exceptions/{id}/resolve')) return { resolutionNotes: runKey };
   if (p.endsWith('/adjust-departure-time')) return { newDepartureTime: '09:00:00' };
   if (p.endsWith('/assign')) return { vehicleId: resourceId(refs.vehicle), driverId: resourceId(refs.driver) };
-  if (p.endsWith('/assign-split')) return { assignments: [{ vehicleId: resourceId(assignmentVehicles[1]), driverId: assignmentVehicles[1].assignedDriverId, stopIds: refs.splitStops.map(stop => stop.tripDraftStopId) }] };
+  if (p.endsWith('/assign-split')) {
+    return {
+      assignments: refs.splitStops.map((stop, index) => {
+        const vehicle = splitAssignmentVehicles[index % splitAssignmentVehicles.length];
+        return { vehicleId: resourceId(vehicle), driverId: vehicle.assignedDriverId, stopIds: [stop.tripDraftStopId] };
+      }),
+    };
+  }
   if (p.endsWith('/settle-delay')) return { reason: runKey };
-  if (p.endsWith('/recalculate-eta')) return { plannedDepartureTime: '23:00:00' };
+  if (p.endsWith('/recalculate-eta')) return { plannedDepartureTime: '09:00:00' };
   if (p === '/api/v1/trip-drafts/consolidate') {
     return { deliveryDate: testCase.id === 'L3-PLANNING-087' ? fixtureDates[5] : refs.deliveryDate };
   }
@@ -486,7 +554,7 @@ try {
     if (testCase.id === 'L3-AUTH-119') body = { username: `${runKey}-unknown`, password: 'Wrong@123' };
     if (testCase.id === 'L3-AUTH-120') body = { username: disabledUsername, password: disabledPassword };
     if (testCase.id === 'L3-AUTH-121') body = { refreshToken: `unknown-${runKey}` };
-    if (testCase.id === 'L3-AUTH-122') body = { refreshToken: 'L3QA_EXPIRED_REFRESH_TOKEN' };
+    if (testCase.id === 'L3-AUTH-122') body = { refreshToken: refs.expiredRefreshToken ?? 'L3QA_EXPIRED_REFRESH_TOKEN' };
     if (testCase.id === 'L3-MASTERDATA-123') body = { ...vehicleBody(), vehicleCode: `${runKey}-VD`.slice(0, 50), plateNumber: refs.createdVehicle?.plateNumber };
     if (testCase.id === 'L3-MASTERDATA-124') body = { ...jsonBody({ path: '/api/v1/products' }), sku: refs.createdProduct?.sku ?? refs.product?.sku };
     if (testCase.id === 'L3-MASTERDATA-125') body = { ...jsonBody({ path: '/api/v1/stores' }), storeCode: refs.createdStore?.storeCode ?? refs.store?.storeCode };
@@ -514,7 +582,7 @@ try {
         : testCase.id === 'L3-EXECUTION-105'
           ? driverIdOfTrip(refs.rejectTrip, assignmentVehicles[3].assignedDriverId)
           : testCase.id === 'L3-EXECUTION-130'
-            ? driverIdOfTrip(refs.splitTrip, assignmentVehicles[1].assignedDriverId)
+            ? driverIdOfTrip(refs.splitTrip, splitAssignmentVehicles[0].assignedDriverId)
             : driverIdOfTrip(refs.trip, assignmentVehicles[0].assignedDriverId);
       caseToken = await tokenForDriver(driverId) ?? caseToken;
     }
@@ -522,6 +590,9 @@ try {
     if (testCase.id === 'L3-EXECUTION-105' && refs.rejectTrip && refs.rejectTripStop) {
       await bootstrapRequest('POST', `/api/v1/trips/${resourceId(refs.rejectTrip)}/start`, undefined, caseToken);
       await bootstrapRequest('POST', `/api/v1/trip-stops/${resourceId(refs.rejectTripStop)}/arrive`, undefined, caseToken);
+    }
+    if (testCase.id === 'L3-EXECUTION-103' && refs.tripStop) {
+      execMysql(`UPDATE trip_stops SET planned_eta = TIMESTAMPADD(MINUTE, 5, NOW()) WHERE trip_stop_id = ${Number(resourceId(refs.tripStop))};`);
     }
 
     const actual = await rawRequest(testCase.httpMethod, requestPath, body, caseToken);
@@ -567,7 +638,7 @@ try {
     if (testCase.id === 'L3-PLANNING-065' || testCase.id === 'L3-PLANNING-066') {
       const draft = testCase.id.endsWith('066') ? refs.splitDraft : refs.tripDraft;
       if (testCase.id.endsWith('066') && refs.splitTrip) {
-        refs.splitTrip = { ...refs.splitTrip, driver: { userId: assignmentVehicles[1].assignedDriverId } };
+        refs.splitTrip = { ...refs.splitTrip, driver: { userId: splitAssignmentVehicles[0].assignedDriverId } };
       }
       if (testCase.id.endsWith('065') && refs.trip) refs.tripStop = refs.trip.tripStops?.[0] ?? refs.tripStop;
     }

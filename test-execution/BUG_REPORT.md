@@ -4,6 +4,8 @@ Execution date: 2026-08-14.
 
 This report separates confirmed product/test fixes from E2E coverage gaps. A case is listed as Pass only when the current run produced ID-specific evidence.
 
+Latest update: 2026-08-14 17:56 +07:00. L3 System API was rerun on isolated schema `elog_report5_full5_20260814` and produced 130 Pass / 0 Fail / 0 Not Run. A follow-up L4 rerun was attempted after patching the known Cypress spec issues, but the local Cypress runtime failed before executing the spec (`Cypress.exe` rejects `--smoke-test`; subsequent run exits with native code `-1073741795`).
+
 ## Backend status
 
 No remaining verified L1/L2/L3 defects in the fresh ledgers.
@@ -27,6 +29,14 @@ Evidence:
 - Fresh Cypress log: `../ELog-FE/test-execution/evidence/l4/cypress-l4-20260814-1355.out.log`
 - Fresh JUnit: `../ELog-FE/test-execution/evidence/l4/junit-80e79a632bd7bb75f33be0aeab3b5792.xml`
 - Screenshots: `../ELog-FE/src/Test/cypress/screenshots/report5-web.cy.ts/`
+
+Prepared remediation in `../ELog-FE/src/Test/e2e/l4/report5-web.cy.ts`:
+
+- `L4-WEB-ASSIGN-02` now verifies the split draft through real API state instead of relying on the absent `Chuyen 1` label.
+- `L4-WEB-HIST-01` and `L4-WEB-HIST-02` now assert inside `.ant-layout-content` and tab content, avoiding the hidden sidebar/menu match that caused the previous false selector failure.
+- `../ELog-FE/src/Test/cypress.config.ts` now accepts `apiBaseUrl` so Cypress can target an isolated backend when rerun.
+
+These fixes are prepared but not counted as Pass yet because Cypress crashed before producing a fresh JUnit run.
 
 ## L4 Web coverage gaps, not product defects yet
 

@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-08-14T07:26:07.519Z",
+  "generatedAt": "2026-08-14T10:44:17.773Z",
   "level": "L3",
   "total": 130,
   "summary": {
-    "Pass": 117,
-    "Fail": 13,
+    "Pass": 130,
+    "Fail": 0,
     "Not Run": 0
   },
   "results": [
@@ -74,9 +74,8 @@
     {
       "testId": "L3-EXECUTION-008",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 200, received 403",
-      "defectId": "L3-DEF-L3-EXECUTION-008",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -84,9 +83,8 @@
     {
       "testId": "L3-EXECUTION-009",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 200, received 403",
-      "defectId": "L3-DEF-L3-EXECUTION-009",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -94,9 +92,8 @@
     {
       "testId": "L3-EXECUTION-010",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 200, received 403",
-      "defectId": "L3-DEF-L3-EXECUTION-010",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -104,9 +101,8 @@
     {
       "testId": "L3-EXECUTION-011",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 200, received 403",
-      "defectId": "L3-DEF-L3-EXECUTION-011",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -114,9 +110,8 @@
     {
       "testId": "L3-EXECUTION-012",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 200, received 403",
-      "defectId": "L3-DEF-L3-EXECUTION-012",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -196,9 +191,8 @@
     {
       "testId": "L3-MONITORING-021",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 200, received 404",
-      "defectId": "L3-DEF-L3-MONITORING-021",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -206,9 +200,8 @@
     {
       "testId": "L3-MONITORING-022",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 200, received 404",
-      "defectId": "L3-DEF-L3-MONITORING-022",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -891,9 +884,8 @@
     {
       "testId": "L3-EXECUTION-098",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 200, received 400",
-      "defectId": "L3-DEF-L3-EXECUTION-098",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -901,9 +893,8 @@
     {
       "testId": "L3-EXECUTION-099",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 200, received 404",
-      "defectId": "L3-DEF-L3-EXECUTION-099",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -938,9 +929,8 @@
     {
       "testId": "L3-EXECUTION-103",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 200, received 400",
-      "defectId": "L3-DEF-L3-EXECUTION-103",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -948,9 +938,8 @@
     {
       "testId": "L3-EXECUTION-104",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 200, received 400",
-      "defectId": "L3-DEF-L3-EXECUTION-104",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -958,9 +947,8 @@
     {
       "testId": "L3-EXECUTION-105",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 201, received 409",
-      "defectId": "L3-DEF-L3-EXECUTION-105",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
@@ -1184,9 +1172,8 @@
     {
       "testId": "L3-EXECUTION-130",
       "level": "L3",
-      "status": "Fail",
-      "assertion": "Expected HTTP 409, received 400",
-      "defectId": "L3-DEF-L3-EXECUTION-130",
+      "status": "Pass",
+      "assertion": "HTTP 409 and basic response envelope matched",
       "evidence": [
         "l3-rerun-results.json"
       ]
