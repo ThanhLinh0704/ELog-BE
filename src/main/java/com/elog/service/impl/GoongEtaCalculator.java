@@ -83,6 +83,7 @@ public class GoongEtaCalculator implements EtaCalculationService {
         }
 
         // 4. Validate coordinates
+        double avgSpeedKmh = getConfigDouble("AVG_SPEED_KMH");
         double warehouseLat = getConfigDouble("WAREHOUSE_LAT");
         double warehouseLng = getConfigDouble("WAREHOUSE_LNG");
 
@@ -143,13 +144,11 @@ public class GoongEtaCalculator implements EtaCalculationService {
 
             long legMeters = (leg.getDistance() != null && leg.getDistance().getValue() != null)
                     ? leg.getDistance().getValue() : 0L;
-            long legSeconds = (leg.getDuration() != null && leg.getDuration().getValue() != null)
-                    ? leg.getDuration().getValue() : 0L;
 
             totalDistanceMeters += legMeters;
 
             BigDecimal legDistanceKm = BigDecimal.valueOf(legMeters / 1000.0).setScale(2, RoundingMode.HALF_UP);
-            int legTravelMinutes = (int) Math.round(legSeconds / 60.0);
+            int legTravelMinutes = (int) Math.round((legDistanceKm.doubleValue() / avgSpeedKmh) * 60.0);
 
             stop.setDistanceFromPrevKm(legDistanceKm);
             stop.setTravelTimeFromPrevMin(legTravelMinutes);

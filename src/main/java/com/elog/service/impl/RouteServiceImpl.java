@@ -353,11 +353,8 @@ public class RouteServiceImpl implements RouteService {
                         long totalMeters = r.getLegs().stream()
                                 .mapToLong(leg -> leg.getDistance() != null && leg.getDistance().getValue() != null ? leg.getDistance().getValue() : 0)
                                 .sum();
-                        long totalSecs = r.getLegs().stream()
-                                .mapToLong(leg -> leg.getDuration() != null && leg.getDuration().getValue() != null ? leg.getDuration().getValue() : 0)
-                                .sum();
                         double distKm = totalMeters / 1000.0;
-                        int durMin = (int) (totalSecs / 60);
+                        int durMin = (int) Math.round((distKm / 40.0) * 60.0);
 
                         builder.totalDistanceKm(distKm);
                         builder.totalDurationMin(durMin);
