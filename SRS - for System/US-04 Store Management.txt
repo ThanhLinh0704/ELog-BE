@@ -1,0 +1,366 @@
+US-04 Store Management
+
+
+
+
+TASK-01 Thiết kế Database Store
+
+
+Mô tả
+
+Thiết kế và tạo Flyway migration đầy đủ cho bảng stores. 
+
+Schema
+
+Bảng stores gợi ý
+
+Column
+
+Type
+
+Constraint
+
+Ghi chú
+
+id
+
+BIGINT
+
+PK · Auto increment
+
+
+
+store_code
+
+VARCHAR(20)
+
+UNIQUE · NOT NULL
+
+VD: "ST-GV-005"
+
+store_name
+
+VARCHAR(100)
+
+NOT NULL
+
+
+
+address
+
+VARCHAR(255)
+
+NOT NULL
+
+Địa chỉ đầy đủ
+
+contact_name
+
+VARCHAR(100)
+
+NULLABLE
+
+Người liên hệ tại cửa hàng
+
+contact_phone
+
+VARCHAR(15)
+
+NULLABLE
+
+SĐT người liên hệ
+
+latitude
+
+DECIMAL(9,6)
+
+NULLABLE
+
+Vĩ độ · Dùng cho ETA (US-14)
+
+longitude
+
+DECIMAL(9,6)
+
+NULLABLE
+
+Kinh độ · Dùng cho ETA (US-14)
+
+is_active
+
+BOOLEAN
+
+DEFAULT true
+
+Soft delete
+
+created_at
+
+DATETIME
+
+AUTO
+
+
+
+updated_at
+
+DATETIME
+
+AUTO
+
+
+
+Ghi chú thiết kế — latitude / longitude nullable: Toạ độ GPS là bắt buộc về mặt nghiệp vụ dài hạn (ETA Sprint 5), nhưng đặt NULLABLE ở tầng DB để tránh block Admin khi nhập liệu ban đầu (không phải lúc nào cũng tra được toạ độ ngay). Validation bắt buộc sẽ được enforce ở tầng API với rule riêng, cho phép lưu store chưa có toạ độ nhưng cảnh báo rõ ràng.
+
+File migration: V3__stores_schema.sql
+
+Seed data mẫu:
+
+sql
+
+INSERT INTO stores (store_code, store_name, address, contact_name, contact_phone, latitude, longitude)
+VALUES
+  ('ST-Q1-001', 'Điện Máy Phú Sĩ',            '10 Lê Lai, P.Bến Thành, Q.1',              'Anh Sĩ',   '0901111001', 10.7721, 106.6980),
+  ('ST-Q1-002', 'Trung Tâm Điện Tử Vĩnh Lợi', '94 Nguyễn Trãi, P.Phạm Ngũ Lão, Q.1',    'Chị Lợi',  '0901111002', 10.7698, 106.6943),
+  ('ST-BT-001', 'Điện Máy Thiên Hà',           '102 Đinh Tiên Hoàng, P.3, Bình Thạnh',    'Anh Hà',   '0901111003', 10.7994, 106.7141),
+  ('ST-BT-002', 'Shop Điện Tử Minh Phát',      '45 Bạch Đằng, P.24, Bình Thạnh',          'Chị Phát', '0901111004', 10.8021, 106.7089),
+  ('ST-GV-001', 'Siêu Thị Điện Máy Gò Vấp',   '200 Quang Trung, P.10, Q.Gò Vấp',        'Anh Vấp',  '0901111005', 10.8384, 106.6644);
+
+Acceptance Criteria
+
+Migration chạy thành công, không lỗi
+
+UNIQUE constraint trên store_code hoạt động đúng
+
+Seed data có ít nhất 5 stores ở các quận khác nhau để phục vụ test
+
+
+
+
+
+
+TASK-02 Store CRUD API
+
+Mô tả
+
+Xây dựng bộ REST API quản lý vòng đời cửa hàng: tạo mới, xem danh sách, xem chi tiết, cập nhật thông tin, và vô hiệu hoá. Bao gồm endpoint kiểm tra trạng thái gắn tuyến để hỗ trợ US-04.
+
+Endpoints
+
+Method
+
+Path
+
+Mô tả
+
+Role
+
+GET
+
+/api/stores
+
+Danh sách stores (phân trang + filter)
+
+ADMIN, DISPATCHER, LOGISTICS_MANAGER
+
+GET
+
+/api/stores/{id}
+
+Chi tiết 1 store
+
+ADMIN, DISPATCHER, LOGISTICS_MANAGER
+
+POST
+
+/api/stores
+
+Tạo store mới
+
+SYSTEM_ADMIN
+
+PUT
+
+/api/stores/{id}
+
+Cập nhật thông tin store
+
+SYSTEM_ADMIN
+
+PATCH
+
+/api/stores/{id}/status
+
+Kích hoạt / vô hiệu hoá store
+
+SYSTEM_ADMIN
+
+Chi tiết kỹ thuật
+
+POST /api/stores — Tạo store:
+
+json
+
+// Request
+{
+  "storeCode": "ST-GV-005",
+  "storeName": "Điện Máy Phúc Anh",
+  "address": "120 Nguyễn Oanh, P.17, Q.Gò Vấp, TP.HCM",
+  "contactName": "Phúc Anh",
+  "contactPhone": "0901234567",
+  "latitude": 10.8384,
+  "longitude": 106.6644
+}
+
+// Response 201
+{
+  "id": 6,
+  "storeCode": "ST-GV-005",
+  "storeName": "Điện Máy Phúc Anh",
+  "address": "120 Nguyễn Oanh, P.17, Q.Gò Vấp, TP.HCM",
+  "contactName": "Phúc Anh",
+  "contactPhone": "0901234567",
+  "latitude": 10.8384,
+  "longitude": 106.6644,
+  "isActive": true,
+  "assignedRoute": null,
+  "createdAt": "2025-01-15T08:30:00"
+}
+
+GET /api/stores — Danh sách (có phân trang):
+
+json
+
+{
+  "content": [
+    {
+      "id": 1,
+      "storeCode": "ST-Q1-001",
+      "storeName": "Điện Máy Phú Sĩ",
+      "address": "10 Lê Lai, Q.1",
+      "isActive": true,
+      "hasCoordinates": true,
+      "assignedRoute": {
+        "id": 1,
+        "code": "RT-Q1",
+        "name": "Tuyến Quận 1"
+      }
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 15,
+  "totalPages": 1
+}
+
+assignedRoute: Join với bảng route_stops để biết store đang ở tuyến nào. Sẽ là null nếu store chưa được gắn vào bất kỳ tuyến nào. Field này sẵn sàng cho US-04 dùng ngay khi Sprint 2 build Route Management.
+
+Query params cho GET /api/stores:
+
+Param
+
+Kiểu
+
+Mô tả
+
+page
+
+int
+
+Số trang (default: 0)
+
+size
+
+int
+
+Số record/trang (default: 20)
+
+keyword
+
+string
+
+Tìm theo store_code hoặc store_name
+
+isActive
+
+boolean
+
+Filter theo trạng thái
+
+hasRoute
+
+boolean
+
+true = chỉ store đã gắn tuyến · false = chỉ store chưa gắn tuyến
+
+hasRoute=false đặc biệt hữu ích cho US-04: khi Admin thêm điểm dừng, dropdown chỉ hiện stores chưa thuộc tuyến nào (vì 1 store chỉ thuộc 1 route — ERD BR).
+
+Validation rules:
+
+Field
+
+Rule
+
+storeCode
+
+Bắt buộc · Unique · 3–20 ký tự · Chỉ chữ, số, dấu gạch ngang
+
+storeName
+
+Bắt buộc · 2–100 ký tự
+
+address
+
+Bắt buộc · 5–255 ký tự
+
+contactPhone
+
+Nullable · Nếu có: đúng định dạng SĐT Việt Nam (10 số, bắt đầu 0)
+
+latitude
+
+Nullable · Nếu có: -90.0 đến 90.0
+
+longitude
+
+Nullable · Nếu có: -90.0 đến 180.0
+
+latitude + longitude
+
+Phải nhập cả hai hoặc để trống cả hai — không nhập một nửa
+
+Business rules — PATCH /api/stores/{id}/status:
+
+Trước khi cho phép is_active = false:
+
+1. Kiểm tra store có đang là RouteStop của Route đang ACTIVE không
+   → Nếu có: HTTP 409 · "Store đang thuộc tuyến [RT-XX]. Hãy xoá store khỏi tuyến trước."
+
+2. Kiểm tra store có trip đang ở trạng thái Dispatched / InProgress không
+   → Nếu có: HTTP 409 · "Store có [N] chuyến đang vận hành. Vui lòng đợi hoàn tất."
+   [ASSUMPTION: Trip entity chưa có ở Sprint 1 — check này sẽ được bổ sung khi Trip
+   được implement ở Sprint 4 (US-16). Tạm thời bỏ qua check #2, chỉ làm check #1.]
+
+Acceptance Criteria
+
+Tạo store mới hợp lệ → HTTP 201, isActive = true, assignedRoute = null
+
+Tạo store với storeCode trùng → HTTP 409 với message rõ
+
+Nhập latitude mà không có longitude (hoặc ngược lại) → HTTP 400
+
+contactPhone sai định dạng → HTTP 400 với message hướng dẫn
+
+Response GET /api/stores trả đúng assignedRoute (null nếu chưa gắn tuyến)
+
+hasRoute=false chỉ trả về stores chưa thuộc tuyến nào
+
+PATCH vô hiệu hoá store đang là RouteStop active → HTTP 409
+
+DISPATCHER gọi POST/PUT/PATCH → HTTP 403
+
+
+
+
+
+

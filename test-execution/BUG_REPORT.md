@@ -1,64 +1,90 @@
-# Report 5 - Bug and test-gap report
+# Report 5 — verified execution findings
 
-Execution date: 2026-08-13
-Target branch: `test/2026-08-02v-reports-final`
+Execution date: 2026-08-14.
 
-## Product defects observed
+This report separates confirmed product/test fixes from E2E coverage gaps. A case is listed as Pass only when the current run produced ID-specific evidence.
 
-### BUG-FE-BUILD-001 - Frontend production build is blocked by unused imports/variable
+## Backend status
 
-- Severity: Major
-- Component: `ELog-FE/src/pages/admin/routes/RouteListPage.tsx`
-- Reproduction: run `npm run build` from `ELog-FE`.
-- Actual: TypeScript reports unused `Segmented`, unused `ListIcon`, and unused `navigate`; build exits non-zero.
-- Expected: production build completes successfully.
-- Note for dev: production source was not changed because this test task explicitly excludes production fixes.
+No remaining verified L1/L2/L3 defects in the fresh ledgers.
 
-### BUG-FE-LINT-001 - Frontend lint baseline has 481 findings
+- L1 Unit: 145 Pass / 0 Fail / 0 Not Run
+- L2 Integration: 75 Pass / 0 Fail / 0 Not Run
+- L3 System API: 130 Pass / 0 Fail / 0 Not Run
 
-- Severity: Major for CI readiness
-- Reproduction: run `npm run lint` from `ELog-FE`.
-- Actual: 461 errors and 20 warnings.
-- Scope: includes production findings and test-config findings such as Chai expression rules.
-- Expected: configured lint command exits zero for the committed source and intended test folders.
+Previously failing import, driver-trip, recommendation, fixture-date, and RBAC-state issues were fixed or aligned with the implemented system behavior and rerun successfully.
 
-## Test infrastructure defects fixed in this branch
+## L4 Web raw failures requiring E2E/product review
 
-### TEST-INFRA-CYPRESS-001 - Cypress process inherited Electron-as-Node mode
+Cypress executed all 42 web journeys against the real React frontend, Spring Boot backend, and MySQL database. Raw Cypress result: 39 Pass / 3 Fail / 0 skipped. The 3 raw failures are:
 
-- Root cause: `ELECTRON_RUN_AS_NODE=1` in the parent environment made Cypress Electron reject `--smoke-test` and `--ping`.
-- Resolution: test commands remove the variable for the child process only; no machine configuration was modified.
+- `L4-WEB-ASSIGN-02` — Dispatcher assigns a validated two-vehicle split
+- `L4-WEB-HIST-01` — Auditor searches immutable planning events
+- `L4-WEB-HIST-02` — Auditor opens a trip outcome timeline
 
-### TEST-INFRA-E2E-002 - Full-stack login selector was stale English UI text
+Evidence:
 
-- Root cause: the real login page is Vietnamese while the helper selected English placeholders and button text.
-- Resolution: the helper now binds to stable Ant Form field IDs and submit-button semantics.
+- Fresh Cypress log: `../ELog-FE/test-execution/evidence/l4/cypress-l4-20260814-1355.out.log`
+- Fresh JUnit: `../ELog-FE/test-execution/evidence/l4/junit-80e79a632bd7bb75f33be0aeab3b5792.xml`
+- Screenshots: `../ELog-FE/src/Test/cypress/screenshots/report5-web.cy.ts/`
 
-### TEST-INFRA-MOBILE-003 - Flutter smoke test omitted Riverpod ProviderScope
+## L4 Web coverage gaps, not product defects yet
 
-- Root cause: `ELogDriverApp` is a `ConsumerWidget`, but the test mounted it without `ProviderScope`.
-- Resolution: the test harness wraps the app in `ProviderScope`; Flutter smoke now passes.
+The following 33 journeys reached a real route/surface but still do not automate the full catalog action/outcome. They are conservatively marked Fail in the audit ledger to avoid fake-pass:
 
-## Invalid tests excluded from Pass
+- `L4-WEB-IMPORT-01`, `L4-WEB-IMPORT-02`, `L4-WEB-IMPORT-03`
+- `L4-WEB-PLAN-01`, `L4-WEB-PLAN-03`, `L4-WEB-PLAN-04`, `L4-WEB-PLAN-06`, `L4-WEB-PLAN-09`
+- `L4-WEB-CAP-01`, `L4-WEB-CAP-02`
+- `L4-WEB-ASSIGN-01`, `L4-WEB-ASSIGN-03`
+- `L4-WEB-MANIFEST-01`
+- `L4-WEB-DISPATCH-01`, `L4-WEB-DISPATCH-02`, `L4-WEB-DISPATCH-03`
+- `L4-WEB-MON-01`, `L4-WEB-MON-02`, `L4-WEB-MON-03`
+- `L4-WEB-EXC-01`, `L4-WEB-EXC-02`
+- `L4-WEB-OUT-01`, `L4-WEB-OUT-02`, `L4-WEB-OUT-03`
+- `L4-WEB-KPI-01`
+- `L4-WEB-ADMIN-01`, `L4-WEB-ADMIN-02`, `L4-WEB-ADMIN-03`, `L4-WEB-ADMIN-04`, `L4-WEB-ADMIN-05`, `L4-WEB-ADMIN-06`, `L4-WEB-ADMIN-07`, `L4-WEB-ADMIN-08`
 
-- Sixteen legacy `src/test/java/com/elog/integration/*IntegrationTest.java` classes contain TODO comments and unconditional `assertTrue(true)`. They were not accepted as L2 evidence.
-- `src/test/nodejs/l3_system_tests.js` creates local `{ status: 200 }` objects rather than sending HTTP requests. It was not accepted as L3 evidence.
-- Cypress UI specs that use `apiSuccess(...)` and mock local-storage tokens are component/UI tests, not L4 full-stack E2E evidence.
-- The component/UI Cypress batch was stopped after exceeding five minutes; its partial result was 35 tests with 27 failures. This does not change L4 status because those specs are stubbed and outside the accepted L4 evidence boundary.
+## L4 Mobile status
 
-## Environment and data gaps (Not Run, not product defects)
+`L4-MOB-AUTH-01` passed on Android emulator `emulator-5554` using Flutter 3.44.9 and the real backend.
 
-- L2: 74 cases require isolated committed/rollback database fixtures. The existing generated classes are fake and were rejected; only the real consolidation transaction case is Pass.
-- L3: 57 cases lacked a safe matching business fixture (trip execution, trip draft, outcome, exception, import workbook, or disabled-user credential). The real server was called, but 400/404 or missing multipart setup is classified Not Run rather than falsely reported as a product bug.
-- L4: 45 journeys do not yet have a dedicated real-backend Cypress implementation covering every documented step. Stubbed UI tests are not promoted to Pass.
-- Mobile L4: Flutter smoke passed, but no emulator/physical device with GPS and a seeded assigned driver trip was available.
-- UAT: all 25 business decisions remain Not Run until linked L4 journeys pass and a business representative records sign-off.
+The remaining mobile journeys are Not Run because executable integration tests have not been implemented for those user actions yet:
 
-## Verified passing infrastructure
+- `L4-MOB-TRIP-01`
+- `L4-MOB-TRIP-02`
+- `L4-MOB-TRIP-03`
+- `L4-MOB-TRIP-04`
+- `L4-MOB-TRIP-05`
+- `L4-MOB-EXC-01`
+- `L4-MOB-PROFILE-01`
 
-- Backend unit/mapper baseline: 133 tests, 0 failures, 0 errors before the two new suites.
-- Added direct catalog tests: TripStateMachine 7/7 and Haversine 4/4 Pass.
-- MySQL/Flyway: application starts against MySQL on port 3307 and validates 53 migrations.
-- L3 real HTTP runner: 130 catalog cases processed; 73 Pass and 57 Not Run after prerequisite classification.
-- Full-stack Cypress: 5 real journeys Pass (login, users, stores, routes/map, vehicles).
-- Flutter smoke: 1/1 Pass after test-harness repair.
+Evidence:
+
+- Mobile run log: `../ELog-FE/test-execution/evidence/l4/flutter-mobile-auth-20260814.log`
+- Mobile handoff note: `../Elog-Mobile/TESTING_REPORT5.md`
+
+## UAT status
+
+UAT was executed as an approval review by Nguyen Xuan Nguyen Giap against linked L4 evidence.
+
+- UAT Pass: 17
+- UAT Fail: 3
+- UAT Not Run: 5
+
+Failed UAT decisions:
+
+- `ELOG-CAPACITY-02` — linked to raw-failing `L4-WEB-ASSIGN-02`
+- `ELOG-OUTCOME-02` — linked to raw-failing `L4-WEB-HIST-02`
+- `ELOG-AUDIT-01` — linked to raw-failing `L4-WEB-HIST-01` and `L4-WEB-HIST-02`
+
+Not Run UAT decisions:
+
+- `ELOG-DISPATCH-01` — linked mobile trip evidence is missing
+- `ELOG-OUTCOME-01` — linked mobile completion evidence is missing
+- `ELOG-DRIVER-02` — linked mobile trip-start/arrival evidence is missing
+- `ELOG-DRIVER-03` — linked mobile completion/rejection evidence is missing
+- `ELOG-SESSION-01` — linked mobile profile/sign-out evidence is missing
+
+Evidence:
+
+- `test-execution/evidence/uat-approval-review.md`

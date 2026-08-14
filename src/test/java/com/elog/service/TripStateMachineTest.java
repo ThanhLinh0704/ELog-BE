@@ -7,6 +7,7 @@ import com.elog.entity.VehicleStatus;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 
 import java.time.LocalDateTime;
 
@@ -18,6 +19,7 @@ class TripStateMachineTest {
     private final TripStateMachine stateMachine = new TripStateMachine();
 
     @Test
+    @DisplayName("[L1-SM-01] validated to dispatched sets lock and vehicle available")
     void l1Sm01_validatedToDispatched_setsLockAndVehicleAvailable() {
         Vehicle vehicle = Vehicle.builder().status(VehicleStatus.IN_USE).build();
         Trip trip = Trip.builder().tripId(1L).status(TripStatus.VALIDATED).vehicle(vehicle).build();
@@ -30,6 +32,7 @@ class TripStateMachineTest {
     }
 
     @Test
+    @DisplayName("[L1-SM-02] dispatched to in progress sets departure and vehicle in use")
     void l1Sm02_dispatchedToInProgress_setsDepartureAndVehicleInUse() {
         Vehicle vehicle = Vehicle.builder().status(VehicleStatus.AVAILABLE).build();
         Trip trip = Trip.builder().tripId(2L).status(TripStatus.DISPATCHED).vehicle(vehicle).build();
@@ -42,6 +45,7 @@ class TripStateMachineTest {
     }
 
     @Test
+    @DisplayName("[L1-SM-03] in progress to completed sets completed timestamp")
     void l1Sm03_inProgressToCompleted_setsCompletedAt() {
         Trip trip = Trip.builder().tripId(3L).status(TripStatus.IN_PROGRESS).build();
 
@@ -52,6 +56,7 @@ class TripStateMachineTest {
     }
 
     @Test
+    @DisplayName("[L1-SM-04] validated to dispatched accepts a null vehicle")
     void l1Sm04_validatedToDispatched_acceptsNullVehicle() {
         Trip trip = Trip.builder().tripId(4L).status(TripStatus.VALIDATED).vehicle(null).build();
 
@@ -62,6 +67,7 @@ class TripStateMachineTest {
     }
 
     @Test
+    @DisplayName("[L1-SM-05] completed trip rejects every subsequent target without mutation")
     void l1Sm05_completedRejectsEveryTargetWithoutMutation() {
         LocalDateTime completedAt = LocalDateTime.now().minusMinutes(1);
         for (TripStatus target : TripStatus.values()) {
@@ -77,6 +83,7 @@ class TripStateMachineTest {
     }
 
     @Test
+    @DisplayName("[L1-SM-06] dispatched to validated is blocked by the trip lock")
     void l1Sm06_dispatchedToValidated_reportsLocked() {
         LocalDateTime lockedAt = LocalDateTime.now().minusMinutes(1);
         Trip trip = Trip.builder().tripId(6L).status(TripStatus.DISPATCHED).lockedAt(lockedAt).build();
@@ -93,6 +100,7 @@ class TripStateMachineTest {
     }
 
     @Test
+    @DisplayName("[L1-SM-07] unsupported nonterminal transitions are rejected")
     void l1Sm07_unsupportedNonTerminalTransitionsAreRejected() {
         TripStatus[][] invalid = {
                 {TripStatus.VALIDATED, TripStatus.IN_PROGRESS},

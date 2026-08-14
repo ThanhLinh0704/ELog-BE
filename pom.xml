@@ -136,6 +136,14 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
+                    <!-- Preserve JUnit 5 @DisplayName values in raw XML so every
+                         catalog ID is independently auditable. -->
+                    <statelessTestsetReporter implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5Xml30StatelessReporter">
+                        <usePhrasedFileName>false</usePhrasedFileName>
+                        <usePhrasedTestSuiteClassName>false</usePhrasedTestSuiteClassName>
+                        <usePhrasedTestCaseClassName>false</usePhrasedTestCaseClassName>
+                        <usePhrasedTestCaseMethodName>true</usePhrasedTestCaseMethodName>
+                    </statelessTestsetReporter>
                     <excludes>
                         <exclude>**/integration/AddressServiceIntegrationTest.java</exclude>
                         <exclude>**/integration/AuthServiceIntegrationTest.java</exclude>

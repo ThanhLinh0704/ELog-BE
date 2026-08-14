@@ -55,6 +55,13 @@ public class ImportServiceImpl implements ImportService {
         // Step 2: Parse Excel rows (so size check throws BEFORE creating db batch)
         List<RowData> rows = parseExcelFile(file);
 
+        if (confirmReplace) {
+            List<ImportBatch> activeBatches = batchRepository.findAllActiveByDate(deliveryDate);
+            for (ImportBatch activeBatch : activeBatches) {
+                activeBatch.setIsActive(false);
+                batchRepository.save(activeBatch);
+            }
+        }
 
         // Step 4: Create new batch
         ImportBatch batch = ImportBatch.builder()
@@ -111,7 +118,7 @@ public class ImportServiceImpl implements ImportService {
         batch.setTotalRows(totalRows);
         batch.setAcceptedRows(acceptedRows);
         batch.setRejectedRows(rejectedRows);
-        batch.setStatus("COMPLETED");
+        batch.setStatus(resolveImportStatus(acceptedRows, rejectedRows));
         batchRepository.save(batch);
 
         long ordersCreated = orderRepository.countByBatchId(batch.getId());
@@ -415,6 +422,9 @@ public class ImportServiceImpl implements ImportService {
         }
         Store store = storeCache.get(storeCode);
         if (store == null) {
+            throw new RowRejectedException("Store code '" + storeCode + "' not found", "STORE_NOT_FOUND", "storeCode");
+        }
+        if (store == null) {
             throw new RowRejectedException("Mã cửa hàng '" + storeCode + "' không tồn tại trong hệ thống", "STORE_NOT_FOUND", "store_code");
         }
 
@@ -687,6 +697,13 @@ public class ImportServiceImpl implements ImportService {
         }
 
         return null;
+    }
+
+    private String resolveImportStatus(int acceptedRows, int rejectedRows) {
+        if (acceptedRows > 0 && rejectedRows > 0) {
+            return "PARTIAL";
+        }
+        return "COMPLETED";
     }
 
 

@@ -86,7 +86,7 @@ public class DriverTripServiceImpl implements DriverTripService {
         verifyDriverAccess(execution, driverUsername);
         validateDeliveryDate(execution);
 
-        if (!"ASSIGNED".equals(execution.getStatus())) {
+        if (!List.of("ASSIGNED", "DISPATCHED").contains(execution.getStatus())) {
             throw new BusinessException(
                     ErrorCode.VALIDATION_FAILED,
                     "Chuyến xe không ở trạng thái ASSIGNED (hiện tại: " + execution.getStatus() + ")",
@@ -99,7 +99,7 @@ public class DriverTripServiceImpl implements DriverTripService {
         tripExecutionRepo.save(execution);
 
         Trip trip = execution.getTrip();
-        if (trip != null) {
+        if (trip != null && "ASSIGNED".equals(statusBefore)) {
             trip.setStatus(TripStatus.IN_PROGRESS);
             if (trip.getActualDepartureTime() == null) {
                 trip.setActualDepartureTime(execution.getStartedAt());
