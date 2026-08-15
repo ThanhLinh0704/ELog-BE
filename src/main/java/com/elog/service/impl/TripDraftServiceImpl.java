@@ -261,9 +261,7 @@ public class TripDraftServiceImpl implements TripDraftService {
                         "Trip Draft not found with id: " + id,
                         HttpStatus.NOT_FOUND));
 
-        List<TripDraftStopResponse> stopResponses = draft.getStops().stream()
-                .map(this::toStopResponse)
-                .toList();
+        List<TripDraftStopResponse> stopResponses = buildStopResponses(draft.getStops(), draft.getId());
 
         return toResponse(draft, stopResponses);
     }
@@ -526,45 +524,64 @@ public class TripDraftServiceImpl implements TripDraftService {
                 .stops(stops)
                 .build();
     }
+    private List<TripDraftStopResponse> buildStopResponses(List<TripDraftStop> stops, Long draftId) {
+        if (stops == null || stops.isEmpty()) return Collections.emptyList();
+
+        List<Long> storeIds = stops.stream()
+                .map(s -> s.getStore() != null ? s.getStore().getId() : null)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, List<OrderItem>> itemsByStoreId = (draftId != null && !storeIds.isEmpty())
+                ? orderItemRepository.findByStoreIdInAndTripDraftId(storeIds, draftId).stream()
+                .collect(Collectors.groupingBy(item -> item.getOrder().getStore().getId()))
+                : Collections.emptyMap();
+
+        return stops.stream().map(stop -> {
+            Long routeStopId = (stop.getRouteStop() != null) ? stop.getRouteStop().getId() : null;
+
+            BigDecimal stopWeight = BigDecimal.ZERO;
+            BigDecimal stopVolume = BigDecimal.ZERO;
+
+            if (draftId != null && stop.getStore() != null) {
+                List<OrderItem> items = itemsByStoreId.get(stop.getStore().getId());
+                if (items != null) {
+                    stopWeight = items.stream()
+                            .map(OrderItem::getLineWeightKg)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    stopVolume = items.stream()
+                            .map(OrderItem::getLineVolumeM3)
+                            .filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                }
+            }
+
+            return TripDraftStopResponse.builder()
+                    .tripDraftStopId(stop.getId())
+                    .sequenceNo(stop.getSequenceNo())
+                    .storeId(stop.getStore() != null ? stop.getStore().getId() : null)
+                    .storeCode(stop.getStore() != null ? stop.getStore().getCode() : null)
+                    .storeName(stop.getStore() != null ? stop.getStore().getName() : null)
+                    .isActive(stop.getIsActive())
+                    .orderCount(stop.getOrderCount())
+                    .plannedEta(stop.getPlannedEta())
+                    .overrideNote(stop.getOverrideNote())
+                    .routeStopId(routeStopId)
+                    .stopVolumeM3(stopVolume)
+                    .stopWeightKg(stopWeight)
+                    .distanceFromPrevKm(stop.getDistanceFromPrevKm())
+                    .travelTimeFromPrevMin(stop.getTravelTimeFromPrevMin())
+                    .estimatedDistanceKm(stop.getDistanceFromPrevKm())
+                    .estimatedTravelMin(stop.getTravelTimeFromPrevMin())
+                    .build();
+        }).toList();
+    }
+
     private TripDraftStopResponse toStopResponse(TripDraftStop stop) {
         Long draftId = (stop.getTripDraft() != null) ? stop.getTripDraft().getId() : null;
-        Long routeStopId = (stop.getRouteStop() != null) ? stop.getRouteStop().getId() : null;
-        
-        BigDecimal stopWeight = BigDecimal.ZERO;
-        BigDecimal stopVolume = BigDecimal.ZERO;
-        
-        if (draftId != null && stop.getStore() != null) {
-            List<OrderItem> items = orderItemRepository.findByStopForManifest(
-                    stop.getStore().getId(), draftId);
-            if (items != null) {
-                stopWeight = items.stream()
-                        .map(OrderItem::getLineWeightKg)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-                stopVolume = items.stream()
-                        .map(OrderItem::getLineVolumeM3)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
-            }
-        }
-
-        return TripDraftStopResponse.builder()
-                .tripDraftStopId(stop.getId())
-                .sequenceNo(stop.getSequenceNo())
-                .storeId(stop.getStore() != null ? stop.getStore().getId() : null)
-                .storeCode(stop.getStore() != null ? stop.getStore().getCode() : null)
-                .storeName(stop.getStore() != null ? stop.getStore().getName() : null)
-                .isActive(stop.getIsActive())
-                .orderCount(stop.getOrderCount())
-                .plannedEta(stop.getPlannedEta())
-                .overrideNote(stop.getOverrideNote())
-                .routeStopId(routeStopId)
-                .stopVolumeM3(stopVolume)
-                .stopWeightKg(stopWeight)
-                .distanceFromPrevKm(stop.getDistanceFromPrevKm())
-                .travelTimeFromPrevMin(stop.getTravelTimeFromPrevMin())
-                .estimatedDistanceKm(stop.getDistanceFromPrevKm())
-                .estimatedTravelMin(stop.getTravelTimeFromPrevMin())
-                .build();
-
+        return buildStopResponses(List.of(stop), draftId).get(0);
     }
 
 

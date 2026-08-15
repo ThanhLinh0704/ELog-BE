@@ -88,7 +88,8 @@ public class StoreServiceImpl implements StoreService {
         Specification<Store> spec = Specification.where(StoreSpecification.hasKeyword(keyword))
                 .and(StoreSpecification.hasActiveStatus(isActive))
                 .and(StoreSpecification.hasRoute(hasRoute))
-                .and(StoreSpecification.belongsToRouteCode(routeCode));
+                .and(StoreSpecification.belongsToRouteCode(routeCode))
+                .and(StoreSpecification.fetchLocations());
 
         Page<Store> page = storeRepository.findAll(spec, pageable);
 

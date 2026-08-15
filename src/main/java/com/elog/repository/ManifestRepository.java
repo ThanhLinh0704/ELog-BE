@@ -13,6 +13,8 @@ public interface ManifestRepository extends JpaRepository<Manifest, Long> {
 
     Optional<Manifest> findByTripDraftId(Long tripDraftId);
 
+    java.util.List<Manifest> findByTripDraftIdIn(java.util.Collection<Long> tripDraftIds);
+
     @Query("SELECT m FROM Manifest m " +
            "JOIN FETCH m.tripDraft td " +
            "JOIN FETCH td.route " +

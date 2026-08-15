@@ -2,6 +2,7 @@ package com.elog.repository;
 
 import com.elog.entity.Trip;
 import com.elog.entity.TripStatus;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +12,7 @@ import java.util.List;
 
 public interface TripRepository extends JpaRepository<Trip, Long> {
 
+        @EntityGraph(attributePaths = {"vehicle", "driver", "route", "tripDraft", "lockedBy"})
         List<Trip> findByTripDraftId(Long tripDraftId);
 
         boolean existsByTripDraftId(Long tripDraftId);
@@ -45,6 +47,7 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         List<Trip> findByDriverIdAndDeliveryDateBetween(
                         Long driverId, LocalDate startDate, LocalDate endDate);
 
+        @EntityGraph(attributePaths = {"vehicle", "driver", "route", "tripDraft", "lockedBy"})
         List<Trip> findByDeliveryDateAndStatus(LocalDate deliveryDate, TripStatus status);
 
         // ── US-17 — Dashboard Monitoring ─────────────────────────────────────────

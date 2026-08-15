@@ -2,6 +2,9 @@ package com.elog.repository.specification;
 
 import com.elog.entity.Order;
 import com.elog.entity.RouteStop;
+import com.elog.entity.Store;
+import jakarta.persistence.criteria.Fetch;
+import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
@@ -24,6 +27,15 @@ public class OrderSpecification {
             String search) {
 
         return (root, query, cb) -> {
+            // Add fetch joins for data queries to avoid N+1 queries when mapping to DTOs
+            if (query.getResultType() != null && !Long.class.isAssignableFrom(query.getResultType()) && !long.class.isAssignableFrom(query.getResultType())) {
+                Fetch<Order, Store> storeFetch = root.fetch("store", JoinType.LEFT);
+                storeFetch.fetch("province", JoinType.LEFT);
+                storeFetch.fetch("district", JoinType.LEFT);
+                storeFetch.fetch("ward", JoinType.LEFT);
+                root.fetch("tripDraft", JoinType.LEFT);
+            }
+
             List<Predicate> predicates = new ArrayList<>();
 
             // Active import batch condition

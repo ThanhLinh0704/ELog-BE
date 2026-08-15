@@ -12,7 +12,11 @@ import java.util.List;
 
 public interface TripStopRepository extends JpaRepository<TripStop, Long> {
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"routeStop", "routeStop.store", "tripDraftStop"})
     List<TripStop> findByTripTripIdOrderBySequenceOrderAsc(Long tripId);
+
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"routeStop", "routeStop.store", "tripDraftStop"})
+    List<TripStop> findByTripTripIdInOrderBySequenceOrderAsc(java.util.Collection<Long> tripIds);
 
     java.util.Optional<TripStop> findByTripDraftStopId(Long tripDraftStopId);
 
