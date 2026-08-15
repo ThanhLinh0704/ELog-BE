@@ -1,10 +1,10 @@
 package com.elog.controller;
 
-import com.elog.dto.request.RejectStopRequest;
-import com.elog.dto.request.ResolveExceptionRequest;
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.DeliveryExceptionResponse;
-import com.elog.dto.response.ExceptionListResponse;
+import com.elog.dto.request.exception.RejectStopRequest;
+import com.elog.dto.request.exception.ResolveExceptionRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.exception.DeliveryExceptionResponse;
+import com.elog.dto.response.exception.ExceptionListResponse;
 import com.elog.service.ExceptionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

@@ -1,9 +1,9 @@
 package com.elog.controller;
 
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.ImportBatchResponse;
-import com.elog.dto.response.ImportErrorResponse;
-import com.elog.dto.response.ImportedOrderDetailResponse;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.importbatch.ImportBatchResponse;
+import com.elog.dto.response.importbatch.ImportedOrderDetailResponse;
+import com.elog.dto.response.importbatch.ImportErrorResponse;
 import com.elog.entity.User;
 import com.elog.repository.UserRepository;
 import com.elog.service.ImportService;
@@ -33,7 +33,7 @@ public class ImportController {
     private final UserRepository userRepository;
 
     @PostMapping(consumes = "multipart/form-data")
-    @Operation(summary = "Upload Excel file to import orders for a delivery date")
+    @Operation(summary = "Upload Excel file to import orders")
     @PreAuthorize("hasAuthority('order:import')")
     public ResponseEntity<?> importOrders(
             @RequestParam("file") MultipartFile file,

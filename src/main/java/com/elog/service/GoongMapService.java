@@ -58,9 +58,19 @@ public class GoongMapService {
 
                 GoongDirectionsResponse res = restTemplate.getForObject(url, GoongDirectionsResponse.class);
                 if (res != null && res.getRoutes() != null && !res.getRoutes().isEmpty()) {
-                    return res;
+                    int expectedLegs = 1;
+                    if (waypoints != null && !waypoints.trim().isEmpty()) {
+                        expectedLegs += waypoints.split("\\|").length;
+                    }
+                    int actualLegs = (res.getRoutes().get(0).getLegs() != null) ? res.getRoutes().get(0).getLegs().size() : 0;
+
+                    if (actualLegs >= expectedLegs) {
+                        return res;
+                    }
+                    log.warn("Goong Directions API ignored waypoints (returned {} legs, expected {}). Triggering OSRM fallback...", actualLegs, expectedLegs);
+                } else {
+                    log.warn("Goong Directions API returned empty routes or rate limit error. Triggering OSRM fallback...");
                 }
-                log.warn("Goong Directions API returned empty routes or rate limit error. Triggering OSRM fallback...");
             } catch (Exception e) {
                 log.error("Error calling Goong Directions API: {}. Triggering OSRM fallback...", e.getMessage());
             }

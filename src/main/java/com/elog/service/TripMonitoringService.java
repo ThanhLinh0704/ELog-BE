@@ -1,6 +1,10 @@
 package com.elog.service;
 
-import com.elog.dto.response.*;
+import com.elog.dto.response.trip.ActiveTripsResponse;
+import com.elog.dto.response.trip.StopArriveResponse;
+import com.elog.dto.response.trip.StopCompleteResponse;
+import com.elog.dto.response.trip.TripProgressResponse;
+import com.elog.dto.response.trip.TripStartResponse;
 
 import java.time.LocalDate;
 

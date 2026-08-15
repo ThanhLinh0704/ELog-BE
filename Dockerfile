@@ -1,18 +1,30 @@
-# Stage 1: Build JAR using Maven
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+# ── Stage 1: Build stage ──
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS builder
 WORKDIR /app
+
+# Copy pom.xml and source code
 COPY pom.xml .
-# Pre-fetch dependencies
-RUN mvn dependency:go-offline -B
 COPY src ./src
+
+# Build application executable JAR skipping tests
 RUN mvn clean package -DskipTests
 
-# Stage 2: Lightweight Runtime image
+# ── Stage 2: Runtime stage ──
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY --from=build /app/target/*.jar app.jar
 
-ENV PORT=8080
+# Create non-root user for security
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
+
+# Copy built JAR from builder stage
+COPY --from=builder /app/target/*.jar app.jar
+
+# Expose default Spring Boot port
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-Dserver.port=${PORT}", "-jar", "app.jar"]
+# Active profile defaults to prod
+ENV SPRING_PROFILES_ACTIVE=prod
+
+# Run the executable JAR
+ENTRYPOINT ["java", "-jar", "app.jar"]

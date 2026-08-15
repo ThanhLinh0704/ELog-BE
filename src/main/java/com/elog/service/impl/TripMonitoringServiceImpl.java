@@ -1,6 +1,10 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.*;
+import com.elog.dto.response.trip.ActiveTripsResponse;
+import com.elog.dto.response.trip.StopArriveResponse;
+import com.elog.dto.response.trip.StopCompleteResponse;
+import com.elog.dto.response.trip.TripProgressResponse;
+import com.elog.dto.response.trip.TripStartResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;

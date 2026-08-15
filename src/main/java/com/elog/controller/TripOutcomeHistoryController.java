@@ -1,7 +1,7 @@
 package com.elog.controller;
 
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.TripOutcomeEventResponse;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.trip.TripOutcomeEventResponse;
 import com.elog.entity.TripOutcomeEventType;
 import com.elog.service.TripOutcomeHistoryService;
 import io.swagger.v3.oas.annotations.Operation;

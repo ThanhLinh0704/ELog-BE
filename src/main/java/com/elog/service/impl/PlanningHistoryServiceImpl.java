@@ -1,7 +1,7 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.PlanningEventResponse;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.trip.PlanningEventResponse;
 import com.elog.entity.PlanningActorType;
 import com.elog.entity.TripPlanningEvent;
 import com.elog.entity.User;

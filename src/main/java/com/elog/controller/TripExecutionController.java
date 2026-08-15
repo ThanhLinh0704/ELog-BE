@@ -1,8 +1,8 @@
 package com.elog.controller;
 
-import com.elog.dto.request.AdminTripOverrideRequest;
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.DriverTripResponse;
+import com.elog.dto.request.trip.AdminTripOverrideRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.user.DriverTripResponse;
 import com.elog.service.DriverTripService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

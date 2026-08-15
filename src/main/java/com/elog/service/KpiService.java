@@ -1,10 +1,10 @@
 package com.elog.service;
 
-import com.elog.dto.response.KpiByDriverResponse;
-import com.elog.dto.response.KpiByRouteResponse;
-import com.elog.dto.response.KpiByVehicleResponse;
-import com.elog.dto.response.KpiDailyTrendResponse;
-import com.elog.dto.response.KpiSummaryResponse;
+import com.elog.dto.response.kpi.KpiByDriverResponse;
+import com.elog.dto.response.kpi.KpiByRouteResponse;
+import com.elog.dto.response.kpi.KpiByVehicleResponse;
+import com.elog.dto.response.kpi.KpiDailyTrendResponse;
+import com.elog.dto.response.kpi.KpiSummaryResponse;
 
 import java.time.LocalDate;
 

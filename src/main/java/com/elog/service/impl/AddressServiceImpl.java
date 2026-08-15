@@ -1,8 +1,8 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.ProvinceResponse;
-import com.elog.dto.response.DistrictResponse;
-import com.elog.dto.response.WardResponse;
+import com.elog.dto.response.goong.DistrictResponse;
+import com.elog.dto.response.goong.ProvinceResponse;
+import com.elog.dto.response.goong.WardResponse;
 import com.elog.repository.ProvinceRepository;
 import com.elog.repository.DistrictRepository;
 import com.elog.repository.WardRepository;

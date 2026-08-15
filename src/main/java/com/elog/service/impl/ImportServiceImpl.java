@@ -1,9 +1,9 @@
 package com.elog.service.impl;
 
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.ImportBatchResponse;
-import com.elog.dto.response.ImportErrorResponse;
-import com.elog.dto.response.ImportedOrderDetailResponse;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.importbatch.ImportBatchResponse;
+import com.elog.dto.response.importbatch.ImportedOrderDetailResponse;
+import com.elog.dto.response.importbatch.ImportErrorResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -60,6 +60,27 @@ public class ImportServiceImpl implements ImportService {
             for (ImportBatch activeBatch : activeBatches) {
                 activeBatch.setIsActive(false);
                 batchRepository.save(activeBatch);
+            }
+        } else {
+            Set<String> duplicateRefs = new HashSet<>();
+            for (RowData row : rows) {
+                if (row.orderRef != null && !row.orderRef.trim().isEmpty()) {
+                    String ref = row.orderRef.trim();
+                    LocalDate rowDate = parseRowDate(row.deliveryDateRaw != null ? row.deliveryDateRaw.trim() : "");
+                    if (rowDate == null && deliveryDate != null) {
+                        rowDate = deliveryDate;
+                    }
+                    if (rowDate != null) {
+                        if (orderRepository.findActiveByOrderRefAndDeliveryDate(ref, rowDate).isPresent()) {
+                            duplicateRefs.add(ref);
+                        }
+                    }
+                }
+            }
+            if (!duplicateRefs.isEmpty()) {
+                throw new BusinessException(ErrorCode.DUPLICATE_ORDERS_EXIST,
+                        "Phát hiện " + duplicateRefs.size() + " đơn hàng đã tồn tại trên hệ thống: " + String.join(", ", duplicateRefs),
+                        HttpStatus.CONFLICT);
             }
         }
 
@@ -392,6 +413,16 @@ public class ImportServiceImpl implements ImportService {
                 throw new RowRejectedException("Ngày giao hàng không đúng định dạng DD/MM/YYYY (ví dụ: 02/08/2026) (giá trị: '" + row.deliveryDateRaw + "')", "INVALID_DATE_FORMAT", "delivery_date");
             }
 
+        }
+
+        // Validate date window (must not be in the past, max 7 days from today)
+        LocalDate today = LocalDate.now();
+        if (rowDeliveryDate.isBefore(today)) {
+            throw new RowRejectedException("Ngày giao hàng (" + rowDeliveryDate + ") không được ở quá khứ (hôm nay là " + today + ")", "INVALID_DELIVERY_DATE", "delivery_date");
+        }
+        LocalDate maxDate = today.plusDays(7);
+        if (rowDeliveryDate.isAfter(maxDate)) {
+            throw new RowRejectedException("Ngày giao hàng (" + rowDeliveryDate + ") vượt quá 7 ngày tính từ ngày hiện tại (tối đa " + maxDate + ")", "INVALID_DELIVERY_DATE", "delivery_date");
         }
 
         // Reject rows targeting a delivery date whose TripDraft is already locked (status != DRAFT)

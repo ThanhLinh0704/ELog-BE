@@ -1,7 +1,7 @@
 package com.elog.controller;
 
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.PlanningEventResponse;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.trip.PlanningEventResponse;
 import com.elog.entity.PlanningEventType;
 import com.elog.service.PlanningHistoryService;
 import io.swagger.v3.oas.annotations.Operation;

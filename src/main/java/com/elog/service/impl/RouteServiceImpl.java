@@ -1,7 +1,15 @@
 package com.elog.service.impl;
 
-import com.elog.dto.request.*;
-import com.elog.dto.response.*;
+import com.elog.dto.request.route.RouteCreateRequest;
+import com.elog.dto.request.route.RouteStatusUpdateRequest;
+import com.elog.dto.request.route.RouteStopAddRequest;
+import com.elog.dto.request.route.RouteStopReorderRequest;
+import com.elog.dto.request.route.RouteUpdateRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.route.RouteDetailResponse;
+import com.elog.dto.response.route.RouteDirectionsResponse;
+import com.elog.dto.response.route.RouteResponse;
+import com.elog.dto.response.route.RouteStopResponse;
 import com.elog.entity.Route;
 import com.elog.entity.RouteStop;
 import com.elog.entity.Store;
@@ -270,13 +278,24 @@ public class RouteServiceImpl implements RouteService {
     @Override
     @Transactional
     public RouteDirectionsResponse getRouteDirections(Long routeId) {
+        return getRouteDirections(routeId, false);
+    }
+
+    @Override
+    @Transactional
+    public RouteDirectionsResponse getRouteDirections(Long routeId, boolean forceRefresh) {
         Route route = findRouteOrThrow(routeId);
         List<RouteStop> stops = routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(routeId);
 
         double warehouseLat = 21.032612;
         double warehouseLng = 105.868367;
 
-        if (route.getRoutePolyline() != null && !route.getRoutePolyline().trim().isEmpty()) {
+        if (forceRefresh) {
+            route.setRoutePolyline(null);
+            route.setTotalDistanceKm(null);
+            route.setTotalDurationMin(null);
+            routeRepository.save(route);
+        } else if (route.getRoutePolyline() != null && !route.getRoutePolyline().trim().isEmpty()) {
             return RouteDirectionsResponse.builder()
                     .routeId(route.getId())
                     .routeCode(route.getCode())
@@ -334,11 +353,8 @@ public class RouteServiceImpl implements RouteService {
                         long totalMeters = r.getLegs().stream()
                                 .mapToLong(leg -> leg.getDistance() != null && leg.getDistance().getValue() != null ? leg.getDistance().getValue() : 0)
                                 .sum();
-                        long totalSecs = r.getLegs().stream()
-                                .mapToLong(leg -> leg.getDuration() != null && leg.getDuration().getValue() != null ? leg.getDuration().getValue() : 0)
-                                .sum();
                         double distKm = totalMeters / 1000.0;
-                        int durMin = (int) (totalSecs / 60);
+                        int durMin = (int) Math.round((distKm / 40.0) * 60.0);
 
                         builder.totalDistanceKm(distKm);
                         builder.totalDurationMin(durMin);

@@ -1,9 +1,12 @@
 package com.elog.service.impl;
 
-import com.elog.dto.request.UpdateOrderResultRequest;
-import com.elog.dto.response.DriverTripResponse;
-import com.elog.dto.response.DriverTripResponse.*;
-import com.elog.dto.response.TripOutcomeResponse;
+import com.elog.dto.response.user.DriverTripResponse.DriverOrderDto;
+import com.elog.dto.response.user.DriverTripResponse.DriverOrderItemDto;
+import com.elog.dto.response.user.DriverTripResponse.DriverStopDto;
+import com.elog.dto.response.user.DriverTripResponse.LifoLoadingItemDto;
+import com.elog.dto.request.trip.UpdateOrderResultRequest;
+import com.elog.dto.response.trip.TripOutcomeResponse;
+import com.elog.dto.response.user.DriverTripResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -48,11 +51,10 @@ public class DriverTripServiceImpl implements DriverTripService {
                 .stream()
                 .filter(te -> "IN_PROGRESS".equals(te.getStatus())
                         || (te.getTrip() != null && te.getTrip().getDeliveryDate() != null
-                            && !te.getTrip().getDeliveryDate().isAfter(today)))
-                .sorted(Comparator.comparing(te ->
-                        te.getTrip() != null && te.getTrip().getDeliveryDate() != null
-                                ? te.getTrip().getDeliveryDate()
-                                : LocalDate.MAX))
+                                && !te.getTrip().getDeliveryDate().isAfter(today)))
+                .sorted(Comparator.comparing(te -> te.getTrip() != null && te.getTrip().getDeliveryDate() != null
+                        ? te.getTrip().getDeliveryDate()
+                        : LocalDate.MAX))
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.RESOURCE_NOT_FOUND,
@@ -66,7 +68,8 @@ public class DriverTripServiceImpl implements DriverTripService {
     @Transactional(readOnly = true)
     public List<DriverTripResponse> getPendingReturnTrips(String driverUsername) {
         User driver = userRepo.findByUsername(driverUsername)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "Không tìm thấy tài xế", HttpStatus.NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND, "Không tìm thấy tài xế",
+                        HttpStatus.NOT_FOUND));
 
         return tripExecutionRepo.findUnreturnedByDriverId(driver.getId()).stream()
                 .filter(te -> List.of("COMPLETED", "COMPLETED_WITH_EXCEPTIONS").contains(te.getStatus()))
@@ -117,8 +120,7 @@ public class DriverTripServiceImpl implements DriverTripService {
                 statusBefore, "IN_PROGRESS",
                 null, null, null, null, null, null, null, null,
                 trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
-                trip != null ? trip.getDeliveryDate() : null, driverUsername
-        ));
+                trip != null ? trip.getDeliveryDate() : null, driverUsername));
 
         log.info("Driver {} started trip execution ID {}", driverUsername, executionId);
         return buildDriverTripResponse(execution);
@@ -167,7 +169,8 @@ public class DriverTripServiceImpl implements DriverTripService {
         TripStop firstRemaining = remainingStops.get(0);
         if (!firstRemaining.getTripStopId().equals(targetStop.getTripStopId())) {
             throw new BusinessException(ErrorCode.PREVIOUS_STOP_NOT_DONE,
-                    "Phải xử lý xong điểm dừng trước (thứ tự " + firstRemaining.getSequenceOrder() + ") mới được điểm tiếp theo.",
+                    "Phải xử lý xong điểm dừng trước (thứ tự " + firstRemaining.getSequenceOrder()
+                            + ") mới được điểm tiếp theo.",
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -186,8 +189,8 @@ public class DriverTripServiceImpl implements DriverTripService {
     @Override
     @Transactional
     public DriverTripResponse updateOrderResult(Long executionId, Long orderId,
-                                                UpdateOrderResultRequest request,
-                                                String driverUsername) {
+            UpdateOrderResultRequest request,
+            String driverUsername) {
         TripExecution execution = tripExecutionRepo.findById(executionId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.RESOURCE_NOT_FOUND,
@@ -225,8 +228,8 @@ public class DriverTripServiceImpl implements DriverTripService {
         TripDraftStop stop = result.getStop();
         List<DeliveryOrderResult> stopResultsBefore = stop != null
                 ? deliveryOrderResultRepo.findByTripExecutionId(executionId).stream()
-                .filter(r -> r.getStop() != null && r.getStop().getId().equals(stop.getId()))
-                .toList()
+                        .filter(r -> r.getStop() != null && r.getStop().getId().equals(stop.getId()))
+                        .toList()
                 : List.of();
         String stopStatusBefore = aggregateStopStatusFromResults(stopResultsBefore);
 
@@ -241,8 +244,8 @@ public class DriverTripServiceImpl implements DriverTripService {
         com.elog.entity.TripOutcomeEventType eventType = "DELIVERED".equals(newStatus)
                 ? com.elog.entity.TripOutcomeEventType.ORDER_DELIVERED
                 : "FAILED".equals(newStatus)
-                ? com.elog.entity.TripOutcomeEventType.ORDER_FAILED
-                : com.elog.entity.TripOutcomeEventType.ORDER_PARTIALLY_DELIVERED;
+                        ? com.elog.entity.TripOutcomeEventType.ORDER_FAILED
+                        : com.elog.entity.TripOutcomeEventType.ORDER_PARTIALLY_DELIVERED;
 
         tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
                 executionId, trip != null ? trip.getTripId() : null,
@@ -253,11 +256,11 @@ public class DriverTripServiceImpl implements DriverTripService {
                 stop != null && stop.getStore() != null ? stop.getStore().getCode() : null,
                 newStatus, request.getReasonCode(), request.getExceptionText(), null,
                 trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
-                trip != null ? trip.getDeliveryDate() : null, driverUsername
-        ));
+                trip != null ? trip.getDeliveryDate() : null, driverUsername));
 
         if (stop != null) {
-            List<DeliveryOrderResult> stopResultsAfter = deliveryOrderResultRepo.findByTripExecutionId(executionId).stream()
+            List<DeliveryOrderResult> stopResultsAfter = deliveryOrderResultRepo.findByTripExecutionId(executionId)
+                    .stream()
                     .filter(r -> r.getStop() != null && r.getStop().getId().equals(stop.getId()))
                     .toList();
             String stopStatusAfter = aggregateStopStatusFromResults(stopResultsAfter);
@@ -272,8 +275,7 @@ public class DriverTripServiceImpl implements DriverTripService {
                         stop.getStore() != null ? stop.getStore().getCode() : null,
                         null, null, null, null,
                         trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
-                        trip != null ? trip.getDeliveryDate() : null, driverUsername
-                ));
+                        trip != null ? trip.getDeliveryDate() : null, driverUsername));
 
                 // Sync to System A TripStop entity if exists
                 tripStopRepo.findByTripDraftStopId(stop.getId()).ifPresent(ts -> {
@@ -297,7 +299,8 @@ public class DriverTripServiceImpl implements DriverTripService {
         if (List.of("FAILED", "PARTIALLY_DELIVERED").contains(newStatus)) {
             log.warn("Order ID {} updated to exception status {} by driver {}", orderId, newStatus, driverUsername);
 
-            if (!deliveryExceptionRepo.existsByOrderIdAndExceptionTypeAndResolvedAtIsNull(orderId, ExceptionType.DELIVERY_REJECTION)) {
+            if (!deliveryExceptionRepo.existsByOrderIdAndExceptionTypeAndResolvedAtIsNull(orderId,
+                    ExceptionType.DELIVERY_REJECTION)) {
                 User driver = userRepo.findByUsername(driverUsername).orElse(null);
                 Long driverId = driver != null ? driver.getId() : null;
                 String reasonCode = request.getReasonCode() != null ? request.getReasonCode() : newStatus;
@@ -347,7 +350,8 @@ public class DriverTripServiceImpl implements DriverTripService {
         if (pendingCount > 0) {
             throw new BusinessException(
                     ErrorCode.VALIDATION_FAILED,
-                    "Còn " + pendingCount + " đơn hàng ở trạng thái PENDING. Phải cập nhật kết quả cho tất cả đơn trước khi hoàn tất chuyến.",
+                    "Còn " + pendingCount
+                            + " đơn hàng ở trạng thái PENDING. Phải cập nhật kết quả cho tất cả đơn trước khi hoàn tất chuyến.",
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -380,8 +384,7 @@ public class DriverTripServiceImpl implements DriverTripService {
                 statusBefore, finalExecutionStatus,
                 null, null, null, null, null, null, null, null,
                 trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
-                trip != null ? trip.getDeliveryDate() : null, driverUsername
-        ));
+                trip != null ? trip.getDeliveryDate() : null, driverUsername));
 
         // Create Submitted Trip Outcome for Dispatcher validation
         TripOutcome outcome = TripOutcome.builder()
@@ -403,10 +406,10 @@ public class DriverTripServiceImpl implements DriverTripService {
                 "IN_PROGRESS", "SUBMITTED",
                 null, null, null, null, null, null, null, null,
                 trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
-                trip != null ? trip.getDeliveryDate() : null, driverUsername
-        ));
+                trip != null ? trip.getDeliveryDate() : null, driverUsername));
 
-        log.info("Driver {} completed trip execution ID {} with status {}", driverUsername, executionId, finalExecutionStatus);
+        log.info("Driver {} completed trip execution ID {} with status {}", driverUsername, executionId,
+                finalExecutionStatus);
 
         String tripCodeStr = trip != null ? "TRIP-" + trip.getTripId() : null;
         return TripOutcomeResponse.builder()
@@ -440,7 +443,8 @@ public class DriverTripServiceImpl implements DriverTripService {
         if (!List.of("COMPLETED", "COMPLETED_WITH_EXCEPTIONS").contains(execution.getStatus())) {
             throw new BusinessException(
                     ErrorCode.VALIDATION_FAILED,
-                    "Chuyến xe chưa hoàn thành (trạng thái hiện tại: " + execution.getStatus() + "). Không thể xác nhận về kho.",
+                    "Chuyến xe chưa hoàn thành (trạng thái hiện tại: " + execution.getStatus()
+                            + "). Không thể xác nhận về kho.",
                     HttpStatus.BAD_REQUEST);
         }
 
@@ -460,7 +464,8 @@ public class DriverTripServiceImpl implements DriverTripService {
             trip.getVehicle().setStatus(VehicleStatus.AVAILABLE);
         }
 
-        log.info("Driver {} confirmed return to warehouse for trip execution ID {}. Vehicle released to AVAILABLE.", driverUsername, executionId);
+        log.info("Driver {} confirmed return to warehouse for trip execution ID {}. Vehicle released to AVAILABLE.",
+                driverUsername, executionId);
         return buildDriverTripResponse(execution);
     }
 
@@ -480,7 +485,8 @@ public class DriverTripServiceImpl implements DriverTripService {
                 String formattedDate = deliveryDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
                 throw new BusinessException(
                         ErrorCode.VALIDATION_FAILED,
-                        "Chưa đến ngày giao hàng (ngày giao: " + formattedDate + "). Không thể thực hiện chuyến xe trước ngày giao.",
+                        "Chưa đến ngày giao hàng (ngày giao: " + formattedDate
+                                + "). Không thể thực hiện chuyến xe trước ngày giao.",
                         HttpStatus.BAD_REQUEST);
             }
         }
@@ -548,8 +554,10 @@ public class DriverTripServiceImpl implements DriverTripService {
                 DeliveryOrderResult r = resultMap.get(o.getId());
                 String orderStatus = r != null ? r.getStatus() : "PENDING";
 
-                if ("PENDING".equals(orderStatus)) pendingCount++;
-                else completedCount++;
+                if ("PENDING".equals(orderStatus))
+                    pendingCount++;
+                else
+                    completedCount++;
 
                 List<DriverOrderItemDto> itemDtos = o.getItems().stream()
                         .map(i -> DriverOrderItemDto.builder()
@@ -595,7 +603,8 @@ public class DriverTripServiceImpl implements DriverTripService {
                     .build());
         }
 
-        // Build LIFO guidance (REVERSE sequence of delivery stops: load last stop first at the bottom/back)
+        // Build LIFO guidance (REVERSE sequence of delivery stops: load last stop first
+        // at the bottom/back)
         List<TripDraftStop> reverseStops = new ArrayList<>(stops);
         Collections.reverse(reverseStops);
 
@@ -645,30 +654,39 @@ public class DriverTripServiceImpl implements DriverTripService {
     }
 
     private String aggregateStopStatus(List<DriverOrderDto> orders) {
-        if (orders.isEmpty()) return "PENDING";
+        if (orders.isEmpty())
+            return "PENDING";
         boolean anyPending = orders.stream().anyMatch(o -> "PENDING".equals(o.getDeliveryStatus()));
-        if (anyPending) return "PENDING";
+        if (anyPending)
+            return "PENDING";
         boolean allDelivered = orders.stream().allMatch(o -> "DELIVERED".equals(o.getDeliveryStatus()));
-        if (allDelivered) return "DELIVERED";
+        if (allDelivered)
+            return "DELIVERED";
         boolean anyFailed = orders.stream().anyMatch(o -> "FAILED".equals(o.getDeliveryStatus()));
-        if (anyFailed) return "FAILED";
+        if (anyFailed)
+            return "FAILED";
         return "PARTIALLY_DELIVERED";
     }
 
     private String aggregateStopStatusFromResults(List<DeliveryOrderResult> results) {
-        if (results.isEmpty()) return "PENDING";
+        if (results.isEmpty())
+            return "PENDING";
         boolean anyPending = results.stream().anyMatch(o -> "PENDING".equals(o.getStatus()));
-        if (anyPending) return "PENDING";
+        if (anyPending)
+            return "PENDING";
         boolean allDelivered = results.stream().allMatch(o -> "DELIVERED".equals(o.getStatus()));
-        if (allDelivered) return "DELIVERED";
+        if (allDelivered)
+            return "DELIVERED";
         boolean anyFailed = results.stream().anyMatch(o -> "FAILED".equals(o.getStatus()));
-        if (anyFailed) return "FAILED";
+        if (anyFailed)
+            return "FAILED";
         return "PARTIALLY_DELIVERED";
     }
 
     @Override
     @Transactional
-    public DriverTripResponse adminOverrideTripExecution(Long executionId, com.elog.dto.request.AdminTripOverrideRequest request, String adminUsername) {
+    public DriverTripResponse adminOverrideTripExecution(Long executionId,
+            com.elog.dto.request.trip.AdminTripOverrideRequest request, String adminUsername) {
         TripExecution execution = tripExecutionRepo.findById(executionId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.RESOURCE_NOT_FOUND,
@@ -682,7 +700,8 @@ public class DriverTripServiceImpl implements DriverTripService {
             if (!List.of("COMPLETED", "COMPLETED_WITH_EXCEPTIONS").contains(execution.getStatus())) {
                 throw new BusinessException(
                         ErrorCode.VALIDATION_FAILED,
-                        "Chỉ có thể Force Return khi chuyến xe đã ở trạng thái hoàn thành (COMPLETED hoặc COMPLETED_WITH_EXCEPTIONS). Trạng thái hiện tại: " + execution.getStatus(),
+                        "Chỉ có thể Force Return khi chuyến xe đã ở trạng thái hoàn thành (COMPLETED hoặc COMPLETED_WITH_EXCEPTIONS). Trạng thái hiện tại: "
+                                + execution.getStatus(),
                         HttpStatus.BAD_REQUEST);
             }
             if (execution.getReturnedToWarehouseAt() != null) {
@@ -709,14 +728,15 @@ public class DriverTripServiceImpl implements DriverTripService {
                     null, null, null, null, null, reason, null, null,
                     trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
                     trip != null ? trip.getDeliveryDate() : null,
-                    execution.getDriver() != null ? execution.getDriver().getUsername() : null
-            ));
+                    execution.getDriver() != null ? execution.getDriver().getUsername() : null));
 
-            log.info("Admin {} performed FORCE_RETURN on trip execution ID {}. Reason: {}", adminUsername, executionId, reason);
+            log.info("Admin {} performed FORCE_RETURN on trip execution ID {}. Reason: {}", adminUsername, executionId,
+                    reason);
             return buildDriverTripResponse(execution);
 
         } else if ("FORCE_COMPLETE_AND_RETURN".equals(action)) {
-            if (List.of("COMPLETED", "COMPLETED_WITH_EXCEPTIONS").contains(execution.getStatus()) && execution.getReturnedToWarehouseAt() != null) {
+            if (List.of("COMPLETED", "COMPLETED_WITH_EXCEPTIONS").contains(execution.getStatus())
+                    && execution.getReturnedToWarehouseAt() != null) {
                 throw new BusinessException(
                         ErrorCode.VALIDATION_FAILED,
                         "Chuyến xe đã hoàn tất và đã về kho từ trước.",
@@ -724,11 +744,13 @@ public class DriverTripServiceImpl implements DriverTripService {
             }
 
             // Update remaining PENDING orders
-            String defaultOrderStatus = (request.getDefaultPendingOrderStatus() != null && !request.getDefaultPendingOrderStatus().isBlank())
-                    ? request.getDefaultPendingOrderStatus().toUpperCase()
-                    : "DELIVERED";
+            String defaultOrderStatus = (request.getDefaultPendingOrderStatus() != null
+                    && !request.getDefaultPendingOrderStatus().isBlank())
+                            ? request.getDefaultPendingOrderStatus().toUpperCase()
+                            : "DELIVERED";
 
-            List<DeliveryOrderResult> pendingResults = deliveryOrderResultRepo.findByTripExecutionId(executionId).stream()
+            List<DeliveryOrderResult> pendingResults = deliveryOrderResultRepo.findByTripExecutionId(executionId)
+                    .stream()
                     .filter(r -> "PENDING".equals(r.getStatus()))
                     .toList();
 
@@ -743,7 +765,8 @@ public class DriverTripServiceImpl implements DriverTripService {
             long totalCount = deliveryOrderResultRepo.countByTripExecutionId(executionId);
             long deliveredCount = deliveryOrderResultRepo.countByTripExecutionIdAndStatus(executionId, "DELIVERED");
             long failedCount = deliveryOrderResultRepo.countByTripExecutionIdAndStatus(executionId, "FAILED");
-            long partialCount = deliveryOrderResultRepo.countByTripExecutionIdAndStatus(executionId, "PARTIALLY_DELIVERED");
+            long partialCount = deliveryOrderResultRepo.countByTripExecutionIdAndStatus(executionId,
+                    "PARTIALLY_DELIVERED");
 
             boolean hasExceptions = (failedCount > 0 || partialCount > 0);
             String finalExecutionStatus = hasExceptions ? "COMPLETED_WITH_EXCEPTIONS" : "COMPLETED";
@@ -801,16 +824,17 @@ public class DriverTripServiceImpl implements DriverTripService {
                     null, null, null, null, null, reason, null, null,
                     trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
                     trip != null ? trip.getDeliveryDate() : null,
-                    execution.getDriver() != null ? execution.getDriver().getUsername() : null
-            ));
+                    execution.getDriver() != null ? execution.getDriver().getUsername() : null));
 
-            log.info("Admin {} performed FORCE_COMPLETE_AND_RETURN on trip execution ID {}. Reason: {}", adminUsername, executionId, reason);
+            log.info("Admin {} performed FORCE_COMPLETE_AND_RETURN on trip execution ID {}. Reason: {}", adminUsername,
+                    executionId, reason);
             return buildDriverTripResponse(execution);
 
         } else {
             throw new BusinessException(
                     ErrorCode.VALIDATION_FAILED,
-                    "Action không hợp lệ: " + request.getAction() + ". Chỉ chấp nhận FORCE_RETURN hoặc FORCE_COMPLETE_AND_RETURN.",
+                    "Action không hợp lệ: " + request.getAction()
+                            + ". Chỉ chấp nhận FORCE_RETURN hoặc FORCE_COMPLETE_AND_RETURN.",
                     HttpStatus.BAD_REQUEST);
         }
     }

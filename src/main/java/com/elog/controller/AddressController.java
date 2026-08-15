@@ -1,6 +1,9 @@
 package com.elog.controller;
 
-import com.elog.dto.response.*;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.goong.DistrictResponse;
+import com.elog.dto.response.goong.ProvinceResponse;
+import com.elog.dto.response.goong.WardResponse;
 import com.elog.service.AddressService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

@@ -1,8 +1,8 @@
 package com.elog.mapper;
 
-import com.elog.dto.request.ProductCreateRequest;
-import com.elog.dto.response.ProductListItemResponse;
-import com.elog.dto.response.ProductResponse;
+import com.elog.dto.request.product.ProductCreateRequest;
+import com.elog.dto.response.product.ProductListItemResponse;
+import com.elog.dto.response.product.ProductResponse;
 import com.elog.entity.Product;
 import org.springframework.stereotype.Component;
 

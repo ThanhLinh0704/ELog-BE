@@ -1,12 +1,12 @@
 package com.elog.service;
 
-import com.elog.dto.request.VehicleCreateRequest;
-import com.elog.dto.request.VehicleStatusUpdateRequest;
-import com.elog.dto.request.VehicleUpdateRequest;
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.VehicleFleetCapacityResponse;
-import com.elog.dto.response.VehicleListItemResponse;
-import com.elog.dto.response.VehicleResponse;
+import com.elog.dto.request.vehicle.VehicleCreateRequest;
+import com.elog.dto.request.vehicle.VehicleStatusUpdateRequest;
+import com.elog.dto.request.vehicle.VehicleUpdateRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.vehicle.VehicleFleetCapacityResponse;
+import com.elog.dto.response.vehicle.VehicleListItemResponse;
+import com.elog.dto.response.vehicle.VehicleResponse;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;

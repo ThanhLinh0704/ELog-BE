@@ -1,9 +1,19 @@
 package com.elog.controller;
 
-import com.elog.dto.request.ConsolidateRequest;
-import com.elog.dto.request.RecalculateEtaRequest;
-import com.elog.dto.request.StopUpdateRequest;
-import com.elog.dto.response.*;
+import com.elog.dto.request.trip.ConsolidateRequest;
+import com.elog.dto.request.trip.RecalculateEtaRequest;
+import com.elog.dto.request.trip.StopUpdateRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.common.ConfirmResponse;
+import com.elog.dto.response.goong.RecalculateEtaResponse;
+import com.elog.dto.response.trip.ConsolidateResponse;
+import com.elog.dto.response.trip.ManifestByStopResponse;
+import com.elog.dto.response.trip.ManifestResponse;
+import com.elog.dto.response.trip.RecommendationResultResponse;
+import com.elog.dto.response.trip.StopOrderItemResponse;
+import com.elog.dto.response.trip.TripDraftResponse;
+import com.elog.dto.response.trip.TripDraftStopResponse;
+import com.elog.dto.response.vehicle.CapacityValidationResultResponse;
 import com.elog.service.CapacityValidationService;
 import com.elog.service.ManifestService;
 import com.elog.service.TripDraftService;
@@ -194,7 +204,7 @@ public class TripDraftController {
     @PreAuthorize("hasAuthority('trip:write')")
     public ResponseEntity<ApiResponse<TripDraftResponse>> adjustDepartureTime(
             @PathVariable Long id,
-            @Valid @RequestBody com.elog.dto.request.AdjustDepartureTimeRequest request) {
+            @Valid @RequestBody com.elog.dto.request.trip.AdjustDepartureTimeRequest request) {
         TripDraftResponse response = tripDraftService.adjustDepartureTime(id, request);
         return ResponseEntity.ok(ApiResponse.success(response, "Đã điều chỉnh giờ xuất phát thành công"));
     }
@@ -205,7 +215,7 @@ public class TripDraftController {
     public ResponseEntity<ApiResponse<Void>> settleDelay(
             @PathVariable Long id,
             @PathVariable Long orderId,
-            @Valid @RequestBody com.elog.dto.request.SettleDelayRequest request) {
+            @Valid @RequestBody com.elog.dto.request.trip.SettleDelayRequest request) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         tripDraftService.settleDelay(id, orderId, request, currentUsername);
         return ResponseEntity.ok(ApiResponse.success(null, "Ghi nhận dàn xếp giao trễ thành công"));
@@ -256,7 +266,7 @@ public class TripDraftController {
     @GetMapping("/{id}/history")
     @Operation(summary = "Get planning history for a specific Trip Draft")
     @PreAuthorize("hasAuthority('planning-history:read')")
-    public ResponseEntity<ApiResponse<List<com.elog.dto.response.PlanningEventResponse>>> getTripDraftHistory(
+    public ResponseEntity<ApiResponse<List<com.elog.dto.response.trip.PlanningEventResponse>>> getTripDraftHistory(
             @PathVariable Long id,
             @org.springframework.data.web.PageableDefault(size = 20, sort = "occurredAt", direction = org.springframework.data.domain.Sort.Direction.DESC) org.springframework.data.domain.Pageable pageable) {
         var filter = new com.elog.service.PlanningHistoryService.PlanningHistoryFilter(
