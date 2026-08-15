@@ -13,6 +13,10 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
+# Install tzdata for timezone support
+RUN apk add --no-cache tzdata
+ENV TZ=Asia/Ho_Chi_Minh
+
 # Create non-root user for security
 RUN addgroup -S spring && adduser -S spring -G spring
 USER spring:spring

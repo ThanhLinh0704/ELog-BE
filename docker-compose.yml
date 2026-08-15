@@ -4,6 +4,7 @@ services:
     container_name: elog-mysql
     restart: always
     environment:
+      TZ: Asia/Ho_Chi_Minh
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
       MYSQL_DATABASE: ${DB_NAME:-elog_db}
     ports:
@@ -33,7 +34,8 @@ services:
       - "80:8080"
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      DB_URL: jdbc:mysql://mysql:3306/elog_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      TZ: Asia/Ho_Chi_Minh
+      DB_URL: jdbc:mysql://mysql:3306/elog_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh
       CORS_ORIGINS: "https://elog.click,https://www.elog.click,https://elog-fe.vercel.app,http://localhost:3000"
     depends_on:
       mysql:
