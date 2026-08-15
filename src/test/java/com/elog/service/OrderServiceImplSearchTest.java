@@ -16,7 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -70,6 +69,7 @@ class OrderServiceImplSearchTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void searchOrders_success_returnsPaginatedResponse() {
         Page<Order> page = new PageImpl<>(List.of(order1), PageRequest.of(0, 10), 1);
         when(orderRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
