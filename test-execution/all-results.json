@@ -2275,8 +2275,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "POST /api/v1/driver/trips/{executionId}/complete primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/driver/trips/1/complete; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/driver/trips/1/complete; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2285,8 +2285,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "PUT /api/v1/driver/trips/{executionId}/orders/{orderId}/result primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for PUT /api/v1/driver/trips/1/orders/1/result; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for PUT /api/v1/driver/trips/1/orders/6/result; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2295,8 +2295,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "POST /api/v1/driver/trips/{executionId}/return-to-warehouse primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/driver/trips/1/return-to-warehouse; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/driver/trips/1/return-to-warehouse; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2305,8 +2305,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "POST /api/v1/driver/trips/{executionId}/start primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/driver/trips/1/start; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/driver/trips/1/start; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2315,8 +2315,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "POST /api/v1/driver/trips/{executionId}/stops/{stopId}/arrive primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/driver/trips/1/stops/1/arrive; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/driver/trips/1/stops/37/arrive; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2325,8 +2325,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "GET /api/v1/driver/trips/active primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/driver/trips/active; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/driver/trips/active; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2386,7 +2386,7 @@
         "priority":  "P1",
         "title":  "GET /api/v1/drivers/available primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for GET /api/v1/drivers/available?date=2026-08-13; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for GET /api/v1/drivers/available?date=2026-08-15; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2405,8 +2405,8 @@
         "feature":  "L3-MONITORING",
         "priority":  "P1",
         "title":  "GET /api/v1/exceptions/{id} primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/exceptions/1; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/exceptions/1; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2415,8 +2415,8 @@
         "feature":  "L3-MONITORING",
         "priority":  "P1",
         "title":  "PATCH /api/v1/exceptions/{id}/resolve primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for PATCH /api/v1/exceptions/1/resolve; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for PATCH /api/v1/exceptions/1/resolve; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2436,7 +2436,7 @@
         "priority":  "P2",
         "title":  "GET /api/v1/fleet/capacity-check primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for GET /api/v1/fleet/capacity-check?date=2026-08-13; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for GET /api/v1/fleet/capacity-check?date=2026-08-15; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2455,8 +2455,8 @@
         "feature":  "L3-IMPORT",
         "priority":  "P1",
         "title":  "GET /api/v1/imports primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 0 for GET /api/v1/imports; Multipart workbook fixture is not available in this runner",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/imports; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2465,8 +2465,8 @@
         "feature":  "L3-IMPORT",
         "priority":  "P1",
         "title":  "POST /api/v1/imports primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 0 for POST /api/v1/imports; Multipart workbook fixture is not available in this runner",
+        "status":  "Pass",
+        "evidence":  "HTTP 201 for POST /api/v1/imports; HTTP 201 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2475,8 +2475,8 @@
         "feature":  "L3-IMPORT",
         "priority":  "P1",
         "title":  "GET /api/v1/imports/{batchId} primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/imports/1; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/imports/2; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2485,8 +2485,8 @@
         "feature":  "L3-IMPORT",
         "priority":  "P1",
         "title":  "GET /api/v1/imports/{batchId}/errors primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/imports/1/errors; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/imports/2/errors; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2495,8 +2495,8 @@
         "feature":  "L3-IMPORT",
         "priority":  "P1",
         "title":  "GET /api/v1/imports/{batchId}/errors/export primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/imports/1/errors/export; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/imports/2/errors/export; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2505,8 +2505,8 @@
         "feature":  "L3-IMPORT",
         "priority":  "P1",
         "title":  "GET /api/v1/imports/{batchId}/orders primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/imports/1/orders; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/imports/2/orders; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2595,8 +2595,8 @@
         "feature":  "L3-MASTERDATA",
         "priority":  "P1",
         "title":  "POST /api/v1/products primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 400 for POST /api/v1/products; Expected HTTP 201, received 400; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 201 for POST /api/v1/products; HTTP 201 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2636,7 +2636,7 @@
         "priority":  "P2",
         "title":  "GET /api/v1/products/by-sku/{sku} primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for GET /api/v1/products/by-sku/TOSTLR677WI; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for GET /api/v1/products/by-sku/L3QA-1786763699227-P; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2696,7 +2696,7 @@
         "priority":  "P2",
         "title":  "GET /api/v1/routes/{id} primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for GET /api/v1/routes/1; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for GET /api/v1/routes/18; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2706,7 +2706,7 @@
         "priority":  "P1",
         "title":  "PUT /api/v1/routes/{id} primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for PUT /api/v1/routes/1; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for PUT /api/v1/routes/18; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2736,7 +2736,7 @@
         "priority":  "P1",
         "title":  "POST /api/v1/routes/{id}/stops primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 201 for POST /api/v1/routes/1/stops; HTTP 201 and basic response envelope matched",
+        "evidence":  "HTTP 201 for POST /api/v1/routes/18/stops; HTTP 201 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2746,7 +2746,7 @@
         "priority":  "P1",
         "title":  "DELETE /api/v1/routes/{id}/stops/{stopId} primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for DELETE /api/v1/routes/1/stops/1; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for DELETE /api/v1/routes/18/stops/174; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2755,8 +2755,8 @@
         "feature":  "L3-MASTERDATA",
         "priority":  "P1",
         "title":  "PUT /api/v1/routes/{id}/stops/reorder primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 400 for PUT /api/v1/routes/1/stops/reorder; Expected HTTP 200, received 400; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for PUT /api/v1/routes/18/stops/reorder; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2816,7 +2816,7 @@
         "priority":  "P2",
         "title":  "GET /api/v1/trip-drafts primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts?deliveryDate=2026-08-13; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts?deliveryDate=2026-08-15; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2825,8 +2825,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "GET /api/v1/trip-drafts/{id} primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trip-drafts/1; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts/1; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2835,8 +2835,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-drafts/{id}/adjust-departure-time primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 400 for POST /api/v1/trip-drafts/1/adjust-departure-time; Expected HTTP 200, received 400; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-drafts/1/adjust-departure-time; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2845,8 +2845,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-drafts/{id}/assign primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-drafts/1/assign; Expected HTTP 201, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 201 for POST /api/v1/trip-drafts/1/assign; HTTP 201 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2855,8 +2855,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-drafts/{id}/assign-split primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-drafts/1/assign-split; Expected HTTP 201, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 201 for POST /api/v1/trip-drafts/2/assign-split; HTTP 201 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2865,8 +2865,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-drafts/{id}/confirm primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-drafts/1/confirm; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-drafts/1/confirm; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2875,8 +2875,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "GET /api/v1/trip-drafts/{id}/eligible-vehicles primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trip-drafts/1/eligible-vehicles; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts/1/eligible-vehicles; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2885,8 +2885,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "GET /api/v1/trip-drafts/{id}/eligible-vehicles-for-stops primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trip-drafts/1/eligible-vehicles-for-stops?stopIds=1; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts/1/eligible-vehicles-for-stops?stopIds=9; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2895,8 +2895,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "GET /api/v1/trip-drafts/{id}/excluded-orders primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trip-drafts/1/excluded-orders; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts/1/excluded-orders; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2905,8 +2905,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-drafts/{id}/generate-manifest primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-drafts/1/generate-manifest; Expected HTTP 201, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 201 for POST /api/v1/trip-drafts/1/generate-manifest; HTTP 201 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2925,8 +2925,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "GET /api/v1/trip-drafts/{id}/manifest primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trip-drafts/1/manifest; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts/1/manifest; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2935,8 +2935,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "GET /api/v1/trip-drafts/{id}/manifest/by-stop primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trip-drafts/1/manifest/by-stop; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts/1/manifest/by-stop; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2945,8 +2945,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-drafts/{id}/optimal-departure primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-drafts/1/optimal-departure; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-drafts/1/optimal-departure; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2955,8 +2955,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-drafts/{id}/orders/{orderId}/exclude primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-drafts/1/orders/1/exclude; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-drafts/1/orders/1/exclude; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2965,8 +2965,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-drafts/{id}/orders/{orderId}/re-include primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-drafts/1/orders/1/re-include; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-drafts/1/orders/1/re-include; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2975,8 +2975,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-drafts/{id}/orders/{orderId}/settle-delay primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 400 for POST /api/v1/trip-drafts/1/orders/1/settle-delay; Expected HTTP 200, received 400; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-drafts/1/orders/1/settle-delay; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2985,8 +2985,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-drafts/{id}/recalculate-eta primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-drafts/1/recalculate-eta; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-drafts/1/recalculate-eta; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -2995,8 +2995,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "GET /api/v1/trip-drafts/{id}/recommendations primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trip-drafts/1/recommendations; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts/1/recommendations; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3005,8 +3005,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-drafts/{id}/revert primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-drafts/1/revert; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-drafts/3/revert; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3015,8 +3015,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P2",
         "title":  "GET /api/v1/trip-drafts/{id}/stops primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trip-drafts/1/stops; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts/1/stops; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3025,8 +3025,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P3",
         "title":  "PATCH /api/v1/trip-drafts/{id}/stops/{stopId} primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for PATCH /api/v1/trip-drafts/1/stops/1; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for PATCH /api/v1/trip-drafts/1/stops/9; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3035,8 +3035,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P3",
         "title":  "GET /api/v1/trip-drafts/{id}/stops/{stopId}/order-items primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trip-drafts/1/stops/1/order-items; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts/1/stops/9/order-items; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3045,8 +3045,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P3",
         "title":  "POST /api/v1/trip-drafts/{id}/validate-capacity primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-drafts/1/validate-capacity; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-drafts/1/validate-capacity; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3055,8 +3055,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P3",
         "title":  "GET /api/v1/trip-drafts/{id}/validation-result primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trip-drafts/1/validation-result; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trip-drafts/1/validation-result; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3075,8 +3075,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "POST /api/v1/trip-executions/{id}/admin-override primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-executions/1/admin-override; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-executions/3/admin-override; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3105,8 +3105,8 @@
         "feature":  "L3-MONITORING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-outcomes/{id}/amend primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-outcomes/1/amend?amendmentReason=QA%20contract%20verification; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-outcomes/1/amend?amendmentReason=L3%20QA%20contract%20verification; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3115,8 +3115,8 @@
         "feature":  "L3-MONITORING",
         "priority":  "P2",
         "title":  "POST /api/v1/trip-outcomes/{id}/validate primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-outcomes/1/validate; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-outcomes/1/validate; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3135,8 +3135,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "PATCH /api/v1/trips/{id}/assignment primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for PATCH /api/v1/trips/1/assignment; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for PATCH /api/v1/trips/3/assignment; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3145,8 +3145,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "POST /api/v1/trips/{id}/dispatch primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trips/1/dispatch; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trips/3/dispatch; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3155,8 +3155,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "GET /api/v1/trips/{id}/handover-slip primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trips/1/handover-slip; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trips/3/handover-slip; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3165,8 +3165,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "GET /api/v1/trips/{id}/progress primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trips/1/progress; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trips/3/progress; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3175,8 +3175,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "POST /api/v1/trips/{id}/start primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trips/1/start; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trips/3/start; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3185,8 +3185,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "GET /api/v1/trips/{tripId} primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for GET /api/v1/trips/1; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for GET /api/v1/trips/1; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3206,7 +3206,7 @@
         "priority":  "P1",
         "title":  "GET /api/v1/trips/my-trips primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for GET /api/v1/trips/my-trips?date=2026-08-13; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for GET /api/v1/trips/my-trips?date=2026-08-15; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3225,8 +3225,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "POST /api/v1/trip-stops/{id}/arrive primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-stops/1/arrive; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-stops/3/arrive; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3235,8 +3235,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "POST /api/v1/trip-stops/{id}/complete primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-stops/1/complete; Expected HTTP 200, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 200 for POST /api/v1/trip-stops/3/complete; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3245,8 +3245,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "POST /api/v1/trip-stops/{id}/reject primary source contract",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-stops/1/reject; Expected HTTP 201, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 201 for POST /api/v1/trip-stops/2/reject; HTTP 201 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3276,7 +3276,7 @@
         "priority":  "P2",
         "title":  "GET /api/v1/users/{id} primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for GET /api/v1/users/1; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for GET /api/v1/users/33; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3286,7 +3286,7 @@
         "priority":  "P1",
         "title":  "PUT /api/v1/users/{id} primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for PUT /api/v1/users/1; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for PUT /api/v1/users/33; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3296,7 +3296,7 @@
         "priority":  "P1",
         "title":  "PATCH /api/v1/users/{id}/roles primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for PATCH /api/v1/users/1/roles; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for PATCH /api/v1/users/33/roles; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3306,7 +3306,7 @@
         "priority":  "P1",
         "title":  "PATCH /api/v1/users/{id}/status primary source contract",
         "status":  "Pass",
-        "evidence":  "HTTP 200 for PATCH /api/v1/users/1/status; HTTP 200 and basic response envelope matched",
+        "evidence":  "HTTP 200 for PATCH /api/v1/users/33/status; HTTP 200 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3395,8 +3395,8 @@
         "feature":  "L3-AUTH",
         "priority":  "P1",
         "title":  "Login rejects a disabled account",
-        "status":  "Not Run",
-        "evidence":  "HTTP 401 for POST /api/v1/auth/login; Expected HTTP 403, received 401; no approved disabled-account credential fixture existed.",
+        "status":  "Pass",
+        "evidence":  "HTTP 403 for POST /api/v1/auth/login; HTTP 403 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3425,8 +3425,8 @@
         "feature":  "L3-MASTERDATA",
         "priority":  "P1",
         "title":  "Vehicle create rejects a duplicate plate",
-        "status":  "Not Run",
-        "evidence":  "HTTP 400 for POST /api/v1/vehicles; Expected HTTP 409, received 400; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 409 for POST /api/v1/vehicles; HTTP 409 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3465,8 +3465,8 @@
         "feature":  "L3-IMPORT",
         "priority":  "P1",
         "title":  "Import rejects a workbook over the row limit",
-        "status":  "Not Run",
-        "evidence":  "HTTP 0 for POST /api/v1/imports; Multipart workbook fixture is not available in this runner",
+        "status":  "Pass",
+        "evidence":  "HTTP 400 for POST /api/v1/imports; HTTP 400 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3475,8 +3475,8 @@
         "feature":  "L3-PLANNING",
         "priority":  "P3",
         "title":  "Draft confirmation rejects an already transitioned draft",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trip-drafts/1/confirm; Expected HTTP 409, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 409 for POST /api/v1/trip-drafts/1/confirm; HTTP 409 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3485,8 +3485,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "Dispatch rejects an already locked trip",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trips/1/dispatch; Expected HTTP 409, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 409 for POST /api/v1/trips/3/dispatch; HTTP 409 and basic response envelope matched",
         "defectId":  ""
     },
     {
@@ -3495,8 +3495,8 @@
         "feature":  "L3-EXECUTION",
         "priority":  "P1",
         "title":  "Trip start rejects a non-dispatched state",
-        "status":  "Not Run",
-        "evidence":  "HTTP 404 for POST /api/v1/trips/1/start; Expected HTTP 409, received 404; prerequisite business fixture was not available.",
+        "status":  "Pass",
+        "evidence":  "HTTP 409 for POST /api/v1/trips/4/start; HTTP 409 and basic response envelope matched",
         "defectId":  ""
     },
     {

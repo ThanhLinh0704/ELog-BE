@@ -1,212 +1,193 @@
 package com.elog.integration;
 
+import com.elog.dto.response.StopArriveResponse;
+import com.elog.dto.response.TripStartResponse;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.service.TripMonitoringService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
+@ActiveProfiles("dev")
 @Transactional
-public class TripMonitoringServiceIntegrationTest {
+@ExtendWith(Report5L2EvidenceExtension.class)
+class TripMonitoringServiceIntegrationTest {
 
-    /**
-     * TEST ID: INT-TRIP-01
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
+    @Autowired TripMonitoringService tripMonitoringService;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired EntityManager entityManager;
+
     @Test
-    void integrationTest_Scenario1() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-01");
+    void l2Mon01StartPersistsDepartureAndReturnsFirstStop() {
+        Fixture fixture = seedTrip(LocalDate.now(), "DISPATCHED", List.of("PENDING", "PENDING"));
+
+        TripStartResponse response = tripMonitoringService.startTrip(fixture.tripId(), "driver01");
+        Map<String, Object> trip = reloadTrip(fixture.tripId());
+
+        assertThat(trip.get("status")).isEqualTo("IN_PROGRESS");
+        assertThat(trip.get("actual_departure_time")).isNotNull();
+        assertThat(response.getFirstStopCode()).isEqualTo("KH0138");
+        assertThat(response.getStatus()).isEqualTo("IN_PROGRESS");
     }
 
-    /**
-     * TEST ID: INT-TRIP-02
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario2() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-02");
+    void l2Mon02FutureDeliveryDateLeavesTripDispatched() {
+        Fixture fixture = seedTrip(LocalDate.now().plusDays(1), "DISPATCHED", List.of("PENDING"));
+
+        assertThatThrownBy(() -> tripMonitoringService.startTrip(fixture.tripId(), "driver01"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+
+        Map<String, Object> trip = reloadTrip(fixture.tripId());
+        assertThat(trip.get("status")).isEqualTo("DISPATCHED");
+        assertThat(trip.get("actual_departure_time")).isNull();
     }
 
-    /**
-     * TEST ID: INT-TRIP-03
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario3() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-03");
+    void l2Mon03OnTimeArrivalPersistsWithoutTimeException() {
+        Fixture fixture = seedTrip(LocalDate.now(), "IN_PROGRESS", List.of("PENDING"));
+        long stopId = fixture.stopIds().getFirst();
+        jdbc.update("UPDATE trip_stops SET planned_eta = ? WHERE trip_stop_id = ?",
+                LocalDateTime.now().minusMinutes(5), stopId);
+
+        StopArriveResponse response = tripMonitoringService.arriveAtStop(stopId, "driver01");
+        Map<String, Object> stop = reloadStop(stopId);
+
+        assertThat(stop.get("status")).isEqualTo("IN_PROGRESS");
+        assertThat(stop.get("actual_arrival_time")).isNotNull();
+        assertThat(response.getDelayMinutes()).isBetween(4L, 6L);
+        assertThat(countExceptions(stopId)).isZero();
     }
 
-    /**
-     * TEST ID: INT-TRIP-04
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario4() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-04");
+    void l2Mon04LateArrivalCreatesOneExceptionAndMarksStopException() {
+        Fixture fixture = seedTrip(LocalDate.now(), "IN_PROGRESS", List.of("PENDING"));
+        long stopId = fixture.stopIds().getFirst();
+        jdbc.update("UPDATE trip_stops SET planned_eta = ? WHERE trip_stop_id = ?",
+                LocalDateTime.now().minusMinutes(30), stopId);
+
+        StopArriveResponse response = tripMonitoringService.arriveAtStop(stopId, "driver01");
+        Map<String, Object> stop = reloadStop(stopId);
+
+        assertThat(stop.get("status")).isEqualTo("EXCEPTION");
+        assertThat(stop.get("actual_arrival_time")).isNotNull();
+        assertThat(response.isTimeExceptionFlagged()).isTrue();
+        assertThat(countExceptions(stopId)).isEqualTo(1);
     }
 
-    /**
-     * TEST ID: INT-TRIP-05
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario5() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-05");
+    void l2Mon05SecondStopCannotBypassPendingFirstStop() {
+        Fixture fixture = seedTrip(LocalDate.now(), "IN_PROGRESS", List.of("PENDING", "PENDING"));
+        long secondStopId = fixture.stopIds().get(1);
+
+        assertThatThrownBy(() -> tripMonitoringService.arriveAtStop(secondStopId, "driver01"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.PREVIOUS_STOP_NOT_DONE));
+
+        assertThat(reloadStop(secondStopId).get("status")).isEqualTo("PENDING");
     }
 
-    /**
-     * TEST ID: INT-TRIP-06
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario6() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-06");
+    void l2Mon06CompletedStopCannotBeArrivedAgain() {
+        Fixture fixture = seedTrip(LocalDate.now(), "IN_PROGRESS", List.of("COMPLETED"));
+        long stopId = fixture.stopIds().getFirst();
+        Map<String, Object> before = reloadStop(stopId);
+
+        assertThatThrownBy(() -> tripMonitoringService.arriveAtStop(stopId, "driver01"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.STOP_ALREADY_DONE));
+
+        assertThat(reloadStop(stopId)).containsAllEntriesOf(before);
     }
 
-    /**
-     * TEST ID: INT-TRIP-07
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario7() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-07");
+    void l2Mon07CompletingFirstOfThreeStopsKeepsTripInProgress() {
+        Fixture fixture = seedTrip(LocalDate.now(), "IN_PROGRESS",
+                List.of("IN_PROGRESS", "PENDING", "PENDING"));
+        long firstStopId = fixture.stopIds().getFirst();
+
+        tripMonitoringService.completeStop(firstStopId, "driver01");
+        Map<String, Object> stop = reloadStop(firstStopId);
+
+        assertThat(stop.get("status")).isEqualTo("COMPLETED");
+        assertThat(stop.get("actual_departure_time")).isNotNull();
+        assertThat(reloadTrip(fixture.tripId()).get("status")).isEqualTo("IN_PROGRESS");
     }
 
-    /**
-     * TEST ID: INT-TRIP-08
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario8() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-08");
+    private Fixture seedTrip(LocalDate deliveryDate, String tripStatus, List<String> stopStatuses) {
+        jdbc.update("""
+                INSERT INTO trip_drafts
+                    (route_id, delivery_date, total_volume_m3, total_weight_kg,
+                     active_stop_count, skipped_stop_count, status)
+                VALUES (1, ?, 1.000000, 100.000, ?, 0, 'VALIDATED')
+                """, deliveryDate, stopStatuses.size());
+        long draftId = lastInsertId();
+        jdbc.update("""
+                INSERT INTO trips
+                    (trip_draft_id, route_id, vehicle_id, driver_id, delivery_date,
+                     status, total_weight_kg, total_volume_m3, created_by)
+                VALUES (?, 1, 1, 6, ?, ?, 100.000, 1.000000, 2)
+                """, draftId, deliveryDate, tripStatus);
+        long tripId = lastInsertId();
+
+        List<Long> stopIds = new ArrayList<>();
+        for (int index = 0; index < stopStatuses.size(); index++) {
+            jdbc.update("""
+                    INSERT INTO trip_stops
+                        (trip_id, route_stop_id, sequence_order, planned_eta, status,
+                         stop_weight_kg, stop_volume_m3)
+                    VALUES (?, ?, ?, ?, ?, 10.000, 0.100000)
+                    """, tripId, 2 + index, index + 1,
+                    deliveryDate.atTime(9 + index, 0), stopStatuses.get(index));
+            stopIds.add(lastInsertId());
+        }
+        return new Fixture(tripId, stopIds);
     }
 
-    /**
-     * TEST ID: INT-TRIP-09
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario9() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-09");
+    private long lastInsertId() {
+        return jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
-    /**
-     * TEST ID: INT-TRIP-10
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario10() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-10");
+    private Map<String, Object> reloadTrip(long tripId) {
+        entityManager.flush();
+        entityManager.clear();
+        return jdbc.queryForMap("""
+                SELECT status, actual_departure_time, completed_at FROM trips WHERE trip_id = ?
+                """, tripId);
     }
 
-    /**
-     * TEST ID: INT-TRIP-11
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario11() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-11");
+    private Map<String, Object> reloadStop(long stopId) {
+        entityManager.flush();
+        entityManager.clear();
+        return jdbc.queryForMap("""
+                SELECT status, actual_arrival_time, actual_departure_time
+                FROM trip_stops WHERE trip_stop_id = ?
+                """, stopId);
     }
 
-    /**
-     * TEST ID: INT-TRIP-12
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario12() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-12");
+    private int countExceptions(long stopId) {
+        return jdbc.queryForObject("""
+                SELECT COUNT(*) FROM delivery_exceptions
+                WHERE trip_stop_id = ? AND exception_type = 'TIME_EXCEPTION'
+                """, Integer.class, stopId);
     }
 
-    /**
-     * TEST ID: INT-TRIP-13
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario13() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-13");
-    }
-
-    /**
-     * TEST ID: INT-TRIP-14
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario14() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-14");
-    }
-
-    /**
-     * TEST ID: INT-TRIP-15
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario15() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-15");
-    }
-
-    /**
-     * TEST ID: INT-TRIP-16
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario16() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-16");
-    }
-
-    /**
-     * TEST ID: INT-TRIP-17
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario17() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-17");
-    }
-
-    /**
-     * TEST ID: INT-TRIP-18
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario18() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-18");
-    }
-
-    /**
-     * TEST ID: INT-TRIP-19
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario19() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-19");
-    }
-
-    /**
-     * TEST ID: INT-TRIP-20
-     * COVERS: Integration of TripMonitoring service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario20() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-TRIP-20");
-    }
-
+    private record Fixture(long tripId, List<Long> stopIds) {}
 }
+

@@ -1,5 +1,6 @@
 package com.elog.service;
 
+import com.elog.dto.request.StopUpdateRequest;
 import com.elog.dto.response.*;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
@@ -436,5 +437,35 @@ class TripDraftServiceImplTest {
         assertThat(result.get(0).getOrderId()).isEqualTo(300L);
         assertThat(result.get(0).getOrderRef()).isEqualTo("DH-EXCLUDED");
         assertThat(result.get(0).getSku()).isEqualTo("SKU-999");
+    }
+
+    @Test
+    void updateStop_lockedDraft_throwsException() {
+        TripDraft draft = TripDraft.builder().id(50L).status("CONFIRMED").build();
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+
+        StopUpdateRequest req = new StopUpdateRequest();
+        req.setIsActive(false);
+
+        assertThatThrownBy(() -> tripDraftService.updateStop(50L, 100L, req))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void updateStop_activateEmptyStop_throwsException() {
+        TripDraft draft = TripDraft.builder().id(50L).status("DRAFT").deliveryDate(deliveryDate).build();
+        Store store = Store.builder().id(10L).code("ST-001").build();
+        TripDraftStop stop = TripDraftStop.builder().id(100L).store(store).tripDraft(draft).orderCount(0).build();
+
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+        when(tripDraftStopRepository.findById(100L)).thenReturn(Optional.of(stop));
+
+        StopUpdateRequest req = new StopUpdateRequest();
+        req.setIsActive(true);
+
+        assertThatThrownBy(() -> tripDraftService.updateStop(50L, 100L, req))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.BAD_REQUEST);
     }
 }

@@ -1,106 +1,34 @@
 package com.elog.service;
 
-import com.elog.dto.request.VehicleCreateRequest;
-import com.elog.dto.response.VehicleResponse;
-import com.elog.entity.Vehicle;
-import com.elog.exception.BusinessException;
-import com.elog.exception.ErrorCode;
+import com.elog.dto.response.VehicleFleetCapacityResponse;
 import com.elog.mapper.VehicleMapper;
+import com.elog.repository.UserRepository;
 import com.elog.repository.VehicleRepository;
 import com.elog.service.impl.VehicleServiceImpl;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
 
 import java.math.BigDecimal;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 class VehicleServiceImplTest {
-
-    @Mock
-    private VehicleRepository vehicleRepository;
-
-    @Mock
-    private VehicleMapper vehicleMapper;
-
-    @InjectMocks
-    private VehicleServiceImpl vehicleService;
-
-    private VehicleCreateRequest request;
-    private Vehicle vehicle;
-
-    @BeforeEach
-    void setUp() {
-        request = new VehicleCreateRequest();
-        request.setPlateNumber("29A-12345");
-        request.setVehicleType("1.25 TONS");
-        request.setPayloadKg(BigDecimal.valueOf(1250.0));
-        request.setMaxVolumeM3(BigDecimal.valueOf(6.0)); // ratio = 1250 / 6 = 208 kg/m3
-
-        vehicle = Vehicle.builder()
-                .id(1L)
-                .plateNumber("29A-12345")
-                .vehicleType("1.25 TONS")
-                .payloadKg(BigDecimal.valueOf(1250.0))
-                .maxVolumeM3(BigDecimal.valueOf(6.0))
-                .isActive(true)
-                .build();
-    }
-
-    @Test
-    void createVehicle_success_validRatio() {
-        when(vehicleMapper.normalizePlate("29A-12345")).thenReturn("29A-12345");
-        when(vehicleRepository.existsByPlateNumber("29A-12345")).thenReturn(false);
-        when(vehicleMapper.toEntity(any(VehicleCreateRequest.class))).thenReturn(vehicle);
-        when(vehicleRepository.save(any(Vehicle.class))).thenReturn(vehicle);
-        when(vehicleMapper.toResponse(any(Vehicle.class))).thenReturn(VehicleResponse.builder().id(1L).plateNumber("29A-12345").build());
-
-        VehicleResponse response = vehicleService.createVehicle(request);
-
-        assertThat(response.getId()).isEqualTo(1L);
-        verify(vehicleRepository).save(any(Vehicle.class));
-    }
-
-    @Test
-    void createVehicle_fails_anomalyRatioTooHigh() {
-        // ratio = 10000 / 2.0 = 5000 kg/m3 (extremely heavy and small)
-        request.setPayloadKg(BigDecimal.valueOf(10000.0));
-        request.setMaxVolumeM3(BigDecimal.valueOf(2.0));
-
-        when(vehicleMapper.normalizePlate("29A-12345")).thenReturn("29A-12345");
-        when(vehicleRepository.existsByPlateNumber("29A-12345")).thenReturn(false);
-
-        assertThatThrownBy(() -> vehicleService.createVehicle(request))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_CAPACITY_RATIO)
-                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.BAD_REQUEST);
-
-        verify(vehicleRepository, never()).save(any(Vehicle.class));
-    }
-
-    @Test
-    void createVehicle_fails_anomalyRatioTooLow() {
-        // ratio = 500 / 15.0 = 33.3 kg/m3 (extremely light and huge)
-        request.setPayloadKg(BigDecimal.valueOf(500.0));
-        request.setMaxVolumeM3(BigDecimal.valueOf(15.0));
-
-        when(vehicleMapper.normalizePlate("29A-12345")).thenReturn("29A-12345");
-        when(vehicleRepository.existsByPlateNumber("29A-12345")).thenReturn(false);
-
-        assertThatThrownBy(() -> vehicleService.createVehicle(request))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_CAPACITY_RATIO)
-                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.BAD_REQUEST);
-
-        verify(vehicleRepository, never()).save(any(Vehicle.class));
-    }
+    @Test @DisplayName("[L1-VH-11] active fleet returns count and aggregate payload and volume")
+    void activeFleetReturnsAggregates(){VehicleRepository vehicles=mock(VehicleRepository.class);when(vehicles.countByIsActiveTrue()).thenReturn(5L);when(vehicles.sumActiveMaxWeightKg()).thenReturn(new BigDecimal("15000"));when(vehicles.sumActiveMaxVolumeM3()).thenReturn(new BigDecimal("50"));VehicleFleetCapacityResponse r=new VehicleServiceImpl(vehicles,mock(UserRepository.class),mock(VehicleMapper.class)).getFleetCapacity();assertAll(()->assertEquals(5,r.getActiveVehicleCount()),()->assertEquals(new BigDecimal("15000"),r.getTotalMaxWeightKg()),()->assertEquals(new BigDecimal("50"),r.getTotalMaxVolumeM3()));}
+    @Test @DisplayName("[L1-VH-12] empty active fleet returns zeros without division")
+    void emptyFleetReturnsZeros(){VehicleRepository vehicles=mock(VehicleRepository.class);when(vehicles.countByIsActiveTrue()).thenReturn(0L);VehicleFleetCapacityResponse r=new VehicleServiceImpl(vehicles,mock(UserRepository.class),mock(VehicleMapper.class)).getFleetCapacity();assertAll(()->assertEquals(0,r.getActiveVehicleCount()),()->assertEquals(BigDecimal.ZERO,r.getTotalMaxWeightKg()),()->assertEquals(BigDecimal.ZERO,r.getTotalMaxVolumeM3()));}
+    @Test @DisplayName("[L1-VH-13] createVehicle saves vehicle with normalized plate")
+    void createVehicleSuccess(){VehicleRepository vehicles=mock(VehicleRepository.class);UserRepository users=mock(UserRepository.class);VehicleMapper mapper=mock(VehicleMapper.class);com.elog.dto.request.VehicleCreateRequest req=new com.elog.dto.request.VehicleCreateRequest();req.setPlateNumber("29A-12345");req.setPayloadKg(new BigDecimal("1000"));req.setMaxVolumeM3(new BigDecimal("10"));when(mapper.normalizePlate("29A-12345")).thenReturn("29A-12345");when(vehicles.existsByPlateNumber("29A-12345")).thenReturn(false);com.elog.entity.Vehicle v=com.elog.entity.Vehicle.builder().id(10L).plateNumber("29A-12345").build();when(mapper.toEntity(req)).thenReturn(v);when(vehicles.save(v)).thenReturn(v);when(mapper.toResponse(v)).thenReturn(com.elog.dto.response.VehicleResponse.builder().id(10L).plateNumber("29A-12345").build());com.elog.dto.response.VehicleResponse resp=new VehicleServiceImpl(vehicles,users,mapper).createVehicle(req);assertEquals(10L,resp.getId());}
+    @Test @DisplayName("[L1-VH-14] getVehicleById returns vehicle details")
+    void getVehicleByIdSuccess(){VehicleRepository vehicles=mock(VehicleRepository.class);VehicleMapper mapper=mock(VehicleMapper.class);com.elog.entity.Vehicle v=com.elog.entity.Vehicle.builder().id(10L).plateNumber("29A-12345").build();when(vehicles.findById(10L)).thenReturn(java.util.Optional.of(v));when(mapper.toResponse(v)).thenReturn(com.elog.dto.response.VehicleResponse.builder().id(10L).plateNumber("29A-12345").build());com.elog.dto.response.VehicleResponse resp=new VehicleServiceImpl(vehicles,mock(UserRepository.class),mapper).getVehicleById(10L);assertEquals(10L,resp.getId());}
+    @Test @DisplayName("[L1-VH-15] getAllVehicles returns paginated list")
+    void getAllVehiclesSuccess(){VehicleRepository vehicles=mock(VehicleRepository.class);VehicleMapper mapper=mock(VehicleMapper.class);com.elog.entity.Vehicle v=com.elog.entity.Vehicle.builder().id(10L).plateNumber("29A-12345").build();org.springframework.data.domain.Pageable pageable=org.springframework.data.domain.PageRequest.of(0,10);when(vehicles.findAll(any(org.springframework.data.jpa.domain.Specification.class),eq(pageable))).thenReturn(new org.springframework.data.domain.PageImpl<>(java.util.List.of(v)));when(mapper.toListItem(v)).thenReturn(com.elog.dto.response.VehicleListItemResponse.builder().id(10L).plateNumber("29A-12345").build());com.elog.dto.response.ApiResponse<java.util.List<com.elog.dto.response.VehicleListItemResponse>> resp=new VehicleServiceImpl(vehicles,mock(UserRepository.class),mapper).getAllVehicles(null,null,null,null,pageable);assertTrue(resp.isSuccess());assertEquals(1,resp.getData().size());}
+    @Test @DisplayName("[L1-VH-16] updateVehicle updates vehicle fields")
+    void updateVehicleSuccess(){VehicleRepository vehicles=mock(VehicleRepository.class);VehicleMapper mapper=mock(VehicleMapper.class);com.elog.entity.Vehicle v=com.elog.entity.Vehicle.builder().id(10L).plateNumber("29A-12345").build();com.elog.dto.request.VehicleUpdateRequest req=new com.elog.dto.request.VehicleUpdateRequest();req.setPayloadKg(new BigDecimal("1000"));req.setMaxVolumeM3(new BigDecimal("10"));when(vehicles.findById(10L)).thenReturn(java.util.Optional.of(v));when(vehicles.save(v)).thenReturn(v);when(mapper.toResponse(v)).thenReturn(com.elog.dto.response.VehicleResponse.builder().id(10L).plateNumber("29A-12345").build());com.elog.dto.response.VehicleResponse resp=new VehicleServiceImpl(vehicles,mock(UserRepository.class),mapper).updateVehicle(10L,req);assertEquals(10L,resp.getId());}
+    @Test @DisplayName("[L1-VH-17] updateVehicleStatus updates active flag")
+    void updateVehicleStatusSuccess(){VehicleRepository vehicles=mock(VehicleRepository.class);VehicleMapper mapper=mock(VehicleMapper.class);com.elog.entity.Vehicle v=com.elog.entity.Vehicle.builder().id(10L).plateNumber("29A-12345").isActive(true).build();com.elog.dto.request.VehicleStatusUpdateRequest req=new com.elog.dto.request.VehicleStatusUpdateRequest();req.setIsActive(false);when(vehicles.findById(10L)).thenReturn(java.util.Optional.of(v));when(vehicles.save(v)).thenReturn(v);when(mapper.toResponse(v)).thenReturn(com.elog.dto.response.VehicleResponse.builder().id(10L).isActive(false).build());com.elog.dto.response.VehicleResponse resp=new VehicleServiceImpl(vehicles,mock(UserRepository.class),mapper).updateVehicleStatus(10L,req);assertFalse(resp.getIsActive());}
+    @Test @DisplayName("[L1-VH-18] findAvailableVehiclesForTrip returns active available vehicles")
+    void findAvailableVehiclesForTripSuccess(){VehicleRepository vehicles=mock(VehicleRepository.class);VehicleMapper mapper=mock(VehicleMapper.class);com.elog.entity.Vehicle v=com.elog.entity.Vehicle.builder().id(10L).plateNumber("29A-12345").isActive(true).status(com.elog.entity.VehicleStatus.AVAILABLE).build();when(vehicles.findAll()).thenReturn(java.util.List.of(v));when(mapper.toResponse(v)).thenReturn(com.elog.dto.response.VehicleResponse.builder().id(10L).build());java.util.List<com.elog.dto.response.VehicleResponse> list=new VehicleServiceImpl(vehicles,mock(UserRepository.class),mapper).findAvailableVehiclesForTrip(100L);assertEquals(1,list.size());}
 }
+

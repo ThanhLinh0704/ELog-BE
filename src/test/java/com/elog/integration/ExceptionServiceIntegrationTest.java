@@ -1,212 +1,210 @@
 package com.elog.integration;
 
+import com.elog.dto.request.RejectStopRequest;
+import com.elog.dto.response.DeliveryExceptionResponse;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.service.ExceptionService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
+@ActiveProfiles("dev")
 @Transactional
-public class ExceptionServiceIntegrationTest {
+@ExtendWith(Report5L2EvidenceExtension.class)
+class ExceptionServiceIntegrationTest {
 
-    /**
-     * TEST ID: INT-EXCE-01
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
+    @Autowired ExceptionService exceptionService;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired EntityManager entityManager;
+    private static final AtomicInteger DAY_SEQUENCE = new AtomicInteger(0);
+
     @Test
-    void integrationTest_Scenario1() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-01");
+    void l2Exc01PersistsDeliveryRejectionAndMarksStopException() {
+        Fixture fixture = seedTrip(List.of("IN_PROGRESS"));
+        long stopId = fixture.stopIds().getFirst();
+
+        DeliveryExceptionResponse response = exceptionService.rejectStop(
+                stopId, rejection("STORE_CLOSED", "Closed on arrival"), "driver01");
+
+        assertThat(response.getExceptionId()).isNotNull();
+        assertThat(response.getExceptionType()).isEqualTo("DELIVERY_REJECTION");
+        assertThat(response.getRejectionType()).isEqualTo("STORE_CLOSED");
+        assertThat(reloadStopStatus(stopId)).isEqualTo("EXCEPTION");
+        assertThat(exceptionRows(stopId)).singleElement()
+                .satisfies(row -> {
+                    assertThat(row.get("exception_type")).isEqualTo("DELIVERY_REJECTION");
+                    assertThat(row.get("description")).isEqualTo("[STORE_CLOSED] Closed on arrival");
+                });
     }
 
-    /**
-     * TEST ID: INT-EXCE-02
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario2() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-02");
+    void l2Exc02LastRejectedStopAutoCompletesTrip() {
+        Fixture fixture = seedTrip(List.of("COMPLETED", "COMPLETED", "IN_PROGRESS"));
+        long lastStopId = fixture.stopIds().get(2);
+
+        exceptionService.rejectStop(lastStopId, rejection("CUSTOMER_REFUSED", "Refused"), "driver01");
+
+        assertThat(reloadStopStatus(lastStopId)).isEqualTo("EXCEPTION");
+        Map<String, Object> trip = reloadTrip(fixture.tripId());
+        assertThat(trip.get("status")).isEqualTo("COMPLETED");
+        assertThat(trip.get("completed_at")).isNotNull();
+        assertThat(terminalStopCount(fixture.tripId())).isEqualTo(3);
     }
 
-    /**
-     * TEST ID: INT-EXCE-03
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario3() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-03");
+    void l2Exc03WrongDriverCannotRejectStop() {
+        Fixture fixture = seedTrip(List.of("IN_PROGRESS"));
+        long stopId = fixture.stopIds().getFirst();
+
+        assertThatThrownBy(() -> exceptionService.rejectStop(
+                stopId, rejection("STORE_CLOSED", null), "driver02"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.NOT_YOUR_TRIP));
+
+        assertThat(reloadStopStatus(stopId)).isEqualTo("IN_PROGRESS");
+        assertThat(exceptionRows(stopId)).isEmpty();
     }
 
-    /**
-     * TEST ID: INT-EXCE-04
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario4() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-04");
+    void l2Exc04PendingStopCannotBeRejected() {
+        Fixture fixture = seedTrip(List.of("PENDING"));
+        long stopId = fixture.stopIds().getFirst();
+
+        assertThatThrownBy(() -> exceptionService.rejectStop(
+                stopId, rejection("STORE_CLOSED", null), "driver01"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.STOP_NOT_IN_PROGRESS));
+
+        assertThat(reloadStopStatus(stopId)).isEqualTo("PENDING");
+        assertThat(exceptionRows(stopId)).isEmpty();
     }
 
-    /**
-     * TEST ID: INT-EXCE-05
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario5() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-05");
+    void l2Exc05DuplicateUnresolvedRejectionIsIdempotentlyRejected() {
+        Fixture fixture = seedTrip(List.of("IN_PROGRESS"));
+        long stopId = fixture.stopIds().getFirst();
+        jdbc.update("""
+                INSERT INTO delivery_exceptions
+                    (trip_stop_id, exception_type, reported_by, description)
+                VALUES (?, 'DELIVERY_REJECTION', 6, '[STORE_CLOSED] Existing')
+                """, stopId);
+        long existingId = lastInsertId();
+
+        assertThatThrownBy(() -> exceptionService.rejectStop(
+                stopId, rejection("STORE_CLOSED", "Duplicate"), "driver01"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.REJECTION_ALREADY_RECORDED));
+
+        assertThat(exceptionRows(stopId)).singleElement()
+                .satisfies(row -> {
+                    assertThat(((Number) row.get("exception_id")).longValue()).isEqualTo(existingId);
+                    assertThat(row.get("description")).isEqualTo("[STORE_CLOSED] Existing");
+                });
+        assertThat(reloadStopStatus(stopId)).isEqualTo("IN_PROGRESS");
     }
 
-    /**
-     * TEST ID: INT-EXCE-06
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario6() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-06");
+    void l2Exc06OtherRejectionRequiresDescription() {
+        Fixture fixture = seedTrip(List.of("IN_PROGRESS"));
+        long stopId = fixture.stopIds().getFirst();
+
+        assertThatThrownBy(() -> exceptionService.rejectStop(
+                stopId, rejection("OTHER", "  "), "driver01"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+
+        assertThat(reloadStopStatus(stopId)).isEqualTo("IN_PROGRESS");
+        assertThat(exceptionRows(stopId)).isEmpty();
     }
 
-    /**
-     * TEST ID: INT-EXCE-07
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario7() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-07");
+    private Fixture seedTrip(List<String> stopStatuses) {
+        LocalDate deliveryDate = LocalDate.now().plusYears(30).plusDays(DAY_SEQUENCE.getAndIncrement());
+        jdbc.update("""
+                INSERT INTO trip_drafts
+                    (route_id, delivery_date, total_volume_m3, total_weight_kg,
+                     active_stop_count, skipped_stop_count, status)
+                VALUES (1, ?, 1.000000, 100.000, ?, 0, 'VALIDATED')
+                """, deliveryDate, stopStatuses.size());
+        long draftId = lastInsertId();
+        jdbc.update("""
+                INSERT INTO trips
+                    (trip_draft_id, route_id, vehicle_id, driver_id, delivery_date,
+                     status, total_weight_kg, total_volume_m3, created_by)
+                VALUES (?, 1, 1, 6, ?, 'IN_PROGRESS', 100.000, 1.000000, 2)
+                """, draftId, deliveryDate);
+        long tripId = lastInsertId();
+
+        List<Long> stopIds = new ArrayList<>();
+        for (int index = 0; index < stopStatuses.size(); index++) {
+            jdbc.update("""
+                    INSERT INTO trip_stops
+                        (trip_id, route_stop_id, sequence_order, planned_eta, status,
+                         stop_weight_kg, stop_volume_m3)
+                    VALUES (?, ?, ?, ?, ?, 10.000, 0.100000)
+                    """, tripId, 2 + index, index + 1,
+                    deliveryDate.atTime(9 + index, 0), stopStatuses.get(index));
+            stopIds.add(lastInsertId());
+        }
+        return new Fixture(tripId, stopIds);
     }
 
-    /**
-     * TEST ID: INT-EXCE-08
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario8() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-08");
+    private RejectStopRequest rejection(String type, String description) {
+        RejectStopRequest request = new RejectStopRequest();
+        request.setRejectionType(type);
+        request.setDescription(description);
+        return request;
     }
 
-    /**
-     * TEST ID: INT-EXCE-09
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario9() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-09");
+    private long lastInsertId() {
+        return jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
-    /**
-     * TEST ID: INT-EXCE-10
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario10() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-10");
+    private String reloadStopStatus(long stopId) {
+        entityManager.flush();
+        entityManager.clear();
+        return jdbc.queryForObject(
+                "SELECT status FROM trip_stops WHERE trip_stop_id = ?", String.class, stopId);
     }
 
-    /**
-     * TEST ID: INT-EXCE-11
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario11() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-11");
+    private Map<String, Object> reloadTrip(long tripId) {
+        entityManager.flush();
+        entityManager.clear();
+        return jdbc.queryForMap(
+                "SELECT status, completed_at FROM trips WHERE trip_id = ?", tripId);
     }
 
-    /**
-     * TEST ID: INT-EXCE-12
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario12() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-12");
+    private List<Map<String, Object>> exceptionRows(long stopId) {
+        entityManager.flush();
+        entityManager.clear();
+        return jdbc.queryForList("""
+                SELECT exception_id, exception_type, description, resolved_at
+                FROM delivery_exceptions WHERE trip_stop_id = ? ORDER BY exception_id
+                """, stopId);
     }
 
-    /**
-     * TEST ID: INT-EXCE-13
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario13() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-13");
+    private int terminalStopCount(long tripId) {
+        return jdbc.queryForObject("""
+                SELECT COUNT(*) FROM trip_stops
+                WHERE trip_id = ? AND status IN ('COMPLETED', 'EXCEPTION')
+                """, Integer.class, tripId);
     }
 
-    /**
-     * TEST ID: INT-EXCE-14
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario14() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-14");
-    }
-
-    /**
-     * TEST ID: INT-EXCE-15
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario15() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-15");
-    }
-
-    /**
-     * TEST ID: INT-EXCE-16
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario16() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-16");
-    }
-
-    /**
-     * TEST ID: INT-EXCE-17
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario17() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-17");
-    }
-
-    /**
-     * TEST ID: INT-EXCE-18
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario18() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-18");
-    }
-
-    /**
-     * TEST ID: INT-EXCE-19
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario19() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-19");
-    }
-
-    /**
-     * TEST ID: INT-EXCE-20
-     * COVERS: Integration of Exception service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario20() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-EXCE-20");
-    }
-
+    private record Fixture(long tripId, List<Long> stopIds) {}
 }
+

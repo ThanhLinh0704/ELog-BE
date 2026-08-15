@@ -1,0 +1,30 @@
+# .understandignore — patterns for files/dirs to exclude from analysis
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs)
+# Lines below are suggestions only — uncomment to activate.
+# Built-in defaults already exclude dependency/build artifacts such as .git/,
+# node_modules/, target/, dist/, coverage/, lockfiles, binaries, and media.
+
+# --- Project-specific candidates from .gitignore ---
+
+# application-local.yml
+# application-local.properties
+# .env
+# .env.*
+# *.jks
+# *.keystore
+# *.p12
+# *.pem
+# logs/
+
+# --- Detected directories (kept in scope for this comprehensive audit) ---
+
+# docs/
+# Evidence/
+# skills/
+
+# --- Test file patterns (kept in scope) ---
+
+# src/test/
+# *.test.*
+# *.spec.*
+

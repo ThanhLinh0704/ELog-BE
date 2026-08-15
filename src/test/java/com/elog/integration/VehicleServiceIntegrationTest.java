@@ -1,212 +1,110 @@
 package com.elog.integration;
 
+import com.elog.dto.request.VehicleCreateRequest;
+import com.elog.dto.response.VehicleResponse;
+import com.elog.entity.LicenseClass;
+import com.elog.entity.User;
+import com.elog.entity.Vehicle;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.UserRepository;
+import com.elog.repository.VehicleRepository;
+import com.elog.service.VehicleService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.math.BigDecimal;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
+@ActiveProfiles("dev")
 @Transactional
-public class VehicleServiceIntegrationTest {
+@ExtendWith(Report5L2EvidenceExtension.class)
+class VehicleServiceIntegrationTest {
 
-    /**
-     * TEST ID: INT-VEHI-01
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
+    @Autowired VehicleService vehicleService;
+    @Autowired VehicleRepository vehicleRepository;
+    @Autowired UserRepository userRepository;
+    @Autowired EntityManager entityManager;
+
     @Test
-    void integrationTest_Scenario1() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-01");
+    void l2Vpm01CreatesNormalizedVehicleAndLinksPersistedDriver() {
+        User driver = userRepository.findByUsername("driver01").orElseThrow();
+        VehicleCreateRequest request = validRequest();
+        request.setAssignedDriverId(driver.getId());
+
+        VehicleResponse response = vehicleService.createVehicle(request);
+        entityManager.flush();
+        entityManager.clear();
+
+        Vehicle persisted = vehicleRepository.findById(response.getId()).orElseThrow();
+        assertThat(persisted.getPlateNumber()).isEqualTo(request.getPlateNumber().toUpperCase());
+        assertThat(persisted.getAssignedDriver().getId()).isEqualTo(driver.getId());
     }
 
-    /**
-     * TEST ID: INT-VEHI-02
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario2() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-02");
+    void l2Vpm02RejectsDuplicateNormalizedPlateWithoutInsert() {
+        VehicleCreateRequest first = validRequest();
+        vehicleService.createVehicle(first);
+        entityManager.flush();
+        long before = vehicleRepository.count();
+        VehicleCreateRequest duplicate = validRequest();
+        duplicate.setPlateNumber(first.getPlateNumber().toLowerCase());
+
+        assertThatThrownBy(() -> vehicleService.createVehicle(duplicate))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.VEHICLE_PLATE_DUPLICATE));
+        assertThat(vehicleRepository.count()).isEqualTo(before);
     }
 
-    /**
-     * TEST ID: INT-VEHI-03
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario3() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-03");
+    void l2Vpm03RejectsDuplicateVehicleCodeWithoutInsert() {
+        VehicleCreateRequest first = validRequest();
+        vehicleService.createVehicle(first);
+        entityManager.flush();
+        long before = vehicleRepository.count();
+        VehicleCreateRequest duplicate = validRequest();
+        duplicate.setVehicleCode(first.getVehicleCode());
+
+        assertThatThrownBy(() -> vehicleService.createVehicle(duplicate))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.VEHICLE_CODE_DUPLICATE));
+        assertThat(vehicleRepository.count()).isEqualTo(before);
     }
 
-    /**
-     * TEST ID: INT-VEHI-04
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario4() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-04");
+    void l2Vpm04RejectsInvalidCapacityRatioWithoutInsert() {
+        VehicleCreateRequest request = validRequest();
+        request.setPayloadKg(new BigDecimal("10.00"));
+        request.setMaxVolumeM3(new BigDecimal("10.000"));
+        long before = vehicleRepository.count();
+
+        assertThatThrownBy(() -> vehicleService.createVehicle(request))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.INVALID_CAPACITY_RATIO));
+        assertThat(vehicleRepository.count()).isEqualTo(before);
     }
 
-    /**
-     * TEST ID: INT-VEHI-05
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario5() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-05");
+    private VehicleCreateRequest validRequest() {
+        String suffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        return VehicleCreateRequest.builder()
+                .vehicleCode("R5V-" + suffix)
+                .plateNumber("R5-" + suffix)
+                .vehicleType("Truck")
+                .vehicleClass("Light")
+                .payloadKg(new BigDecimal("3000.00"))
+                .grossVehicleWeightKg(new BigDecimal("5000.00"))
+                .requiredLicense(LicenseClass.B)
+                .maxVolumeM3(new BigDecimal("10.000"))
+                .build();
     }
-
-    /**
-     * TEST ID: INT-VEHI-06
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario6() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-06");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-07
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario7() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-07");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-08
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario8() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-08");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-09
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario9() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-09");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-10
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario10() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-10");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-11
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario11() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-11");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-12
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario12() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-12");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-13
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario13() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-13");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-14
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario14() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-14");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-15
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario15() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-15");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-16
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario16() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-16");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-17
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario17() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-17");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-18
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario18() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-18");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-19
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario19() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-19");
-    }
-
-    /**
-     * TEST ID: INT-VEHI-20
-     * COVERS: Integration of Vehicle service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario20() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-VEHI-20");
-    }
-
 }
+

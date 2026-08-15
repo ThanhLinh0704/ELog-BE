@@ -422,10 +422,7 @@ public class ImportServiceImpl implements ImportService {
         }
         Store store = storeCache.get(storeCode);
         if (store == null) {
-            throw new RowRejectedException("Store code '" + storeCode + "' not found", "STORE_NOT_FOUND", "storeCode");
-        }
-        if (store == null) {
-            throw new RowRejectedException("Mã cửa hàng '" + storeCode + "' không tồn tại trong hệ thống", "STORE_NOT_FOUND", "store_code");
+            throw new RowRejectedException("Mã cửa hàng '" + storeCode + "' không tồn tại trong hệ thống", "STORE_NOT_FOUND", "storeCode");
         }
 
         // Lookup product by SKU (SKU_NOT_FOUND, SKU_INACTIVE)

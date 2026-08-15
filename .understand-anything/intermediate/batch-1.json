@@ -1,0 +1,1506 @@
+{
+  "nodes": [
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "type": "table",
+      "name": "V1__init_schema.sql",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Khởi tạo schema quan hệ cốt lõi cho người dùng, cửa hàng, tuyến giao hàng, phương tiện, sản phẩm, đơn hàng, chuyến đi và bằng chứng giao nhận.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "khởi-tạo-schema",
+        "flyway"
+      ],
+      "complexity": "complex",
+      "languageNotes": "MySQL DDL tổ chức các bảng theo quan hệ khóa ngoại và bổ sung index cho những truy vấn theo tuyến, đơn hàng, chuyến đi và ngoại lệ."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:migration",
+      "type": "table",
+      "name": "V10__seed_us08_import_data.sql",
+      "filePath": "src/main/resources/db/migration/V10__seed_us08_import_data.sql",
+      "summary": "Nạp bộ dữ liệu US-08 gồm batch import, đơn hàng, chi tiết đơn hợp lệ và các lỗi bị từ chối để mô phỏng quy trình nhập đơn từ Excel.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "dữ-liệu-mẫu",
+        "import-đơn-hàng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V11__import_errors_extend.sql:migration",
+      "type": "table",
+      "name": "V11__import_errors_extend.sql",
+      "filePath": "src/main/resources/db/migration/V11__import_errors_extend.sql",
+      "summary": "Mở rộng bảng import_errors với mã lỗi và tên trường, đồng thời thêm index phục vụ tra cứu lỗi theo batch và loại lỗi.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "kiểm-tra-import",
+        "indexing"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:migration",
+      "type": "table",
+      "name": "V12__trip_draft_schema.sql",
+      "filePath": "src/main/resources/db/migration/V12__trip_draft_schema.sql",
+      "summary": "Tạo schema trip_drafts và trip_draft_stops cho bước hợp nhất đơn theo tuyến, đồng thời liên kết đơn hàng với bản nháp chuyến đi.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "lập-kế-hoạch-chuyến",
+        "schema"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V13__seed_us10_trip_draft_data.sql:migration",
+      "type": "table",
+      "name": "V13__seed_us10_trip_draft_data.sql",
+      "filePath": "src/main/resources/db/migration/V13__seed_us10_trip_draft_data.sql",
+      "summary": "Nạp dữ liệu mẫu US-10 cho hai bản nháp chuyến, các điểm dừng tương ứng và liên kết các đơn đã được chấp nhận vào từng bản nháp.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "dữ-liệu-mẫu",
+        "trip-draft"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V14__trip_draft_review_fields.sql:migration",
+      "type": "table",
+      "name": "V14__trip_draft_review_fields.sql",
+      "filePath": "src/main/resources/db/migration/V14__trip_draft_review_fields.sql",
+      "summary": "Bổ sung cấu hình kho, thời gian phục vụ, ETA và các trường review/override để điều phối viên rà soát và tinh chỉnh bản nháp chuyến.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "review-chuyến",
+        "eta",
+        "cấu-hình"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V15__capacity_validation_fields.sql:migration",
+      "type": "table",
+      "name": "V15__capacity_validation_fields.sql",
+      "filePath": "src/main/resources/db/migration/V15__capacity_validation_fields.sql",
+      "summary": "Thêm kết quả kiểm tra tải trọng và thể tích cùng dấu vết người, thời điểm xác nhận năng lực chuyên chở cho trip_drafts.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "kiểm-tra-tải",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V16__manifest_schema.sql:migration",
+      "type": "table",
+      "name": "V16__manifest_schema.sql",
+      "filePath": "src/main/resources/db/migration/V16__manifest_schema.sql",
+      "summary": "Tạo manifest và manifest_lines, thêm index phục vụ thứ tự xếp hàng LIFO và nạp một manifest mẫu từ trip draft đã xác nhận.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "manifest",
+        "lifo",
+        "dữ-liệu-mẫu"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Schema lưu cả thứ tự điểm dừng lẫn lifo_sequence để biểu diễn thứ tự chất hàng ngược với thứ tự giao."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:migration",
+      "type": "table",
+      "name": "V17__trip_tripstop_schema.sql",
+      "filePath": "src/main/resources/db/migration/V17__trip_tripstop_schema.sql",
+      "summary": "Tái tạo trips và trip_stops theo schema vận hành mới, rồi nối lại các khóa ngoại từ manifest, bản ghi giao hàng và ngoại lệ.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "chuyến-giao-hàng",
+        "tái-tạo-schema"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Migration dùng mẫu drop-and-recreate có kiểm soát, tháo khóa ngoại trước khi thay schema rồi khôi phục quan hệ và index."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V18__progress_schema_update.sql:migration",
+      "type": "table",
+      "name": "V18__progress_schema_update.sql",
+      "filePath": "src/main/resources/db/migration/V18__progress_schema_update.sql",
+      "summary": "Tối ưu truy vấn tiến độ bằng index cho chuyến và điểm dừng, đồng thời tạo delivery_exceptions để theo dõi và xử lý sự cố giao hàng.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "theo-dõi-tiến-độ",
+        "ngoại-lệ",
+        "indexing"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:migration",
+      "type": "table",
+      "name": "V19__init_vietnamese_administrative_units.sql",
+      "filePath": "src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql",
+      "summary": "Khởi tạo mô hình địa giới hành chính Việt Nam theo vùng, cấp hành chính, tỉnh, huyện và xã/phường, sau đó nạp bộ dữ liệu tham chiếu đầy đủ.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "địa-giới-hành-chính",
+        "dữ-liệu-tham-chiếu",
+        "flyway"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Dữ liệu được tổ chức theo hierarchy vùng → tỉnh → huyện → xã/phường với mã hành chính và index trên các khóa cha; phần seed lớn được chia thành nhiều INSERT theo lô."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V2__seed_reference_data.sql:migration",
+      "type": "table",
+      "name": "V2__seed_reference_data.sql",
+      "filePath": "src/main/resources/db/migration/V2__seed_reference_data.sql",
+      "summary": "Nạp dữ liệu tham chiếu ban đầu cho vai trò, tài khoản, cửa hàng, tuyến, điểm dừng, phương tiện và sản phẩm để hệ thống có thể chạy thử.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "dữ-liệu-mẫu",
+        "dữ-liệu-tham-chiếu"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V20__alter_stores_address_relational.sql:migration",
+      "type": "table",
+      "name": "V20__alter_stores_address_relational.sql",
+      "filePath": "src/main/resources/db/migration/V20__alter_stores_address_relational.sql",
+      "summary": "Chuẩn hóa địa chỉ cửa hàng thành các mã tỉnh, huyện, xã/phường và chi tiết địa chỉ, rồi ràng buộc chúng với schema hành chính Việt Nam.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "chuẩn-hóa-địa-chỉ",
+        "foreign-key"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Migration chuyển dữ liệu địa chỉ dạng text sang mô hình quan hệ trước khi xóa cột address cũ và thêm ba khóa ngoại hành chính."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V21__add_actual_departure_time_to_trip_stops.sql:migration",
+      "type": "table",
+      "name": "V21__add_actual_departure_time_to_trip_stops.sql",
+      "filePath": "src/main/resources/db/migration/V21__add_actual_departure_time_to_trip_stops.sql",
+      "summary": "Bổ sung actual_departure_time cho trip_stops để schema cơ sở dữ liệu đồng bộ với JPA entity theo dõi thời điểm rời điểm giao.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "đồng-bộ-jpa",
+        "tiến-trình-giao-hàng"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V22__add_new_fields_for_additional_business_needs.sql:migration",
+      "type": "table",
+      "name": "V22__add_new_fields_for_additional_business_needs.sql",
+      "filePath": "src/main/resources/db/migration/V22__add_new_fields_for_additional_business_needs.sql",
+      "summary": "Mở rộng cửa hàng, phương tiện và sản phẩm với khung giờ nhận hàng, giới hạn tải, hình ảnh, giấy phép và thuộc tính đóng gói phục vụ nghiệp vụ bổ sung.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "thuộc-tính-nghiệp-vụ",
+        "catalog"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V23__remove_uq_batch_active_date.sql:migration",
+      "type": "table",
+      "name": "V23__remove_uq_batch_active_date.sql",
+      "filePath": "src/main/resources/db/migration/V23__remove_uq_batch_active_date.sql",
+      "summary": "Gỡ unique index theo ngày giao trên import_batches để cho phép nhiều batch đang hoạt động cùng ngày trong mô hình import tích lũy.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "import-tích-lũy",
+        "ràng-buộc"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V24__add_order_time_window_and_recipient_fields.sql:migration",
+      "type": "table",
+      "name": "V24__add_order_time_window_and_recipient_fields.sql",
+      "filePath": "src/main/resources/db/migration/V24__add_order_time_window_and_recipient_fields.sql",
+      "summary": "Bổ sung khung giờ giao, thông tin người nhận và ghi chú cho orders để lưu yêu cầu giao hàng chi tiết.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "đơn-hàng",
+        "khung-giờ-giao"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V25__alter_vehicles_and_users_for_license_matching.sql:migration",
+      "type": "table",
+      "name": "V25__alter_vehicles_and_users_for_license_matching.sql",
+      "filePath": "src/main/resources/db/migration/V25__alter_vehicles_and_users_for_license_matching.sql",
+      "summary": "Chuẩn hóa thông số phương tiện, sinh mã xe và thêm hạng bằng lái cho người dùng để đối chiếu điều kiện điều khiển xe.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "phương-tiện",
+        "bằng-lái",
+        "data-backfill"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "type": "table",
+      "name": "V26__refresh_seed_data_for_northern_region.sql",
+      "filePath": "src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql",
+      "summary": "Làm mới dữ liệu demo cho khu vực miền Bắc bằng cách xóa dữ liệu giao dịch cũ rồi nạp lại sản phẩm, xe, tài xế, 50 cửa hàng, ba tuyến và các điểm dừng.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "dữ-liệu-mẫu",
+        "khu-vực-miền-bắc",
+        "reset-dữ-liệu"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Migration seed có tính phá hủy chủ động: TRUNCATE theo thứ tự phụ thuộc rồi tái nạp toàn bộ dữ liệu tham chiếu và vận hành nhất quán."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V27__fix_stores_ward_codes.sql:migration",
+      "type": "table",
+      "name": "V27__fix_stores_ward_codes.sql",
+      "filePath": "src/main/resources/db/migration/V27__fix_stores_ward_codes.sql",
+      "summary": "Sửa mã huyện và xã/phường cho 13 cửa hàng miền Bắc để các địa chỉ tham chiếu đúng bộ mã hành chính.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "sửa-dữ-liệu",
+        "địa-giới-hành-chính"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:migration",
+      "type": "table",
+      "name": "V28__add_permissions_schema.sql",
+      "filePath": "src/main/resources/db/migration/V28__add_permissions_schema.sql",
+      "summary": "Tạo schema permissions và role_permissions, sau đó nạp tập quyền nền tảng theo từng vai trò vận hành của hệ thống.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "phân-quyền",
+        "rbac",
+        "dữ-liệu-mẫu"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V29__add_product_permissions.sql:migration",
+      "type": "table",
+      "name": "V29__add_product_permissions.sql",
+      "filePath": "src/main/resources/db/migration/V29__add_product_permissions.sql",
+      "summary": "Bổ sung quyền đọc/ghi sản phẩm và gán chúng cho các vai trò phù hợp trong mô hình RBAC hiện có.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "phân-quyền-sản-phẩm",
+        "rbac"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V3__update_user_roles_and_email.sql:migration",
+      "type": "table",
+      "name": "V3__update_user_roles_and_email.sql",
+      "filePath": "src/main/resources/db/migration/V3__update_user_roles_and_email.sql",
+      "summary": "Thêm email duy nhất cho người dùng, chuyển quan hệ user-role sang bảng nối nhiều-nhiều và đổi tên vai trò ADMIN thành SYSTEM_ADMIN.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "người-dùng",
+        "phân-quyền",
+        "many-to-many"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V30__add_store_constraints_and_waiting_time_fields.sql:migration",
+      "type": "table",
+      "name": "V30__add_store_constraints_and_waiting_time_fields.sql",
+      "filePath": "src/main/resources/db/migration/V30__add_store_constraints_and_waiting_time_fields.sql",
+      "summary": "Bổ sung khung giờ và hạn chế loại xe cho cửa hàng, đồng thời lưu thời gian chờ dự kiến và mã vi phạm trên điểm dừng dự kiến lẫn thực tế.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "ràng-buộc-cửa-hàng",
+        "thời-gian-chờ"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V31__add_order_time_override_fields.sql:migration",
+      "type": "table",
+      "name": "V31__add_order_time_override_fields.sql",
+      "filePath": "src/main/resources/db/migration/V31__add_order_time_override_fields.sql",
+      "summary": "Thêm trạng thái, lý do, người thực hiện và thời điểm override khung giờ giao cho orders để hỗ trợ truy vết quyết định điều phối.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "đơn-hàng",
+        "override-thời-gian",
+        "audit"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:roles",
+      "type": "table",
+      "name": "roles",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu danh mục vai trò dùng để phân nhóm quyền truy cập của người dùng.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "phân-quyền"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "table",
+      "name": "users",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu tài khoản, thông tin xác thực và trạng thái hoạt động của người dùng hệ thống.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "người-dùng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:stores",
+      "type": "table",
+      "name": "stores",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu cửa hàng nhận hàng cùng địa chỉ, tọa độ và các ràng buộc phục vụ giao nhận.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "cửa-hàng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:routes",
+      "type": "table",
+      "name": "routes",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu các tuyến giao hàng cố định được điều phối từ kho đến chuỗi cửa hàng.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "tuyến-giao-hàng"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:route_stops",
+      "type": "table",
+      "name": "route_stops",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Biểu diễn thứ tự cửa hàng trên từng tuyến giao hàng và thời gian phục vụ dự kiến.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "điểm-dừng"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:vehicles",
+      "type": "table",
+      "name": "vehicles",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu năng lực tải, kích thước thùng, loại xe và điều kiện giấy phép của phương tiện.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "phương-tiện"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:products",
+      "type": "table",
+      "name": "products",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu danh mục sản phẩm điện tử cùng kích thước, khối lượng và đặc tính đóng gói.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "sản-phẩm"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:excel_imports",
+      "type": "table",
+      "name": "excel_imports",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Theo dõi lịch sử import Excel, trạng thái xử lý và số dòng hợp lệ hoặc lỗi.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "import-excel"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "table",
+      "name": "orders",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu đơn giao hàng theo cửa hàng, sản phẩm, ngày giao và trạng thái xử lý.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "đơn-hàng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:trips",
+      "type": "table",
+      "name": "trips",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu chuyến giao hàng đã được lập kế hoạch cùng xe, tài xế, lịch chạy và tổng tải.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "chuyến-giao-hàng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:trip_stops",
+      "type": "table",
+      "name": "trip_stops",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu tiến trình của từng điểm dừng trong chuyến, gồm thứ tự, ETA, thời điểm thực tế và trạng thái.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "tiến-trình-giao-hàng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:loading_manifest_items",
+      "type": "table",
+      "name": "loading_manifest_items",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu các mục hàng được xếp lên xe theo chuyến, điểm dừng và thứ tự chất hàng.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "xếp-hàng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:delivery_records",
+      "type": "table",
+      "name": "delivery_records",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu kết quả giao hàng tại điểm dừng, người thực hiện, trạng thái và ghi chú.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "giao-hàng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:epod",
+      "type": "table",
+      "name": "epod",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu bằng chứng giao hàng điện tử gồm chữ ký và hình ảnh hàng hóa.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "bằng-chứng-giao-hàng"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V1__init_schema.sql:exceptions",
+      "type": "table",
+      "name": "exceptions",
+      "filePath": "src/main/resources/db/migration/V1__init_schema.sql",
+      "summary": "Lưu ngoại lệ phát sinh theo chuyến hoặc điểm dừng và trạng thái giải quyết.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "ngoại-lệ"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:import_batches",
+      "type": "table",
+      "name": "import_batches",
+      "filePath": "src/main/resources/db/migration/V10__seed_us08_import_data.sql",
+      "summary": "Đại diện batch import đơn hàng, ngày giao, tệp nguồn và thống kê chấp nhận hoặc từ chối.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "import-đơn-hàng"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:order_items",
+      "type": "table",
+      "name": "order_items",
+      "filePath": "src/main/resources/db/migration/V10__seed_us08_import_data.sql",
+      "summary": "Lưu từng dòng sản phẩm của đơn hàng với snapshot số lượng, khối lượng và thể tích.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "chi-tiết-đơn-hàng"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:import_errors",
+      "type": "table",
+      "name": "import_errors",
+      "filePath": "src/main/resources/db/migration/V10__seed_us08_import_data.sql",
+      "summary": "Lưu lỗi kiểm tra dữ liệu theo dòng, trường và mã lỗi của từng batch import.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "lỗi-import"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_drafts",
+      "type": "table",
+      "name": "trip_drafts",
+      "filePath": "src/main/resources/db/migration/V12__trip_draft_schema.sql",
+      "summary": "Lưu bản nháp chuyến được gom theo tuyến và ngày giao trước khi xác nhận vận hành.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "lập-kế-hoạch"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_draft_stops",
+      "type": "table",
+      "name": "trip_draft_stops",
+      "filePath": "src/main/resources/db/migration/V12__trip_draft_schema.sql",
+      "summary": "Lưu các điểm dừng dự kiến, số đơn và lựa chọn kích hoạt trong một trip draft.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "điểm-dừng-dự-kiến"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V14__trip_draft_review_fields.sql:system_config",
+      "type": "table",
+      "name": "system_config",
+      "filePath": "src/main/resources/db/migration/V14__trip_draft_review_fields.sql",
+      "summary": "Lưu cấu hình vận hành dạng khóa-giá trị như tọa độ kho và tốc độ trung bình.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "cấu-hình-hệ-thống"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V16__manifest_schema.sql:manifests",
+      "type": "table",
+      "name": "manifests",
+      "filePath": "src/main/resources/db/migration/V16__manifest_schema.sql",
+      "summary": "Lưu phần đầu manifest, nguồn trip draft và tổng khối lượng, thể tích cần xếp.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "manifest"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V16__manifest_schema.sql:manifest_lines",
+      "type": "table",
+      "name": "manifest_lines",
+      "filePath": "src/main/resources/db/migration/V16__manifest_schema.sql",
+      "summary": "Lưu từng dòng hàng trên manifest với thứ tự LIFO, điểm dừng và snapshot sản phẩm.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "lifo"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trips",
+      "type": "table",
+      "name": "trips",
+      "filePath": "src/main/resources/db/migration/V17__trip_tripstop_schema.sql",
+      "summary": "Lưu chuyến giao hàng đã được lập kế hoạch cùng xe, tài xế, lịch chạy và tổng tải.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "chuyến-giao-hàng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trip_stops",
+      "type": "table",
+      "name": "trip_stops",
+      "filePath": "src/main/resources/db/migration/V17__trip_tripstop_schema.sql",
+      "summary": "Lưu tiến trình của từng điểm dừng trong chuyến, gồm thứ tự, ETA, thời điểm thực tế và trạng thái.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "tiến-trình-giao-hàng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V18__progress_schema_update.sql:delivery_exceptions",
+      "type": "table",
+      "name": "delivery_exceptions",
+      "filePath": "src/main/resources/db/migration/V18__progress_schema_update.sql",
+      "summary": "Lưu sự cố giao hàng có loại, người báo cáo, mô tả và thông tin xử lý.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "ngoại-lệ-giao-hàng"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:administrative_regions",
+      "type": "table",
+      "name": "administrative_regions",
+      "filePath": "src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql",
+      "summary": "Lưu các vùng hành chính cấp cao và tên gọi song ngữ dùng làm dữ liệu tham chiếu.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "địa-giới-hành-chính"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:administrative_units",
+      "type": "table",
+      "name": "administrative_units",
+      "filePath": "src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql",
+      "summary": "Lưu danh mục loại đơn vị hành chính cùng tên đầy đủ, tên ngắn và mã chuẩn hóa.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "đơn-vị-hành-chính"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:provinces",
+      "type": "table",
+      "name": "provinces",
+      "filePath": "src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql",
+      "summary": "Lưu tỉnh hoặc thành phố trực thuộc trung ương và liên kết đến vùng, cấp hành chính.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "tỉnh-thành"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:districts",
+      "type": "table",
+      "name": "districts",
+      "filePath": "src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql",
+      "summary": "Lưu quận, huyện hoặc thành phố cấp huyện và liên kết đến tỉnh tương ứng.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "quận-huyện"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:wards",
+      "type": "table",
+      "name": "wards",
+      "filePath": "src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql",
+      "summary": "Lưu xã, phường hoặc thị trấn và liên kết đến huyện tương ứng.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "xã-phường"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:permissions",
+      "type": "table",
+      "name": "permissions",
+      "filePath": "src/main/resources/db/migration/V28__add_permissions_schema.sql",
+      "summary": "Lưu các quyền thao tác cấp chức năng được sử dụng trong mô hình RBAC.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "rbac"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:role_permissions",
+      "type": "table",
+      "name": "role_permissions",
+      "filePath": "src/main/resources/db/migration/V28__add_permissions_schema.sql",
+      "summary": "Bảng nối gán nhiều quyền cho nhiều vai trò trong mô hình RBAC.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "rbac"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V3__update_user_roles_and_email.sql:user_roles",
+      "type": "table",
+      "name": "user_roles",
+      "filePath": "src/main/resources/db/migration/V3__update_user_roles_and_email.sql",
+      "summary": "Bảng nối nhiều-nhiều giữa tài khoản người dùng và vai trò.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "rbac"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:roles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:stores",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:routes",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:route_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:vehicles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:products",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:excel_imports",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:trips",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:trip_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:loading_manifest_items",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:delivery_records",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:epod",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V1__init_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:exceptions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:import_batches",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:order_items",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:import_errors",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_drafts",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_draft_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V14__trip_draft_review_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V14__trip_draft_review_fields.sql:system_config",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V16__manifest_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V16__manifest_schema.sql:manifests",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V16__manifest_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V16__manifest_schema.sql:manifest_lines",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trips",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trip_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V18__progress_schema_update.sql:migration",
+      "target": "table:src/main/resources/db/migration/V18__progress_schema_update.sql:delivery_exceptions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:migration",
+      "target": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:administrative_regions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:migration",
+      "target": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:administrative_units",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:migration",
+      "target": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:provinces",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:migration",
+      "target": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:districts",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:migration",
+      "target": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:wards",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:permissions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:role_permissions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V3__update_user_roles_and_email.sql:migration",
+      "target": "table:src/main/resources/db/migration/V3__update_user_roles_and_email.sql:user_roles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V11__import_errors_extend.sql:migration",
+      "target": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:import_errors",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V13__seed_us10_trip_draft_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V13__seed_us10_trip_draft_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_drafts",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V13__seed_us10_trip_draft_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_draft_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V14__trip_draft_review_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:route_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V14__trip_draft_review_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_drafts",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V14__trip_draft_review_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_draft_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V15__capacity_validation_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_drafts",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V15__capacity_validation_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V16__manifest_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_drafts",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:loading_manifest_items",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:delivery_records",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:exceptions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V18__progress_schema_update.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trips",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V18__progress_schema_update.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trip_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V2__seed_reference_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:roles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V2__seed_reference_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V2__seed_reference_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:stores",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V2__seed_reference_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:routes",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V2__seed_reference_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:route_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V2__seed_reference_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:vehicles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V2__seed_reference_data.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:products",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V20__alter_stores_address_relational.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:stores",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V20__alter_stores_address_relational.sql:migration",
+      "target": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:provinces",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V20__alter_stores_address_relational.sql:migration",
+      "target": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:districts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V20__alter_stores_address_relational.sql:migration",
+      "target": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:wards",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V21__add_actual_departure_time_to_trip_stops.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trip_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V22__add_new_fields_for_additional_business_needs.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:stores",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V22__add_new_fields_for_additional_business_needs.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:vehicles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V22__add_new_fields_for_additional_business_needs.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:products",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V23__remove_uq_batch_active_date.sql:migration",
+      "target": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:import_batches",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V24__add_order_time_window_and_recipient_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V25__alter_vehicles_and_users_for_license_matching.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:vehicles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V25__alter_vehicles_and_users_for_license_matching.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trip_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trips",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V16__manifest_schema.sql:manifest_lines",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V16__manifest_schema.sql:manifests",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_draft_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_drafts",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:route_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:routes",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:order_items",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:import_errors",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V10__seed_us08_import_data.sql:import_batches",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:stores",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:vehicles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:products",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V3__update_user_roles_and_email.sql:user_roles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql:migration",
+      "target": "table:src/main/resources/db/migration/V14__trip_draft_review_fields.sql:system_config",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V27__fix_stores_ward_codes.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:stores",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V27__fix_stores_ward_codes.sql:migration",
+      "target": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:districts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V27__fix_stores_ward_codes.sql:migration",
+      "target": "table:src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql:wards",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V29__add_product_permissions.sql:migration",
+      "target": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:permissions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V29__add_product_permissions.sql:migration",
+      "target": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:role_permissions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V3__update_user_roles_and_email.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V3__update_user_roles_and_email.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:roles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V30__add_store_constraints_and_waiting_time_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:stores",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V30__add_store_constraints_and_waiting_time_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_draft_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V30__add_store_constraints_and_waiting_time_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trip_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V31__add_order_time_override_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    }
+  ]
+}

@@ -1,212 +1,427 @@
-package com.elog.integration;
+package com.elog.service;
 
+import com.elog.entity.*;
+import com.elog.repository.*;
+import com.elog.service.impl.ImportServiceImpl;
+import com.elog.exception.BusinessException;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.annotation.Transactional;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.*;
+import com.elog.dto.response.ImportBatchResponse;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import org.junit.jupiter.api.Disabled;
 
 @SpringBootTest
-@Transactional
-public class ImportServiceIntegrationTest {
+@AutoConfigureMockMvc
+@ActiveProfiles("dev")
+@Disabled("Requires Docker and Docker Hub connection to run")
+class ImportServiceIntegrationTest {
 
-    /**
-     * TEST ID: INT-IMPO-01
-     * COVERS: Integration of Import service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario1() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-01");
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ImportService importService;
+
+    @Autowired
+    private ImportBatchRepository batchRepository;
+
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private OrderItemRepository orderItemRepository;
+
+    @Autowired
+    private ImportErrorRepository errorRepository;
+
+    @Autowired
+    private StoreRepository storeRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @BeforeEach
+    void setUp() {
+        // Truncate import-related tables to ensure a clean state before each test
+        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0;");
+        jdbcTemplate.execute("TRUNCATE TABLE order_items;");
+        jdbcTemplate.execute("TRUNCATE TABLE orders;");
+        jdbcTemplate.execute("TRUNCATE TABLE import_errors;");
+        jdbcTemplate.execute("TRUNCATE TABLE import_batches;");
+        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1;");
     }
 
-    /**
-     * TEST ID: INT-IMPO-02
-     * COVERS: Integration of Import service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario2() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-02");
+    private MockMultipartFile createExcelFile(String fileName, List<String[]> rowsData) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet();
+            Row headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("Mã đơn");
+            headerRow.createCell(1).setCellValue("Mã cửa hàng");
+            headerRow.createCell(2).setCellValue("SKU");
+            headerRow.createCell(3).setCellValue("Số lượng");
+
+            for (int i = 0; i < rowsData.size(); i++) {
+                Row row = sheet.createRow(i + 1);
+                String[] rowData = rowsData.get(i);
+                for (int col = 0; col < rowData.length; col++) {
+                    if (rowData[col] != null) {
+                        row.createCell(col).setCellValue(rowData[col]);
+                    }
+                }
+            }
+
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            workbook.write(bos);
+            byte[] bytes = bos.toByteArray();
+            return new MockMultipartFile(
+                    "file",
+                    fileName,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    bytes
+            );
+        }
     }
 
-    /**
-     * TEST ID: INT-IMPO-03
-     * COVERS: Integration of Import service with DB and migrations.
-     */
+    // ── L2-IMP-01: Happy Path + Transaction Boundary ───────────────────────────
     @Test
-    void integrationTest_Scenario3() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-03");
+    @org.springframework.security.test.context.support.WithMockUser(username = "dispatcher01", roles = "DISPATCHER")
+    void l2Imp01_happyPathAndTransactionBoundary() throws Exception {
+        // Given: DB rỗng cho 2026-03-16 (đã dọn dẹp ở setUp)
+        List<String[]> rows = new ArrayList<>();
+        rows.add(new String[]{"DH160325-01", "ST-001", "REF-SAM-300", "2"});
+        rows.add(new String[]{"DH160325-01", "ST-001", "TV-SAM-55", "1"});
+        rows.add(new String[]{"DH160325-02", "ST-002", "GEN-DNY-5K", "3"});
+        rows.add(new String[]{"DH160325-03", "ST-003", "PHN-APL-14", "10"});
+        rows.add(new String[]{"DH160325-04", "ST-HD-099", "REF-SAM-300", "1"}); // Store doesn't exist
+        rows.add(new String[]{"DH160325-05", "ST-001", "ACC-HDMI-2M", "5"});     // Inactive SKU
+
+        MockMultipartFile file = createExcelFile("import.xlsx", rows);
+
+        // When: Gửi file
+        mockMvc.perform(multipart("/api/imports")
+                        .file(file)
+                        .param("deliveryDate", "2026-03-16")
+                        .param("confirmReplace", "false"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true));
+
+        // Then: DB có 3 orders, 4 items, 2 errors, batch.status = COMPLETED
+        assertThat(batchRepository.count()).isEqualTo(1);
+        ImportBatch batch = batchRepository.findAll().get(0);
+        assertThat(batch.getStatus()).isEqualTo("COMPLETED");
+        assertThat(batch.getTotalRows()).isEqualTo(6);
+        assertThat(batch.getAcceptedRows()).isEqualTo(4);
+        assertThat(batch.getRejectedRows()).isEqualTo(2);
+
+        assertThat(orderRepository.countByBatchId(batch.getId())).isEqualTo(3);
+        assertThat(orderItemRepository.count()).isEqualTo(4);
+        assertThat(errorRepository.count()).isEqualTo(2);
     }
 
-    /**
-     * TEST ID: INT-IMPO-04
-     * COVERS: Integration of Import service with DB and migrations.
-     */
+    // ── L2-IMP-02: Error Path + Rollback ───────────────────────────────────────
     @Test
-    void integrationTest_Scenario4() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-04");
+    @org.springframework.security.test.context.support.WithMockUser(username = "dispatcher01", roles = "DISPATCHER")
+    void l2Imp02_corruptedFileRollsBackEntireBatch() throws Exception {
+        // Given: File corrupt (invalid bytes)
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "corrupt.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "invalid corrupt bytes".getBytes()
+        );
+
+        // When: Gửi file hỏng
+        mockMvc.perform(multipart("/api/imports")
+                        .file(file)
+                        .param("deliveryDate", "2026-03-16")
+                        .param("confirmReplace", "false"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("EXCEL_PARSE_ERROR"));
+
+        // Then: KHÔNG có records nào được tạo (được rollback hoàn toàn)
+        assertThat(batchRepository.count()).isEqualTo(0);
+        assertThat(orderRepository.count()).isEqualTo(0);
+        assertThat(orderItemRepository.count()).isEqualTo(0);
     }
 
-    /**
-     * TEST ID: INT-IMPO-05
-     * COVERS: Integration of Import service with DB and migrations.
-     */
+    // ── L2-IMP-03: Replace Flow (confirmReplace = false) ──────────────────────
     @Test
-    void integrationTest_Scenario5() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-05");
+    @org.springframework.security.test.context.support.WithMockUser(username = "dispatcher01", roles = "DISPATCHER")
+    void l2Imp03_replaceFlowConfirmReplaceFalse_returnsConflict() throws Exception {
+        // Given: Có batch 8 active cho 2026-03-16
+        jdbcTemplate.execute("INSERT INTO import_batches (id, delivery_date, file_name, uploaded_by, total_rows, accepted_rows, rejected_rows, status, is_active) VALUES (8, '2026-03-16', 'old_file.xlsx', 2, 45, 45, 0, 'COMPLETED', TRUE)");
+
+        List<String[]> rows = new ArrayList<>();
+        rows.add(new String[]{"DH160325-01", "ST-001", "REF-SAM-300", "2"});
+
+        MockMultipartFile file = createExcelFile("import.xlsx", rows);
+
+        // When: Gửi import cùng ngày với confirmReplace=false
+        mockMvc.perform(multipart("/api/imports")
+                        .file(file)
+                        .param("deliveryDate", "2026-03-16")
+                        .param("confirmReplace", "false"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("DUPLICATE_DELIVERY_DATE"));
+
+        // Then: Batch 8 vẫn active và không có batch mới
+        ImportBatch batch8 = batchRepository.findById(8L).orElseThrow();
+        assertThat(batch8.getIsActive()).isTrue();
+        assertThat(batchRepository.count()).isEqualTo(1);
     }
 
-    /**
-     * TEST ID: INT-IMPO-06
-     * COVERS: Integration of Import service with DB and migrations.
-     */
+    // ── L2-IMP-04: Replace Flow (confirmReplace = true) ───────────────────────
     @Test
-    void integrationTest_Scenario6() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-06");
+    @org.springframework.security.test.context.support.WithMockUser(username = "dispatcher01", roles = "DISPATCHER")
+    void l2Imp04_replaceFlowConfirmReplaceTrue_deactivatesOldAndCreatesNew() throws Exception {
+        // Given: Có batch 8 active cho 2026-03-16, 1 order
+        jdbcTemplate.execute("INSERT INTO import_batches (id, delivery_date, file_name, uploaded_by, total_rows, accepted_rows, rejected_rows, status, is_active) VALUES (8, '2026-03-16', 'old_file.xlsx', 2, 1, 1, 0, 'COMPLETED', TRUE)");
+        jdbcTemplate.execute("INSERT INTO orders (id, import_batch_id, order_ref, store_id, delivery_date, status) VALUES (1, 8, 'DH-OLD', 1, '2026-03-16', 'IMPORTED')");
+
+        List<String[]> rows = new ArrayList<>();
+        rows.add(new String[]{"DH160325-01", "ST-001", "REF-SAM-300", "2"});
+
+        MockMultipartFile file = createExcelFile("import.xlsx", rows);
+
+        // When: Gửi import cùng ngày với confirmReplace=true
+        mockMvc.perform(multipart("/api/imports")
+                        .file(file)
+                        .param("deliveryDate", "2026-03-16")
+                        .param("confirmReplace", "true"))
+                .andExpect(status().isCreated());
+
+        // Then: Batch 8 -> is_active = false. Dữ liệu cũ vẫn còn nguyên. Batch mới -> is_active = true.
+        ImportBatch batch8 = batchRepository.findById(8L).orElseThrow();
+        assertThat(batch8.getIsActive()).isFalse();
+
+        List<ImportBatch> batches = batchRepository.findAll();
+        assertThat(batches).hasSize(2);
+        
+        ImportBatch newBatch = batches.stream().filter(b -> b.getId() != 8).findFirst().orElseThrow();
+        assertThat(newBatch.getIsActive()).isTrue();
+
+        // Kiểm tra soft replace (đơn cũ không bị xoá cứng khỏi DB)
+        assertThat(orderRepository.existsById(1L)).isTrue();
     }
 
-    /**
-     * TEST ID: INT-IMPO-07
-     * COVERS: Integration of Import service with DB and migrations.
-     */
+    // ── L2-IMP-05: Snapshot Integrity ──────────────────────────────────────────
     @Test
-    void integrationTest_Scenario7() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-07");
+    @org.springframework.security.test.context.support.WithMockUser(username = "admin", roles = "SYSTEM_ADMIN")
+    void l2Imp05_snapshotIntegrityRemainsUnaffectedByProductUpdates() throws Exception {
+        // Given: Đơn hàng đã import sản phẩm REF-SAM-300 có weight_kg = 65.0
+        jdbcTemplate.execute("INSERT INTO import_batches (id, delivery_date, file_name, uploaded_by, total_rows, accepted_rows, rejected_rows, status, is_active) VALUES (1, '2026-03-16', 'file.xlsx', 2, 1, 1, 0, 'COMPLETED', TRUE)");
+        jdbcTemplate.execute("INSERT INTO orders (id, import_batch_id, order_ref, store_id, delivery_date, status) VALUES (1, 1, 'DH-OLD', 1, '2026-03-16', 'IMPORTED')");
+        jdbcTemplate.execute("INSERT INTO order_items (id, order_id, product_id, sku, quantity, unit_weight_kg, unit_volume_m3, line_weight_kg, line_volume_m3) VALUES (1, 1, 5, 'REF-SAM-300', 1, 65.000, 0.714000, 65.000, 0.714000)");
+
+        // When: Cập nhật trọng lượng sản phẩm REF-SAM-300 (ID=5) từ 65.000 sang 70.000
+        String updateRequestJson = "{" +
+                "\"sku\": \"REF-SAM-300\"," +
+                "\"productName\": \"Tủ lạnh Samsung 300L\"," +
+                "\"weightKg\": 70.000," +
+                "\"lengthM\": 0.6000," +
+                "\"widthM\": 0.6800," +
+                "\"heightM\": 1.7500" +
+                "}";
+
+        mockMvc.perform(put("/api/products/5")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateRequestJson))
+                .andExpect(status().isOk());
+
+        // Then: order_items.unit_weight_kg của đơn hàng cũ vẫn giữ nguyên là 65.000
+        Double storedWeight = jdbcTemplate.queryForObject(
+                "SELECT unit_weight_kg FROM order_items WHERE id = 1", Double.class);
+        assertThat(storedWeight).isEqualTo(65.000);
+
+        // Đối chiếu xem product trong danh mục đã cập nhật đúng 70.000 chưa
+        Double productWeight = jdbcTemplate.queryForObject(
+                "SELECT weight_kg FROM products WHERE id = 5", Double.class);
+        assertThat(productWeight).isEqualTo(70.000);
     }
 
-    /**
-     * TEST ID: INT-IMPO-08
-     * COVERS: Integration of Import service with DB and migrations.
-     */
+    // ── L2-IMP-06: Partial Failure, No Full Rollback ───────────────────────────
     @Test
-    void integrationTest_Scenario8() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-08");
+    @org.springframework.security.test.context.support.WithMockUser(username = "dispatcher01", roles = "DISPATCHER")
+    void l2Imp06_partialFailureDoesNotRollbackValidRows() throws Exception {
+        // Given: File có 5 dòng, trong đó dòng 3 có SKU sai
+        List<String[]> rows = new ArrayList<>();
+        rows.add(new String[]{"DH-01", "ST-001", "REF-SAM-300", "1"});
+        rows.add(new String[]{"DH-02", "ST-002", "TV-SAM-55", "2"});
+        rows.add(new String[]{"DH-03", "ST-003", "INVALID-SKU", "3"}); // invalid SKU
+        rows.add(new String[]{"DH-04", "ST-001", "PHN-APL-14", "4"});
+        rows.add(new String[]{"DH-05", "ST-002", "GEN-DNY-5K", "5"});
+
+        MockMultipartFile file = createExcelFile("import.xlsx", rows);
+
+        // When: Gửi file
+        mockMvc.perform(multipart("/api/imports")
+                        .file(file)
+                        .param("deliveryDate", "2026-03-16")
+                        .param("confirmReplace", "false"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.data.acceptedRows").value(4))
+                .andExpect(jsonPath("$.data.rejectedRows").value(1));
+
+        // Then: DB vẫn ghi nhận 4 order items thành công, 1 error log
+        assertThat(orderItemRepository.count()).isEqualTo(4);
+        assertThat(errorRepository.count()).isEqualTo(1);
     }
 
-    /**
-     * TEST ID: INT-IMPO-09
-     * COVERS: Integration of Import service with DB and migrations.
-     */
+    // ── L2-IMP-07: DB Constraint - Unique order constraint ─────────────────────
     @Test
-    void integrationTest_Scenario9() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-09");
+    void l2Imp07_dbUniqueConstraintPreventsDuplicateOrderRefPerBatchAndStore() {
+        // Given: Tạo một batch
+        ImportBatch batch = ImportBatch.builder()
+                .deliveryDate(LocalDate.now())
+                .fileName("import.xlsx")
+                .uploadedBy(2L)
+                .status("COMPLETED")
+                .build();
+        batch = batchRepository.save(batch);
+
+        Store store = storeRepository.findById(1L).orElseThrow();
+
+        // When: Lưu order 1
+        Order order1 = Order.builder()
+                .importBatch(batch)
+                .orderRef("DH-DUP")
+                .store(store)
+                .deliveryDate(LocalDate.now())
+                .build();
+        orderRepository.save(order1);
+        orderRepository.flush(); // Lực lượng lưu xuống DB để kiểm tra unique constraint
+
+        // When/Then: Lưu order 2 trùng (batch_id, order_ref, store_id) -> Phải quăng lỗi DataIntegrityViolationException
+        Order order2 = Order.builder()
+                .importBatch(batch)
+                .orderRef("DH-DUP")
+                .store(store)
+                .deliveryDate(LocalDate.now())
+                .build();
+
+        assertThatThrownBy(() -> {
+            orderRepository.save(order2);
+            orderRepository.flush();
+        }).isInstanceOf(DataIntegrityViolationException.class);
     }
 
-    /**
-     * TEST ID: INT-IMPO-10
-     * COVERS: Integration of Import service with DB and migrations.
-     */
+    // ── L2-IMP-08: DB Constraint - Concurrency (Unique active date) ────────────
     @Test
-    void integrationTest_Scenario10() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-10");
+    void l2Imp08_concurrentBatchCreationThrowsConflict() throws Exception {
+        // Given: Không có active batch nào cho ngày 2026-03-20 (đã dọn dẹp ở setUp)
+        LocalDate date = LocalDate.of(2026, 3, 20);
+        MockMultipartFile file1 = createExcelFile("import1.xlsx", List.of());
+        MockMultipartFile file2 = createExcelFile("import2.xlsx", List.of());
+
+        // When: Chạy song song 2 luồng gọi importExcel cho cùng một ngày giao hàng
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        Callable<ImportBatchResponse> task1 = () -> importService.importExcel(file1, date, false, 2L);
+        Callable<ImportBatchResponse> task2 = () -> importService.importExcel(file2, date, false, 2L);
+
+        Future<ImportBatchResponse> future1 = executor.submit(task1);
+        Future<ImportBatchResponse> future2 = executor.submit(task2);
+
+        int successCount = 0;
+        int conflictCount = 0;
+
+        try {
+            future1.get();
+            successCount++;
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof BusinessException && ((BusinessException) e.getCause()).getHttpStatus() == HttpStatus.CONFLICT) {
+                conflictCount++;
+            } else {
+                throw e;
+            }
+        }
+
+        try {
+            future2.get();
+            successCount++;
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof BusinessException && ((BusinessException) e.getCause()).getHttpStatus() == HttpStatus.CONFLICT) {
+                conflictCount++;
+            } else {
+                throw e;
+            }
+        }
+
+        executor.shutdown();
+
+        // Then: Chỉ có 1 luồng thành công (201) và 1 luồng thất bại với HTTP 409 Conflict
+        assertThat(successCount).isEqualTo(1);
+        assertThat(conflictCount).isEqualTo(1);
+        assertThat(batchRepository.count()).isEqualTo(1);
     }
 
-    /**
-     * TEST ID: INT-IMPO-11
-     * COVERS: Integration of Import service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario11() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-11");
-    }
+    void generateRealExcelFilesForPostman() throws IOException {
+        java.io.File dir = new java.io.File("Evidence/Integration Test/US-08");
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
 
-    /**
-     * TEST ID: INT-IMPO-12
-     * COVERS: Integration of Import service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario12() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-12");
-    }
+        // TC01 File
+        List<String[]> rows01 = new ArrayList<>();
+        rows01.add(new String[]{"DH160325-01", "ST-001", "REF-SAM-300", "2"});
+        rows01.add(new String[]{"DH160325-01", "ST-001", "TV-SAM-55", "1"});
+        rows01.add(new String[]{"DH160325-02", "ST-002", "GEN-DNY-5K", "3"});
+        rows01.add(new String[]{"DH160325-03", "ST-003", "PHN-APL-14", "10"});
+        rows01.add(new String[]{"DH160325-04", "ST-HD-099", "REF-SAM-300", "1"});
+        rows01.add(new String[]{"DH160325-05", "ST-001", "ACC-HDMI-2M", "5"});
 
-    /**
-     * TEST ID: INT-IMPO-13
-     * COVERS: Integration of Import service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario13() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-13");
-    }
+        MockMultipartFile file01 = createExcelFile("import_tc01.xlsx", rows01);
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(new java.io.File(dir, "import_tc01.xlsx"))) {
+            fos.write(file01.getBytes());
+        }
 
-    /**
-     * TEST ID: INT-IMPO-14
-     * COVERS: Integration of Import service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario14() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-14");
-    }
+        // TC06 File
+        List<String[]> rows06 = new ArrayList<>();
+        rows06.add(new String[]{"DH-01", "ST-001", "REF-SAM-300", "1"});
+        rows06.add(new String[]{"DH-02", "ST-002", "TV-SAM-55", "2"});
+        rows06.add(new String[]{"DH-03", "ST-003", "INVALID-SKU", "3"});
+        rows06.add(new String[]{"DH-04", "ST-001", "PHN-APL-14", "4"});
+        rows06.add(new String[]{"DH-05", "ST-002", "GEN-DNY-5K", "5"});
 
-    /**
-     * TEST ID: INT-IMPO-15
-     * COVERS: Integration of Import service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario15() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-15");
+        MockMultipartFile file06 = createExcelFile("import_tc06.xlsx", rows06);
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream(new java.io.File(dir, "import_tc06.xlsx"))) {
+            fos.write(file06.getBytes());
+        }
     }
-
-    /**
-     * TEST ID: INT-IMPO-16
-     * COVERS: Integration of Import service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario16() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-16");
-    }
-
-    /**
-     * TEST ID: INT-IMPO-17
-     * COVERS: Integration of Import service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario17() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-17");
-    }
-
-    /**
-     * TEST ID: INT-IMPO-18
-     * COVERS: Integration of Import service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario18() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-18");
-    }
-
-    /**
-     * TEST ID: INT-IMPO-19
-     * COVERS: Integration of Import service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario19() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-19");
-    }
-
-    /**
-     * TEST ID: INT-IMPO-20
-     * COVERS: Integration of Import service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario20() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-IMPO-20");
-    }
-
 }

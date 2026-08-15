@@ -1,212 +1,127 @@
 package com.elog.integration;
 
+import com.elog.dto.request.LoginRequest;
+import com.elog.dto.request.TokenRefreshRequest;
+import com.elog.dto.response.TokenResponse;
+import com.elog.entity.RefreshToken;
+import com.elog.entity.User;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.RefreshTokenRepository;
+import com.elog.repository.UserRepository;
+import com.elog.service.AuthService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
+@ActiveProfiles("dev")
 @Transactional
-public class AuthServiceIntegrationTest {
+@ExtendWith(Report5L2EvidenceExtension.class)
+class AuthServiceIntegrationTest {
 
-    /**
-     * TEST ID: INT-AUTH-01
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
+    @Autowired AuthService authService;
+    @Autowired UserRepository userRepository;
+    @Autowired RefreshTokenRepository refreshTokenRepository;
+    @Autowired PasswordEncoder passwordEncoder;
+    @Autowired EntityManager entityManager;
+
     @Test
-    void integrationTest_Scenario1() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-01");
+    void l2Atk01LoginPersistsOneRefreshTokenWithSevenDayExpiry() {
+        User user = user(true);
+        TokenResponse response = authService.login(login(user.getUsername(), "R5-secret"));
+        entityManager.flush();
+        List<RefreshToken> tokens = tokensFor(user);
+
+        assertThat(response.getAccessToken()).isNotBlank();
+        assertThat(tokens).hasSize(1);
+        assertThat(tokens.getFirst().getToken()).isEqualTo(response.getRefreshToken());
+        assertThat(tokens.getFirst().getExpiryDate()).isAfter(Instant.now().plusSeconds(6 * 24 * 3600));
     }
 
-    /**
-     * TEST ID: INT-AUTH-02
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario2() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-02");
+    void l2Atk02LoginReplacesAllExistingRefreshTokensWithOne() {
+        User user = user(true);
+        for (int index = 0; index < 3; index++) {
+            refreshTokenRepository.save(RefreshToken.builder().user(user)
+                    .token(UUID.randomUUID().toString()).expiryDate(Instant.now().plusSeconds(3600)).build());
+        }
+        entityManager.flush();
+
+        TokenResponse response = authService.login(login(user.getUsername(), "R5-secret"));
+        entityManager.flush();
+
+        assertThat(tokensFor(user)).singleElement()
+                .extracting(RefreshToken::getToken).isEqualTo(response.getRefreshToken());
     }
 
-    /**
-     * TEST ID: INT-AUTH-03
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario3() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-03");
+    void l2Atk03InvalidPasswordCreatesNoRefreshToken() {
+        User user = user(true);
+        assertThatThrownBy(() -> authService.login(login(user.getUsername(), "wrong")))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.INVALID_CREDENTIALS));
+        assertThat(tokensFor(user)).isEmpty();
     }
 
-    /**
-     * TEST ID: INT-AUTH-04
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario4() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-04");
+    void l2Atk04DisabledAccountCreatesNoRefreshToken() {
+        User user = user(false);
+        assertThatThrownBy(() -> authService.login(login(user.getUsername(), "R5-secret")))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.ACCOUNT_DISABLED));
+        assertThat(tokensFor(user)).isEmpty();
     }
 
-    /**
-     * TEST ID: INT-AUTH-05
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario5() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-05");
+    void l2Atk05RefreshReturnsNewAccessTokenWithoutChangingRefreshRow() {
+        User user = user(true);
+        RefreshToken token = refreshTokenRepository.save(RefreshToken.builder().user(user)
+                .token(UUID.randomUUID().toString()).expiryDate(Instant.now().plusSeconds(3600)).build());
+        entityManager.flush();
+        long before = refreshTokenRepository.count();
+        TokenRefreshRequest request = new TokenRefreshRequest();
+        request.setRefreshToken(token.getToken());
+
+        assertThat(authService.refresh(request).getAccessToken()).isNotBlank();
+        entityManager.flush();
+        assertThat(refreshTokenRepository.count()).isEqualTo(before);
+        assertThat(refreshTokenRepository.findByToken(token.getToken())).isPresent();
     }
 
-    /**
-     * TEST ID: INT-AUTH-06
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario6() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-06");
+    private User user(boolean active) {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        return userRepository.saveAndFlush(User.builder()
+                .username("r5auth" + suffix)
+                .email("r5auth" + suffix + "@example.test")
+                .fullName("Report 5 Auth")
+                .passwordHash(passwordEncoder.encode("R5-secret"))
+                .isActive(active)
+                .build());
     }
 
-    /**
-     * TEST ID: INT-AUTH-07
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario7() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-07");
+    private LoginRequest login(String username, String password) {
+        LoginRequest request = new LoginRequest();
+        request.setUsername(username);
+        request.setPassword(password);
+        return request;
     }
 
-    /**
-     * TEST ID: INT-AUTH-08
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario8() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-08");
+    private List<RefreshToken> tokensFor(User user) {
+        return refreshTokenRepository.findAll().stream()
+                .filter(token -> token.getUser().getId().equals(user.getId())).toList();
     }
-
-    /**
-     * TEST ID: INT-AUTH-09
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario9() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-09");
-    }
-
-    /**
-     * TEST ID: INT-AUTH-10
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario10() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-10");
-    }
-
-    /**
-     * TEST ID: INT-AUTH-11
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario11() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-11");
-    }
-
-    /**
-     * TEST ID: INT-AUTH-12
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario12() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-12");
-    }
-
-    /**
-     * TEST ID: INT-AUTH-13
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario13() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-13");
-    }
-
-    /**
-     * TEST ID: INT-AUTH-14
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario14() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-14");
-    }
-
-    /**
-     * TEST ID: INT-AUTH-15
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario15() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-15");
-    }
-
-    /**
-     * TEST ID: INT-AUTH-16
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario16() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-16");
-    }
-
-    /**
-     * TEST ID: INT-AUTH-17
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario17() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-17");
-    }
-
-    /**
-     * TEST ID: INT-AUTH-18
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario18() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-18");
-    }
-
-    /**
-     * TEST ID: INT-AUTH-19
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario19() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-19");
-    }
-
-    /**
-     * TEST ID: INT-AUTH-20
-     * COVERS: Integration of Auth service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario20() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-AUTH-20");
-    }
-
 }
+

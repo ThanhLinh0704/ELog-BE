@@ -1,212 +1,115 @@
 package com.elog.integration;
 
+import com.elog.dto.request.UserCreateRequest;
+import com.elog.dto.request.UserStatusUpdateRequest;
+import com.elog.dto.response.UserResponse;
+import com.elog.entity.Role;
+import com.elog.entity.User;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.RoleRepository;
+import com.elog.repository.UserRepository;
+import com.elog.service.UserService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.Set;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
+@ActiveProfiles("dev")
 @Transactional
-public class UserServiceIntegrationTest {
+@ExtendWith(Report5L2EvidenceExtension.class)
+class UserServiceIntegrationTest {
 
-    /**
-     * TEST ID: INT-USER-01
-     * COVERS: Integration of User service with DB and migrations.
-     */
+    @Autowired UserService userService;
+    @Autowired UserRepository userRepository;
+    @Autowired RoleRepository roleRepository;
+    @Autowired PasswordEncoder passwordEncoder;
+    @Autowired EntityManager entityManager;
+
     @Test
-    void integrationTest_Scenario1() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-01");
+    void l2Udr01CreatesUserWithEncodedPasswordAndPersistedRoleLink() {
+        Role role = roleRepository.findByName("DISPATCHER").orElseThrow();
+        UserCreateRequest request = request("DISPATCHER");
+
+        UserResponse response = userService.createUser(request);
+        entityManager.flush();
+        entityManager.clear();
+
+        User persisted = userRepository.findById(response.getId()).orElseThrow();
+        assertThat(passwordEncoder.matches("R5-password1!", persisted.getPasswordHash())).isTrue();
+        assertThat(persisted.getRoles()).extracting(Role::getId).containsExactly(role.getId());
     }
 
-    /**
-     * TEST ID: INT-USER-02
-     * COVERS: Integration of User service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario2() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-02");
+    void l2Udr02DuplicateUsernameDoesNotInsertUser() {
+        User existing = user(true);
+        UserCreateRequest request = request("DISPATCHER");
+        request.setUsername(existing.getUsername());
+        long before = userRepository.count();
+
+        assertThatThrownBy(() -> userService.createUser(request))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+        assertThat(userRepository.count()).isEqualTo(before);
     }
 
-    /**
-     * TEST ID: INT-USER-03
-     * COVERS: Integration of User service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario3() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-03");
+    void l2Udr03DuplicateEmailDoesNotInsertUser() {
+        User existing = user(true);
+        UserCreateRequest request = request("DISPATCHER");
+        request.setEmail(existing.getEmail());
+        long before = userRepository.count();
+
+        assertThatThrownBy(() -> userService.createUser(request))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+        assertThat(userRepository.count()).isEqualTo(before);
     }
 
-    /**
-     * TEST ID: INT-USER-04
-     * COVERS: Integration of User service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario4() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-04");
+    void l2Udr04PreventsSelfLockoutAndLeavesPersistedStatusActive() {
+        User admin = user(true);
+        UserStatusUpdateRequest request = new UserStatusUpdateRequest();
+        request.setIsActive(false);
+
+        assertThatThrownBy(() -> userService.updateUserStatus(admin.getId(), request, admin.getUsername()))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.ACCESS_DENIED));
+        entityManager.clear();
+        assertThat(userRepository.findById(admin.getId()).orElseThrow().getIsActive()).isTrue();
     }
 
-    /**
-     * TEST ID: INT-USER-05
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario5() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-05");
+    private UserCreateRequest request(String role) {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        UserCreateRequest request = new UserCreateRequest();
+        request.setUsername("r5usr" + suffix);
+        request.setEmail("r5usr" + suffix + "@example.test");
+        request.setFullName("Report 5 User");
+        request.setPassword("R5-password1!");
+        request.setRoles(Set.of(role));
+        return request;
     }
 
-    /**
-     * TEST ID: INT-USER-06
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario6() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-06");
+    private User user(boolean active) {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        return userRepository.saveAndFlush(User.builder()
+                .username("r5existing" + suffix)
+                .email("r5existing" + suffix + "@example.test")
+                .fullName("Report 5 Existing")
+                .passwordHash(passwordEncoder.encode("R5-password1!"))
+                .isActive(active)
+                .build());
     }
-
-    /**
-     * TEST ID: INT-USER-07
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario7() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-07");
-    }
-
-    /**
-     * TEST ID: INT-USER-08
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario8() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-08");
-    }
-
-    /**
-     * TEST ID: INT-USER-09
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario9() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-09");
-    }
-
-    /**
-     * TEST ID: INT-USER-10
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario10() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-10");
-    }
-
-    /**
-     * TEST ID: INT-USER-11
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario11() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-11");
-    }
-
-    /**
-     * TEST ID: INT-USER-12
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario12() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-12");
-    }
-
-    /**
-     * TEST ID: INT-USER-13
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario13() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-13");
-    }
-
-    /**
-     * TEST ID: INT-USER-14
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario14() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-14");
-    }
-
-    /**
-     * TEST ID: INT-USER-15
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario15() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-15");
-    }
-
-    /**
-     * TEST ID: INT-USER-16
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario16() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-16");
-    }
-
-    /**
-     * TEST ID: INT-USER-17
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario17() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-17");
-    }
-
-    /**
-     * TEST ID: INT-USER-18
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario18() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-18");
-    }
-
-    /**
-     * TEST ID: INT-USER-19
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario19() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-19");
-    }
-
-    /**
-     * TEST ID: INT-USER-20
-     * COVERS: Integration of User service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario20() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-USER-20");
-    }
-
 }
+

@@ -1,1253 +1,309 @@
 package com.elog.service;
 
-import com.elog.dto.response.ApiResponse;
 import com.elog.dto.response.ImportBatchResponse;
-import com.elog.dto.response.ImportErrorResponse;
-import com.elog.entity.*;
+import com.elog.entity.ImportBatch;
+import com.elog.entity.ImportError;
+import com.elog.entity.Order;
+import com.elog.entity.OrderItem;
+import com.elog.entity.Product;
+import com.elog.entity.Store;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
-import com.elog.repository.*;
+import com.elog.repository.ImportBatchRepository;
+import com.elog.repository.ImportErrorRepository;
+import com.elog.repository.OrderItemRepository;
+import com.elog.repository.OrderRepository;
+import com.elog.repository.ProductRepository;
+import com.elog.repository.StoreRepository;
+import com.elog.repository.TripDraftRepository;
+import com.elog.repository.UserRepository;
+import com.elog.service.impl.AutoPipelineRunner;
 import com.elog.service.impl.ImportServiceImpl;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
 class ImportServiceImplTest {
-
-    @Mock
-    private ImportBatchRepository batchRepository;
-    @Mock
-    private OrderRepository orderRepository;
-    @Mock
-    private OrderItemRepository orderItemRepository;
-    @Mock
-    private ImportErrorRepository errorRepository;
-    @Mock
-    private StoreRepository storeRepository;
-    @Mock
-    private ProductRepository productRepository;
-    @Mock
-    private UserRepository userRepository;
-    @Mock
-    private TripDraftRepository tripDraftRepository;
-
-    @InjectMocks
-    private ImportServiceImpl importService;
-
-    private Store storeBT001;
-    private Product productActive;
-    private Product productInactive;
+    private ImportBatchRepository batches;
+    private OrderRepository orders;
+    private OrderItemRepository items;
+    private ImportErrorRepository errors;
+    private StoreRepository stores;
+    private ProductRepository products;
+    private ImportServiceImpl service;
+    private final LocalDate deliveryDate = LocalDate.of(2026, 8, 14);
+    private Store store;
+    private Product product;
 
     @BeforeEach
     void setUp() {
-        storeBT001 = Store.builder()
-                .id(1L)
-                .code("ST-BT-001")
-                .name("Store Binh Thanh")
-                .isActive(true)
-                .build();
-
-        productActive = Product.builder()
-                .id(10L)
-                .sku("REF-SAM-300")
-                .productName("Samsung Refrigerator")
-                .weightKg(BigDecimal.valueOf(65.0))
-                .volumeM3(BigDecimal.valueOf(0.714))
-                .isActive(true)
-                .build();
-
-        productInactive = Product.builder()
-                .id(11L)
-                .sku("ACC-HDMI-2M")
-                .productName("HDMI Cable 2M")
-                .weightKg(BigDecimal.valueOf(0.2))
-                .volumeM3(BigDecimal.valueOf(0.001))
-                .isActive(false)
-                .build();
+        batches = mock(ImportBatchRepository.class);
+        orders = mock(OrderRepository.class);
+        items = mock(OrderItemRepository.class);
+        errors = mock(ImportErrorRepository.class);
+        stores = mock(StoreRepository.class);
+        products = mock(ProductRepository.class);
+        service = new ImportServiceImpl(batches, orders, items, errors, stores, products,
+                mock(UserRepository.class), mock(TripDraftRepository.class), mock(AutoPipelineRunner.class));
+        store = Store.builder().id(1L).code("ST-001").name("Store 1").isActive(true).build();
+        product = Product.builder().id(2L).sku("SKU-A").productName("Product A").isActive(true)
+                .weightKg(BigDecimal.ONE).volumeM3(new BigDecimal("0.100000")).build();
+        when(batches.save(any(ImportBatch.class))).thenAnswer(invocation -> {
+            ImportBatch batch = invocation.getArgument(0);
+            if (batch.getId() == null) batch.setId(100L);
+            return batch;
+        });
+        when(stores.findByCode("ST-001")).thenReturn(Optional.of(store));
+        when(products.findBySku("SKU-A")).thenReturn(Optional.of(product));
+        AtomicLong orderId = new AtomicLong(200L);
+        when(orders.save(any(Order.class))).thenAnswer(invocation -> {
+            Order order = invocation.getArgument(0);
+            if (order.getId() == null) order.setId(orderId.getAndIncrement());
+            return order;
+        });
+        when(items.save(any(OrderItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
-    private MultipartFile createMockExcelFile(String fileName, List<String[]> rowsData) throws IOException {
-        try (Workbook workbook = new XSSFWorkbook()) {
-            Sheet sheet = workbook.createSheet();
-            Row headerRow = sheet.createRow(0);
-            headerRow.createCell(0).setCellValue("Mã đơn");
-            headerRow.createCell(1).setCellValue("Mã cửa hàng");
-            headerRow.createCell(2).setCellValue("SKU");
-            headerRow.createCell(3).setCellValue("Số lượng");
+    @Test
+    @DisplayName("[L1-IM-01] ten valid XLSX rows complete with ten accepted")
+    void importsTenValidRows() throws Exception {
+        ImportBatchResponse response = service.importExcel(workbook(validRows(10)), deliveryDate, false, 9L);
+        assertAll(() -> assertEquals("COMPLETED", response.getStatus()),
+                () -> assertEquals(10, response.getAcceptedRows()),
+                () -> assertEquals(0, response.getRejectedRows()),
+                () -> assertNotNull(response.getBatchId()));
+    }
 
-            for (int i = 0; i < rowsData.size(); i++) {
+    @Test
+    @DisplayName("[L1-IM-02] confirmReplace deactivates the old active batch before creating the new batch")
+    void replaceDeactivatesOldBatch() throws Exception {
+        ImportBatch old = ImportBatch.builder().id(77L).deliveryDate(deliveryDate).isActive(true).build();
+        lenient().when(batches.findAllActiveByDate(deliveryDate)).thenReturn(List.of(old));
+        ImportBatchResponse response = service.importExcel(workbook(List.of()), deliveryDate, true, 9L);
+        assertAll(() -> assertFalse(old.getIsActive(), "confirmReplace must deactivate the prior active batch"),
+                () -> verify(batches).save(old),
+                () -> assertEquals(Boolean.TRUE, response.getIsActive()));
+    }
+
+    @Test
+    @DisplayName("[L1-IM-03] eight valid and two unknown-store rows produce exact accepted and rejected counts")
+    void importsMixedEightAndTwo() throws Exception {
+        List<String[]> rows = new ArrayList<>(validRows(8));
+        rows.add(row("BAD-1", "UNKNOWN-1"));
+        rows.add(row("BAD-2", "UNKNOWN-2"));
+        ImportBatchResponse response = service.importExcel(workbook(rows), deliveryDate, false, 9L);
+        ArgumentCaptor<List<ImportError>> captor = errorListCaptor();
+        verify(errors).saveAll(captor.capture());
+        assertAll(() -> assertEquals(8, response.getAcceptedRows()),
+                () -> assertEquals(2, response.getRejectedRows()),
+                () -> assertEquals(2, captor.getValue().size()));
+    }
+
+    @Test
+    @DisplayName("[L1-IM-04] duplicate order store and product accumulates quantity into one item")
+    void accumulatesDuplicateProductQuantity() throws Exception {
+        List<String[]> rows = List.of(
+                new String[]{"ORD-001", "ST-001", "SKU-A", "5"},
+                new String[]{"ORD-001", "ST-001", "SKU-A", "5"});
+        ImportBatchResponse response = service.importExcel(workbook(rows), deliveryDate, false, 9L);
+        ArgumentCaptor<OrderItem> captor = ArgumentCaptor.forClass(OrderItem.class);
+        verify(items, times(2)).save(captor.capture());
+        assertAll(() -> assertEquals(2, response.getAcceptedRows()),
+                () -> verify(orders, times(1)).save(any(Order.class)),
+                () -> assertEquals(10, captor.getValue().getQuantity()));
+    }
+
+    @Test
+    @DisplayName("[L1-IM-05] csv input is rejected as EXCEL_PARSE_ERROR before batch creation")
+    void rejectsNonXlsx() {
+        MultipartFile csv = new MockMultipartFile("file", "orders.csv", "text/csv", "a,b".getBytes());
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.importExcel(csv, deliveryDate, false, 9L));
+        assertAll(() -> assertEquals(ErrorCode.EXCEL_PARSE_ERROR, error.getErrorCode()),
+                () -> assertEquals(HttpStatus.BAD_REQUEST, error.getHttpStatus()),
+                () -> verify(batches, never()).save(any()));
+    }
+
+    @Test
+    @DisplayName("[L1-IM-06] header-only workbook completes an empty batch through processing and completed saves")
+    void importsHeaderOnlyWorkbook() throws Exception {
+        List<String> statusesAtSave = new ArrayList<>();
+        when(batches.save(any(ImportBatch.class))).thenAnswer(invocation -> {
+            ImportBatch batch = invocation.getArgument(0);
+            statusesAtSave.add(batch.getStatus());
+            if (batch.getId() == null) batch.setId(100L);
+            return batch;
+        });
+        ImportBatchResponse response = service.importExcel(workbook(List.of()), deliveryDate, false, 9L);
+        assertAll(() -> assertEquals(List.of("PROCESSING", "COMPLETED"), statusesAtSave),
+                () -> assertEquals(0, response.getTotalRows()),
+                () -> assertEquals(0, response.getAcceptedRows()),
+                () -> assertEquals(0, response.getRejectedRows()));
+    }
+
+    @Test
+    @DisplayName("[L1-IM-07] null and empty files are rejected before batch creation")
+    void rejectsNullAndEmptyFiles() {
+        MultipartFile empty = new MockMultipartFile("file", "empty.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[0]);
+        BusinessException nullError = assertThrows(BusinessException.class,
+                () -> service.importExcel(null, deliveryDate, false, 9L));
+        BusinessException emptyError = assertThrows(BusinessException.class,
+                () -> service.importExcel(empty, deliveryDate, false, 9L));
+        assertAll(() -> assertEquals(ErrorCode.EXCEL_PARSE_ERROR, nullError.getErrorCode()),
+                () -> assertEquals(ErrorCode.EXCEL_PARSE_ERROR, emptyError.getErrorCode()),
+                () -> assertEquals(HttpStatus.BAD_REQUEST, emptyError.getHttpStatus()),
+                () -> verify(batches, never()).save(any()));
+    }
+
+    @Test
+    @DisplayName("[L1-IM-08] corrupt xlsx bytes are translated to EXCEL_PARSE_ERROR")
+    void rejectsCorruptWorkbook() {
+        MultipartFile corrupt = new MockMultipartFile("file", "corrupt.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[]{1, 2, 3, 4});
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.importExcel(corrupt, deliveryDate, false, 9L));
+        assertAll(() -> assertEquals(ErrorCode.EXCEL_PARSE_ERROR, error.getErrorCode()),
+                () -> assertEquals(HttpStatus.BAD_REQUEST, error.getHttpStatus()),
+                () -> verify(batches, never()).save(any()));
+    }
+
+    @Test
+    @DisplayName("[L1-IM-09] unknown store creates a storeCode not-found import error")
+    void rejectsUnknownStoreWithFieldEvidence() throws Exception {
+        ImportBatchResponse response = service.importExcel(workbook(Collections.singletonList(row("BAD-1", "UNKNOWN_STORE"))), deliveryDate, false, 9L);
+        ArgumentCaptor<ImportError> captor = ArgumentCaptor.forClass(ImportError.class);
+        verify(errors).save(captor.capture());
+        assertAll(() -> assertEquals(0, response.getAcceptedRows()),
+                () -> assertEquals(1, response.getRejectedRows()),
+                () -> assertEquals("STORE_NOT_FOUND", captor.getValue().getErrorCode()),
+                () -> assertEquals("storeCode", captor.getValue().getFieldName()),
+                () -> assertTrue(captor.getValue().getErrorReason().toLowerCase().contains("not found") || captor.getValue().getErrorReason().toLowerCase().contains("không tồn tại")));
+    }
+
+    @Test
+    @DisplayName("[L1-IM-16] all valid rows persist batch status COMPLETED with zero rejects")
+    void allValidRowsSetCompletedStatus() throws Exception {
+        ImportBatchResponse response = service.importExcel(workbook(validRows(10)), deliveryDate, false, 9L);
+        ArgumentCaptor<ImportBatch> captor = ArgumentCaptor.forClass(ImportBatch.class);
+        verify(batches, atLeastOnce()).save(captor.capture());
+        ImportBatch last = captor.getAllValues().get(captor.getAllValues().size() - 1);
+        assertAll(() -> assertEquals("COMPLETED", last.getStatus()),
+                () -> assertEquals(10, last.getAcceptedRows()),
+                () -> assertEquals(0, last.getRejectedRows()));
+    }
+
+    @Test
+    @DisplayName("[L1-IM-17] five valid and five invalid rows set a partial-success batch status")
+    void mixedRowsSetPartialStatus() throws Exception {
+        List<String[]> rows = new ArrayList<>(validRows(5));
+        for (int i = 0; i < 5; i++) rows.add(row("BAD-" + i, "UNKNOWN-" + i));
+        ImportBatchResponse response = service.importExcel(workbook(rows), deliveryDate, false, 9L);
+        assertAll(() -> assertEquals(5, response.getAcceptedRows()),
+                () -> assertEquals(5, response.getRejectedRows()),
+                () -> assertEquals("PARTIAL", response.getStatus(), "mixed results need an observable partial-success status"));
+    }
+
+    @Test
+    @DisplayName("[L1-IM-18] ten invalid stores create a batch with zero accepted and no orders")
+    void allInvalidRowsCreateNoOrders() throws Exception {
+        List<String[]> rows = new ArrayList<>();
+        for (int i = 0; i < 10; i++) rows.add(row("BAD-" + i, "UNKNOWN-" + i));
+        ImportBatchResponse response = service.importExcel(workbook(rows), deliveryDate, false, 9L);
+        ArgumentCaptor<List<ImportError>> captor = errorListCaptor();
+        verify(errors).saveAll(captor.capture());
+        assertAll(() -> assertEquals(0, response.getAcceptedRows()),
+                () -> assertEquals(10, response.getRejectedRows()),
+                () -> assertEquals(10, captor.getValue().size()),
+                () -> verify(orders, never()).save(any()));
+    }
+
+    private List<String[]> validRows(int count) {
+        List<String[]> rows = new ArrayList<>();
+        for (int i = 0; i < count; i++) rows.add(row("ORD-" + i, "ST-001"));
+        return rows;
+    }
+
+    private String[] row(String orderRef, String storeCode) {
+        return new String[]{orderRef, storeCode, "SKU-A", "1"};
+    }
+
+    private MultipartFile workbook(List<String[]> data) throws Exception {
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("orders");
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("orderRef");
+            header.createCell(1).setCellValue("storeCode");
+            header.createCell(2).setCellValue("sku");
+            header.createCell(3).setCellValue("quantity");
+            for (int i = 0; i < data.size(); i++) {
                 Row row = sheet.createRow(i + 1);
-                String[] rowData = rowsData.get(i);
-                for (int col = 0; col < rowData.length; col++) {
-                    if (rowData[col] != null) {
-                        row.createCell(col).setCellValue(rowData[col]);
-                    }
+                for (int column = 0; column < data.get(i).length; column++) {
+                    row.createCell(column).setCellValue(data.get(i)[column]);
                 }
             }
-
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            workbook.write(bos);
-            byte[] bytes = bos.toByteArray();
-            return new MockMultipartFile(
-                    "file",
-                    fileName,
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    bytes
-            );
+            workbook.write(output);
+            return new MockMultipartFile("file", "orders.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", output.toByteArray());
         }
     }
 
-    // ── L1-IBS-01 ──────────────────────────────────────────
-    @Test
-    void createBatch_success_cumulativeImport() throws IOException {
-        LocalDate date = LocalDate.now();
-        MultipartFile file = createMockExcelFile("import.xlsx", Collections.emptyList());
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getBatchId()).isEqualTo(1L);
-        assertThat(response.getStatus()).isEqualTo("COMPLETED");
-        verify(batchRepository, times(2)).save(any(ImportBatch.class)); // 1 for creation, 1 for summary update
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ArgumentCaptor<List<ImportError>> errorListCaptor() {
+        return (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
     }
 
     @Test
-    void parseRow_nullBatchDeliveryDate_newOrder_usesRowDeliveryDate() throws IOException {
-        LocalDate rowDate = LocalDate.of(2026, 8, 4);
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-99", "ST-BT-001", "REF-SAM-300", "2", "04/08/2026"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate(anyString(), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
-            Order o = invocation.getArgument(0);
-            o.setId(100L);
-            return o;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, null, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(1);
-        verify(orderRepository).save(argThat(o -> rowDate.equals(o.getDeliveryDate())));
-    }
-
-    // ── L1-EIS-01 ──────────────────────────────────────────
-    @Test
-    void parseRow_validRow_createsOrderItemWithSnapshot() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-        
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate(anyString(), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
-            Order o = invocation.getArgument(0);
-            o.setId(100L);
-            return o;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(1);
-        assertThat(response.getRejectedRows()).isEqualTo(0);
-
-        verify(orderItemRepository).save(argThat(item -> 
-            item.getSku().equals("REF-SAM-300") &&
-            item.getQuantity() == 2 &&
-            item.getUnitWeightKg().compareTo(BigDecimal.valueOf(65.0)) == 0 &&
-            item.getUnitVolumeM3().compareTo(BigDecimal.valueOf(0.714)) == 0 &&
-            item.getLineWeightKg().compareTo(BigDecimal.valueOf(130.0)) == 0 &&
-            item.getLineVolumeM3().compareTo(BigDecimal.valueOf(1.428)) == 0
-        ));
-    }
-
-    // ── L1-EIS-02 ──────────────────────────────────────────
-    @Test
-    void parseRow_skuNotExist_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "ACC-HDMI-2M", "2"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("ACC-HDMI-2M")).thenReturn(Optional.empty());
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-
-        verify(errorRepository).save(argThat(err -> 
-            err.getRowNumber() == 2 && 
-            err.getErrorReason().contains("SKU 'ACC-HDMI-2M' chưa có trong danh mục sản phẩm")
-        ));
-        verify(orderItemRepository, never()).save(any());
-    }
-
-    // ── L1-EIS-03 ──────────────────────────────────────────
-    @Test
-    void parseRow_storeCodeNotExist_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-HD-099", "REF-SAM-300", "2"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-HD-099")).thenReturn(Optional.empty());
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-
-        verify(errorRepository).save(argThat(err -> 
-            err.getRowNumber() == 2 && 
-            err.getErrorReason().contains("Mã cửa hàng 'ST-HD-099' không tồn tại")
-        ));
-        verify(orderItemRepository, never()).save(any());
-    }
-
-    // ── L1-EIS-04 ──────────────────────────────────────────
-    @Test
-    void parseRow_quantityZero_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "0"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-
-        verify(errorRepository).save(argThat(err -> 
-            err.getRowNumber() == 2 && 
-            err.getErrorReason().contains("Số lượng phải là số nguyên dương")
-        ));
-        verify(orderItemRepository, never()).save(any());
-    }
-
-    // ── L1-EIS-05 ──────────────────────────────────────────
-    @Test
-    void parseRow_quantityOne_acceptsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "1"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate(anyString(), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
-            Order o = invocation.getArgument(0);
-            o.setId(100L);
-            return o;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(1);
-        assertThat(response.getRejectedRows()).isEqualTo(0);
-        verify(orderItemRepository).save(argThat(item -> item.getQuantity() == 1));
-    }
-
-    // ── L1-EIS-06 ──────────────────────────────────────────
-    @Test
-    void parseRow_skuInactive_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "ACC-HDMI-2M", "2"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("ACC-HDMI-2M")).thenReturn(Optional.of(productInactive));
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-
-        verify(errorRepository).save(argThat(err -> 
-            err.getRowNumber() == 2 && 
-            err.getErrorReason().contains("đã ngừng kinh doanh")
-        ));
-        verify(orderItemRepository, never()).save(any());
-    }
-
-    // ── L1-EIS-07 ──────────────────────────────────────────
-    @Test
-    void groupIntoOrders_sameOrderRefAndStore_groupsIntoOneOrder() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2"});
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "3"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-
-        Order order = Order.builder().id(100L).orderRef("DH160325-01").store(storeBT001).build();
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate(eq("DH160325-01"), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(orderRepository.save(any(Order.class))).thenReturn(order);
-
-        importService.importExcel(file, date, false, 1L);
-
-        verify(orderRepository, times(1)).save(any(Order.class));
-        verify(orderItemRepository, times(2)).save(any(OrderItem.class));
-    }
-
-    // ── L1-EIS-08 ──────────────────────────────────────────
-    @Test
-    void groupIntoOrders_differentOrderRef_createsSeparateOrders() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2"});
-        rowsData.add(new String[]{"DH160325-02", "ST-BT-001", "REF-SAM-300", "3"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate(anyString(), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
-            Order o = invocation.getArgument(0);
-            o.setId(new Random().nextLong());
-            return o;
-        });
-
-        importService.importExcel(file, date, false, 1L);
-
-        verify(orderRepository, times(2)).save(any(Order.class));
-    }
-
-    // ── L1-EIS-09 ──────────────────────────────────────────
-    @Test
-    void parseRow_missingOrderRef_generatesAutoOrderRef() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{null, "ST-BT-001", "REF-SAM-300", "2"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate(startsWith("AUTO-1-"), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
-            Order o = invocation.getArgument(0);
-            o.setId(100L);
-            return o;
-        });
-
-        importService.importExcel(file, date, false, 1L);
-
-        verify(orderRepository).save(argThat(order -> order.getOrderRef().equals("AUTO-1-2")));
-        verify(orderItemRepository).save(any(OrderItem.class));
-    }
-
-    // ── Additional coverage tests ───────────────────────────
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getBatches_withDeliveryDate_success() {
-        LocalDate date = LocalDate.now();
-        Pageable pageable = mock(Pageable.class);
-        Page<ImportBatch> page = mock(Page.class);
-        ImportBatch batch = ImportBatch.builder().id(1L).deliveryDate(date).isActive(true).build();
-
-        when(page.getContent()).thenReturn(List.of(batch));
-        when(page.getNumber()).thenReturn(0);
-        when(page.getSize()).thenReturn(10);
-        when(page.getTotalElements()).thenReturn(1L);
-        when(page.getTotalPages()).thenReturn(1);
-        when(batchRepository.findByDeliveryDate(date, pageable)).thenReturn(page);
-
-        ApiResponse<List<ImportBatchResponse>> response = importService.getBatches(date, pageable);
-
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getData()).hasSize(1);
-        verify(batchRepository).findByDeliveryDate(date, pageable);
+    @DisplayName("[L1-IMP-09] importExcel rejects null file")
+    void importExcelRejectsNullFile() {
+        BusinessException e = assertThrows(BusinessException.class, () -> service.importExcel(null, LocalDate.now(), false, 1L));
+        assertEquals(ErrorCode.EXCEL_PARSE_ERROR, e.getErrorCode());
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void getBatches_withoutDeliveryDate_success() {
-        Pageable pageable = mock(Pageable.class);
-        Page<ImportBatch> page = mock(Page.class);
-        ImportBatch batch = ImportBatch.builder().id(1L).deliveryDate(LocalDate.now()).isActive(true).build();
-
-        when(page.getContent()).thenReturn(List.of(batch));
-        when(page.getNumber()).thenReturn(0);
-        when(page.getSize()).thenReturn(10);
-        when(page.getTotalElements()).thenReturn(1L);
-        when(page.getTotalPages()).thenReturn(1);
-        when(batchRepository.findAllBatches(pageable)).thenReturn(page);
-
-        ApiResponse<List<ImportBatchResponse>> response = importService.getBatches(null, pageable);
-
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getData()).hasSize(1);
-        verify(batchRepository).findAllBatches(pageable);
+    @DisplayName("[L1-IMP-10] importExcel rejects non-excel file extension")
+    void importExcelRejectsNonExcelExtension() {
+        MockMultipartFile txtFile = new MockMultipartFile("file", "data.txt", "text/plain", "hello".getBytes());
+        BusinessException e = assertThrows(BusinessException.class, () -> service.importExcel(txtFile, LocalDate.now(), false, 1L));
+        assertEquals(ErrorCode.EXCEL_PARSE_ERROR, e.getErrorCode());
     }
 
     @Test
-    void getBatchById_success() {
-        ImportBatch batch = ImportBatch.builder().id(1L).isActive(true).build();
-        when(batchRepository.findById(1L)).thenReturn(Optional.of(batch));
-        when(orderRepository.countByBatchId(1L)).thenReturn(5L);
-
-        ImportBatchResponse response = importService.getBatchById(1L);
-
-        assertThat(response.getBatchId()).isEqualTo(1L);
-        assertThat(response.getOrdersCreated()).isEqualTo(5L);
-    }
-
-    @Test
-    void getBatchById_notFound_throwsException() {
-        when(batchRepository.findById(99L)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> importService.getBatchById(99L))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Import batch not found: 99");
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getBatchErrors_success() {
-        when(batchRepository.existsById(1L)).thenReturn(true);
-        ImportError error = ImportError.builder().rowNumber(5).rawData("raw").errorCode("SKU_NOT_FOUND").fieldName("sku").errorReason("reason").build();
-        Page<ImportError> page = mock(Page.class);
-        when(page.getContent()).thenReturn(List.of(error));
-        when(page.getNumber()).thenReturn(0);
-        when(page.getSize()).thenReturn(10);
-        when(page.getTotalElements()).thenReturn(1L);
-        when(page.getTotalPages()).thenReturn(1);
-
-        when(errorRepository.findByImportBatchIdAndErrorCode(eq(1L), eq("SKU_NOT_FOUND"), any(Pageable.class))).thenReturn(page);
-
-        ApiResponse<List<ImportErrorResponse>> response = importService.getBatchErrors(1L, "SKU_NOT_FOUND", Pageable.ofSize(10));
-
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getData()).hasSize(1);
-        assertThat(response.getData().get(0).getRowNumber()).isEqualTo(5);
-        assertThat(response.getData().get(0).getErrorCode()).isEqualTo("SKU_NOT_FOUND");
-    }
-
-    @Test
-    void getBatchErrors_notFound_throwsException() {
-        when(batchRepository.existsById(99L)).thenReturn(false);
-
-        assertThatThrownBy(() -> importService.getBatchErrors(99L, null, Pageable.unpaged()))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Import batch not found: 99");
-    }
-
-    @Test
-    void importExcel_fileTooLarge_throwsException() throws IOException {
-        List<String[]> rowsData = new ArrayList<>();
-        for (int i = 0; i < 5001; i++) {
-            rowsData.add(new String[]{"DH-" + i, "ST-BT-001", "REF-SAM-300", "1"});
-        }
-        MultipartFile file = createMockExcelFile("large_import.xlsx", rowsData);
-
-        assertThatThrownBy(() -> importService.importExcel(file, LocalDate.now(), false, 1L))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FILE_TOO_LARGE)
-                .hasMessageContaining("File Excel vượt quá giới hạn 5.000 dòng dữ liệu");
-        
-        verify(batchRepository, never()).save(any());
-    }
-
-    @Test
-    void processRow_orderRefStoreMismatch_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2"});
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-002", "REF-SAM-300", "3"}); // Mismatch store for same orderRef
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        Store storeBT002 = Store.builder().id(2L).code("ST-BT-002").name("Store 2").isActive(true).build();
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(storeRepository.findByCode("ST-BT-002")).thenReturn(Optional.of(storeBT002));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate(eq("DH160325-01"), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
-            Order o = invocation.getArgument(0);
-            o.setId(100L);
-            return o;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(1);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-
-        verify(errorRepository).save(argThat(err -> 
-            err.getRowNumber() == 3 && 
-            err.getErrorCode().equals("ORDER_REF_STORE_MISMATCH") &&
-            err.getFieldName().equals("order_ref") &&
-            err.getErrorReason().contains("không thể dùng lại cho cửa hàng khác")
-        ));
-    }
-
-    @Test
-    void processRow_duplicateSkuInSameOrder_accumulatesQuantity() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2"});
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "3"}); // Duplicate SKU in same order
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-
-        Order order = Order.builder().id(100L).orderRef("DH160325-01").store(storeBT001).build();
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate(eq("DH160325-01"), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(orderRepository.save(any(Order.class))).thenReturn(order);
-
-        OrderItem orderItem = OrderItem.builder()
-                .id(500L)
-                .order(order)
-                .product(productActive)
-                .sku("REF-SAM-300")
-                .quantity(2)
-                .unitWeightKg(BigDecimal.valueOf(65.0))
-                .unitVolumeM3(BigDecimal.valueOf(0.714))
-                .build();
-        when(orderItemRepository.save(any(OrderItem.class))).thenReturn(orderItem);
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(2);
-        assertThat(response.getRejectedRows()).isEqualTo(0);
-
-        verify(orderItemRepository, times(2)).save(any(OrderItem.class));
-        assertThat(orderItem.getQuantity()).isEqualTo(5); // verify accumulated
-    }
-
-    @Test
-    void processRow_orderRefExists_cumulativeImport_overwritesOrder() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "4"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(2L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-
-        ImportBatch oldBatch = ImportBatch.builder().id(1L).deliveryDate(date).isActive(true).build();
-        Order existingOrder = Order.builder()
-                .id(100L)
-                .orderRef("DH160325-01")
-                .store(storeBT001)
-                .deliveryDate(date)
-                .importBatch(oldBatch)
-                .build();
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate("DH160325-01", date))
-                .thenReturn(Optional.of(existingOrder));
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        OrderItem orderItem = OrderItem.builder().id(500L).sku("REF-SAM-300").quantity(4).unitWeightKg(BigDecimal.ONE).unitVolumeM3(BigDecimal.ONE).lineWeightKg(BigDecimal.ONE).lineVolumeM3(BigDecimal.ONE).build();
-        when(orderItemRepository.save(any(OrderItem.class))).thenReturn(orderItem);
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(1);
-        assertThat(response.getRejectedRows()).isEqualTo(0);
-
-        verify(orderRepository).save(argThat(o -> o.getId().equals(100L) && o.getImportBatch().getId().equals(2L)));
-        verify(orderItemRepository).findByOrderId(100L);
-        verify(orderItemRepository).save(any(OrderItem.class));
-    }
-
-    @Test
-    void exportBatchErrors_success() {
-        when(batchRepository.existsById(1L)).thenReturn(true);
-        ImportError error = ImportError.builder()
-                .rowNumber(5)
-                .errorCode("SKU_NOT_FOUND")
-                .fieldName("sku")
-                .rawData("raw")
-                .errorReason("reason")
-                .build();
-        when(errorRepository.findByImportBatchIdOrderByRowNumberAsc(1L)).thenReturn(List.of(error));
-
-        byte[] report = importService.exportBatchErrors(1L);
-
-        assertThat(report).isNotEmpty();
-        assertThat(report[0]).isEqualTo((byte) 'P');
-        assertThat(report[1]).isEqualTo((byte) 'K');
-    }
-
-    @Test
-    void exportBatchErrors_notFound_throwsException() {
-        when(batchRepository.existsById(99L)).thenReturn(false);
-
-        assertThatThrownBy(() -> importService.exportBatchErrors(99L))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Import batch not found: 99");
-    }
-
-    @Test
-    void importExcel_nullFile_throwsException() {
-        assertThatThrownBy(() -> importService.importExcel(null, LocalDate.now(), false, 1L))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("File không được để trống");
-    }
-
-    @Test
-    void importExcel_emptyFile_throwsException() {
-        MultipartFile file = new MockMultipartFile("file", "test.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[0]);
-        assertThatThrownBy(() -> importService.importExcel(file, LocalDate.now(), false, 1L))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("File không được để trống");
-    }
-
-    @Test
-    void importExcel_invalidExtension_throwsException() {
-        MultipartFile file = new MockMultipartFile("file", "test.txt", "text/plain", "hello".getBytes());
-        assertThatThrownBy(() -> importService.importExcel(file, LocalDate.now(), false, 1L))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Chỉ hỗ trợ file định dạng .xlsx");
-    }
-
-    @Test
-    void processRow_emptyStoreCode_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "", "REF-SAM-300", "2"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-        verify(errorRepository).save(argThat(err -> err.getErrorReason().contains("Mã cửa hàng không được để trống")));
-    }
-
-    @Test
-    void processRow_emptySku_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "", "2"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-        verify(errorRepository).save(argThat(err -> err.getErrorReason().contains("SKU không được để trống")));
-    }
-
-    @Test
-    void processRow_invalidQuantityFormat_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "abc"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-        verify(errorRepository).save(argThat(err -> err.getErrorReason().contains("Số lượng phải là số nguyên dương")));
-    }
-
-    @Test
-    void processRow_negativeQuantity_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "-5"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-        verify(errorRepository).save(argThat(err -> err.getErrorReason().contains("Số lượng phải là số nguyên dương")));
-    }
-
-    @Test
-    void processRow_decimalQuantity_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2.5"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-        verify(errorRepository).save(argThat(err -> err.getErrorReason().contains("Số lượng phải là số nguyên dương")));
-    }
-
-    @Test
-    void parseExcelFile_emptyRow_skipped() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2"});
-        rowsData.add(new String[]{"", " ", null, ""});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate(anyString(), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
-            Order o = invocation.getArgument(0);
-            o.setId(100L);
-            return o;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getTotalRows()).isEqualTo(1);
-        assertThat(response.getAcceptedRows()).isEqualTo(1);
-        assertThat(response.getRejectedRows()).isEqualTo(0);
-    }
-
-    @Test
-    void parseExcelFile_noSheet_throwsException() throws IOException {
-        MultipartFile file;
-        try (Workbook workbook = new XSSFWorkbook()) {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            workbook.write(bos);
-            byte[] bytes = bos.toByteArray();
-            file = new MockMultipartFile("file", "import.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bytes);
-        }
-
-        assertThatThrownBy(() -> importService.importExcel(file, LocalDate.now(), false, 1L))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("File Excel bị hỏng hoặc không đọc được");
-    }
-
-    @Test
-    void processRow_orderExistsInDb_reusesOrder() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-
-        Order existingOrder = Order.builder().id(100L).orderRef("DH160325-01").store(storeBT001).build();
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate(eq("DH160325-01"), any(LocalDate.class)))
-                .thenReturn(Optional.of(existingOrder));
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        importService.importExcel(file, date, false, 1L);
-
-        verify(orderRepository).save(any(Order.class));
-        verify(orderItemRepository).findByOrderId(100L);
-        verify(orderItemRepository).save(argThat(item -> item.getOrder().getId() == 100L));
-    }
-
-
-
-    @Test
-    void getCellStringValue_variousCellTypes() throws Exception {
-        java.lang.reflect.Method method = ImportServiceImpl.class.getDeclaredMethod("getCellStringValue", Cell.class);
-        method.setAccessible(true);
-
-        String valNull = (String) method.invoke(importService, (Cell) null);
-        assertThat(valNull).isEmpty();
-
-        Cell cellString = mock(Cell.class);
-        when(cellString.getCellType()).thenReturn(CellType.STRING);
-        when(cellString.getStringCellValue()).thenReturn("hello");
-        String valString = (String) method.invoke(importService, cellString);
-        assertThat(valString).isEqualTo("hello");
-
-        Cell cellNumericDouble = mock(Cell.class);
-        when(cellNumericDouble.getCellType()).thenReturn(CellType.NUMERIC);
-        when(cellNumericDouble.getNumericCellValue()).thenReturn(123.45);
-        String valNumericDouble = (String) method.invoke(importService, cellNumericDouble);
-        assertThat(valNumericDouble).isEqualTo("123.45");
-
-        Cell cellNumericInt = mock(Cell.class);
-        when(cellNumericInt.getCellType()).thenReturn(CellType.NUMERIC);
-        when(cellNumericInt.getNumericCellValue()).thenReturn(5.0);
-        String valNumericInt = (String) method.invoke(importService, cellNumericInt);
-        assertThat(valNumericInt).isEqualTo("5");
-
-        Cell cellBoolean = mock(Cell.class);
-        when(cellBoolean.getCellType()).thenReturn(CellType.BOOLEAN);
-        when(cellBoolean.getBooleanCellValue()).thenReturn(true);
-        String valBoolean = (String) method.invoke(importService, cellBoolean);
-        assertThat(valBoolean).isEqualTo("true");
-
-        Cell cellFormulaStr = mock(Cell.class);
-        when(cellFormulaStr.getCellType()).thenReturn(CellType.FORMULA);
-        when(cellFormulaStr.getStringCellValue()).thenReturn("formula_str");
-        String valFormulaStr = (String) method.invoke(importService, cellFormulaStr);
-        assertThat(valFormulaStr).isEqualTo("formula_str");
-
-        Cell cellFormulaNumDouble = mock(Cell.class);
-        when(cellFormulaNumDouble.getCellType()).thenReturn(CellType.FORMULA);
-        when(cellFormulaNumDouble.getStringCellValue()).thenThrow(new IllegalStateException());
-        when(cellFormulaNumDouble.getNumericCellValue()).thenReturn(9.75);
-        String valFormulaNumDouble = (String) method.invoke(importService, cellFormulaNumDouble);
-        assertThat(valFormulaNumDouble).isEqualTo("9.75");
-
-        Cell cellFormulaNumInt = mock(Cell.class);
-        when(cellFormulaNumInt.getCellType()).thenReturn(CellType.FORMULA);
-        when(cellFormulaNumInt.getStringCellValue()).thenThrow(new IllegalStateException());
-        when(cellFormulaNumInt.getNumericCellValue()).thenReturn(10.0);
-        String valFormulaNumInt = (String) method.invoke(importService, cellFormulaNumInt);
-        assertThat(valFormulaNumInt).isEqualTo("10");
-
-        Cell cellBlank = mock(Cell.class);
-        when(cellBlank.getCellType()).thenReturn(CellType.BLANK);
-        String valBlank = (String) method.invoke(importService, cellBlank);
-        assertThat(valBlank).isEmpty();
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    void getBatchErrors_emptyErrorCode_success() {
-        when(batchRepository.existsById(1L)).thenReturn(true);
-        ImportError error = ImportError.builder().rowNumber(5).rawData("raw").errorCode("SKU_NOT_FOUND").fieldName("sku").errorReason("reason").build();
-        Page<ImportError> page = mock(Page.class);
-        when(page.getContent()).thenReturn(List.of(error));
-        when(page.getNumber()).thenReturn(0);
-        when(page.getSize()).thenReturn(10);
-        when(page.getTotalElements()).thenReturn(1L);
-        when(page.getTotalPages()).thenReturn(1);
-
-        when(errorRepository.findByImportBatchIdAndErrorCode(eq(1L), eq(null), any(Pageable.class))).thenReturn(page);
-
-        ApiResponse<List<ImportErrorResponse>> response = importService.getBatchErrors(1L, "  ", Pageable.ofSize(10));
-
-        assertThat(response.isSuccess()).isTrue();
-        assertThat(response.getData()).hasSize(1);
-        verify(errorRepository).findByImportBatchIdAndErrorCode(1L, null, Pageable.ofSize(10));
-    }
-
-    @Test
-    void exportBatchErrors_nullFields_success() {
-        when(batchRepository.existsById(1L)).thenReturn(true);
-        ImportError error = ImportError.builder()
-                .rowNumber(5)
-                .errorCode("SKU_NOT_FOUND")
-                .fieldName(null)
-                .rawData(null)
-                .errorReason("reason")
-                .build();
-        when(errorRepository.findByImportBatchIdOrderByRowNumberAsc(1L)).thenReturn(List.of(error));
-
-        byte[] report = importService.exportBatchErrors(1L);
-
-        assertThat(report).isNotEmpty();
-    }
-
-    @Test
-    void exportBatchErrors_repositoryThrowsException_throwsInternalException() {
-        when(batchRepository.existsById(1L)).thenReturn(true);
-        when(errorRepository.findByImportBatchIdOrderByRowNumberAsc(1L)).thenThrow(new RuntimeException("DB error"));
-
-        assertThatThrownBy(() -> importService.exportBatchErrors(1L))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INTERNAL_ERROR)
-                .hasMessageContaining("Không thể xuất file báo cáo lỗi");
-    }
-
-    @Test
-    void processRow_missingQuantity_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", ""});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-        verify(errorRepository).save(argThat(err -> err.getErrorReason().contains("Thiếu giá trị Số lượng")));
-    }
-
-    @Test
-    void processRow_quantityNullRaw_rejectsRow() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", null});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-        verify(errorRepository).save(argThat(err -> err.getErrorReason().contains("Thiếu giá trị Số lượng")));
-    }
-
-    @Test
-    void processRow_saveReturnsNull_fallsBackToItem() throws IOException {
-        LocalDate date = LocalDate.now();
-        List<String[]> rowsData = new ArrayList<>();
-        rowsData.add(new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2"});
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> {
-            ImportBatch b = invocation.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        when(orderRepository.findActiveByOrderRefAndDeliveryDate(eq("DH160325-01"), any(LocalDate.class)))
-                .thenReturn(Optional.empty());
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
-            Order o = invocation.getArgument(0);
-            o.setId(100L);
-            return o;
-        });
-
-        // Mock save to return null
-        when(orderItemRepository.save(any(OrderItem.class))).thenReturn(null);
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(1);
-        assertThat(response.getRejectedRows()).isEqualTo(0);
-        verify(orderItemRepository).save(any(OrderItem.class));
-    }
-
-    @Test
-    void getCellStringValue_edgeCases() throws Exception {
-        java.lang.reflect.Method method = ImportServiceImpl.class.getDeclaredMethod("getCellStringValue", Cell.class);
-        method.setAccessible(true);
-
-        Cell cellInfinite = mock(Cell.class);
-        when(cellInfinite.getCellType()).thenReturn(CellType.NUMERIC);
-        when(cellInfinite.getNumericCellValue()).thenReturn(Double.POSITIVE_INFINITY);
-        String valInfinite = (String) method.invoke(importService, cellInfinite);
-        assertThat(valInfinite).isEqualTo("Infinity");
-
-        Cell cellError = mock(Cell.class);
-        when(cellError.getCellType()).thenReturn(CellType.ERROR);
-        String valError = (String) method.invoke(importService, cellError);
-        assertThat(valError).isEmpty();
-    }
-
-    @Test
-    void getImportedOrders_success() {
-        when(batchRepository.existsById(1L)).thenReturn(true);
-
-        Store store = Store.builder().id(10L).code("ST-001").name("Store 1").build();
-        Product product = Product.builder().id(20L).sku("SKU-001").productName("Prod 1").build();
-        Order order = Order.builder()
-                .id(100L)
-                .orderRef("DH-001")
-                .store(store)
-                .deliveryTimeWindow("08:00 - 12:00")
-                .recipientName("A")
-                .recipientPhone("123")
-                .notes("notes")
-                .build();
-        OrderItem item = OrderItem.builder()
-                .id(200L)
-                .order(order)
-                .product(product)
-                .sku("SKU-001")
-                .quantity(5)
-                .lineWeightKg(BigDecimal.valueOf(10.0))
-                .lineVolumeM3(BigDecimal.valueOf(0.5))
-                .build();
-        order.setItems(List.of(item));
-
-        when(orderRepository.findByImportBatchId(1L)).thenReturn(List.of(order));
-
-        List<com.elog.dto.response.ImportedOrderDetailResponse> results = importService.getImportedOrders(1L);
-
-        assertThat(results).hasSize(1);
-        com.elog.dto.response.ImportedOrderDetailResponse res = results.get(0);
-        assertThat(res.getOrderRef()).isEqualTo("DH-001");
-        assertThat(res.getStoreCode()).isEqualTo("ST-001");
-        assertThat(res.getStoreName()).isEqualTo("Store 1");
-        assertThat(res.getSku()).isEqualTo("SKU-001");
-        assertThat(res.getProductName()).isEqualTo("Prod 1");
-        assertThat(res.getQuantity()).isEqualTo(5);
-        assertThat(res.getWeightKg()).isEqualByComparingTo(BigDecimal.valueOf(10.0));
-        assertThat(res.getVolumeM3()).isEqualByComparingTo(BigDecimal.valueOf(0.5));
-        assertThat(res.getDeliveryTimeWindow()).isEqualTo("08:00 - 12:00");
-        assertThat(res.getRecipientName()).isEqualTo("A");
-        assertThat(res.getRecipientPhone()).isEqualTo("123");
-        assertThat(res.getNotes()).isEqualTo("notes");
-    }
-
-    @Test
-    void getImportedOrders_batchNotFound_throwsException() {
-        when(batchRepository.existsById(99L)).thenReturn(false);
-
-        assertThatThrownBy(() -> importService.getImportedOrders(99L))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.NOT_FOUND)
-                .hasMessageContaining("Import batch not found: 99");
-    }
-
-    @Test
-    void importExcel_9ColumnMultiDate_success() throws Exception {
-        LocalDate fallbackDate = LocalDate.of(2026, 8, 1);
-        List<String[]> rows = List.of(
-                new String[]{"DH-101", "ST-BT-001", "REF-SAM-300", "2", "2026-08-01", "08:00 - 12:00", "Nguyen A", "0901234567", "Note 1"},
-                new String[]{"DH-102", "ST-BT-001", "REF-SAM-300", "3", "2026-08-02", "13:00 - 17:00", "Nguyen B", "0907654321", "Note 2"}
-        );
-        MultipartFile file = createMockExcelFile("orders_multi_date.xlsx", rows);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(i -> {
-            ImportBatch b = i.getArgument(0);
-            b.setId(10L);
-            return b;
-        });
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        when(orderRepository.save(any(Order.class))).thenAnswer(i -> {
-            Order o = i.getArgument(0);
-            o.setId(100L);
-            return o;
-        });
-        when(orderRepository.countByBatchId(10L)).thenReturn(2L);
-
-        ImportBatchResponse response = importService.importExcel(file, fallbackDate, false, 1L);
-
-        assertThat(response).isNotNull();
-        assertThat(response.getBatchId()).isEqualTo(10L);
-        assertThat(response.getAcceptedRows()).isEqualTo(2);
-        assertThat(response.getRejectedRows()).isEqualTo(0);
-    }
-
-    @Test
-    void parseRow_deliveryDateHasLockedTripDraft_rejectsRow() throws Exception {
-        LocalDate date = LocalDate.of(2026, 8, 1);
-        List<String[]> rowsData = Collections.singletonList(
-                new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2", "2026-08-01"}
-        );
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(i -> {
-            ImportBatch b = i.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-
-        // Mock locked TripDraft for this delivery date
-        when(tripDraftRepository.existsByDeliveryDateAndStatusNot(date, "DRAFT")).thenReturn(true);
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(0);
-        assertThat(response.getRejectedRows()).isEqualTo(1);
-
-        verify(errorRepository).save(argThat(err ->
-                "DELIVERY_DATE_LOCKED".equals(err.getErrorCode()) &&
-                "delivery_date".equals(err.getFieldName())
-        ));
-        verify(orderRepository, never()).save(any(Order.class));
-    }
-
-    @Test
-    void parseRow_deliveryDateNoLockedTripDraft_acceptsRow() throws Exception {
-        LocalDate date = LocalDate.of(2026, 8, 1);
-        List<String[]> rowsData = Collections.singletonList(
-                new String[]{"DH160325-01", "ST-BT-001", "REF-SAM-300", "2", "2026-08-01"}
-        );
-        MultipartFile file = createMockExcelFile("import.xlsx", rowsData);
-
-        when(batchRepository.save(any(ImportBatch.class))).thenAnswer(i -> {
-            ImportBatch b = i.getArgument(0);
-            b.setId(1L);
-            return b;
-        });
-        when(storeRepository.findByCode("ST-BT-001")).thenReturn(Optional.of(storeBT001));
-        when(productRepository.findBySku("REF-SAM-300")).thenReturn(Optional.of(productActive));
-        when(orderRepository.save(any(Order.class))).thenAnswer(i -> {
-            Order o = i.getArgument(0);
-            o.setId(10L);
-            return o;
-        });
-
-        // Mock unlocked TripDraft (no locked TripDraft found)
-        when(tripDraftRepository.existsByDeliveryDateAndStatusNot(date, "DRAFT")).thenReturn(false);
-
-        ImportBatchResponse response = importService.importExcel(file, date, false, 1L);
-
-        assertThat(response.getAcceptedRows()).isEqualTo(1);
-        assertThat(response.getRejectedRows()).isEqualTo(0);
-        verify(orderRepository).save(any(Order.class));
+    @DisplayName("[L1-IMP-11] importExcel rejects empty file")
+    void importExcelRejectsEmptyFile() {
+        MockMultipartFile emptyFile = new MockMultipartFile("file", "orders.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[0]);
+        BusinessException e = assertThrows(BusinessException.class, () -> service.importExcel(emptyFile, LocalDate.now(), false, 1L));
+        assertEquals(ErrorCode.EXCEL_PARSE_ERROR, e.getErrorCode());
     }
 }
+

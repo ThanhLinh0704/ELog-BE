@@ -1,0 +1,1188 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 25,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "src/main/resources/db/migration/V1__init_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 295,
+      "nonEmptyLines": 274,
+      "definitions": [
+        {
+          "name": "roles",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "username",
+            "password_hash",
+            "role_id",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "code",
+            "name",
+            "address",
+            "latitude",
+            "longitude",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "code",
+            "name",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "route_id",
+            "store_id",
+            "sequence_no"
+          ],
+          "startLine": 17,
+          "endLine": 91
+        },
+        {
+          "name": "users",
+          "kind": "table",
+          "fields": [
+            "id",
+            "username",
+            "password_hash",
+            "role_id",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "code",
+            "name",
+            "address",
+            "latitude",
+            "longitude",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "code",
+            "name",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "route_id",
+            "store_id",
+            "sequence_no"
+          ],
+          "startLine": 27,
+          "endLine": 91
+        },
+        {
+          "name": "stores",
+          "kind": "table",
+          "fields": [
+            "id",
+            "code",
+            "name",
+            "address",
+            "latitude",
+            "longitude",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "code",
+            "name",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "route_id",
+            "store_id",
+            "sequence_no"
+          ],
+          "startLine": 45,
+          "endLine": 91
+        },
+        {
+          "name": "routes",
+          "kind": "table",
+          "fields": [
+            "id",
+            "code",
+            "name",
+            "is_active",
+            "created_at",
+            "updated_at",
+            "route_id",
+            "store_id",
+            "sequence_no"
+          ],
+          "startLine": 63,
+          "endLine": 91
+        },
+        {
+          "name": "route_stops",
+          "kind": "table",
+          "fields": [
+            "id",
+            "route_id",
+            "store_id",
+            "sequence_no"
+          ],
+          "startLine": 79,
+          "endLine": 91
+        },
+        {
+          "name": "vehicles",
+          "kind": "table",
+          "fields": [
+            "id",
+            "plate_no",
+            "capacity_m3",
+            "created_at",
+            "updated_at",
+            "code",
+            "name",
+            "length_m",
+            "height_m",
+            "volume_m3",
+            "created_at",
+            "updated_at",
+            "original_filename",
+            "import_date",
+            "imported_by",
+            "valid_rows",
+            "invalid_rows",
+            "status",
+            "created_at",
+            "excel_import_id",
+            "store_id",
+            "product_id",
+            "quantity",
+            "volume_m3",
+            "status",
+            "created_at"
+          ],
+          "startLine": 97,
+          "endLine": 170
+        },
+        {
+          "name": "products",
+          "kind": "table",
+          "fields": [
+            "id",
+            "code",
+            "name",
+            "length_m",
+            "height_m",
+            "volume_m3",
+            "created_at",
+            "updated_at",
+            "original_filename",
+            "import_date",
+            "imported_by",
+            "valid_rows",
+            "invalid_rows",
+            "status",
+            "created_at",
+            "excel_import_id",
+            "store_id",
+            "product_id",
+            "quantity",
+            "volume_m3",
+            "status",
+            "created_at"
+          ],
+          "startLine": 114,
+          "endLine": 170
+        },
+        {
+          "name": "excel_imports",
+          "kind": "table",
+          "fields": [
+            "id",
+            "original_filename",
+            "import_date",
+            "imported_by",
+            "valid_rows",
+            "invalid_rows",
+            "status",
+            "created_at",
+            "excel_import_id",
+            "store_id",
+            "product_id",
+            "quantity",
+            "volume_m3",
+            "status",
+            "created_at"
+          ],
+          "startLine": 134,
+          "endLine": 170
+        },
+        {
+          "name": "orders",
+          "kind": "table",
+          "fields": [
+            "id",
+            "excel_import_id",
+            "store_id",
+            "product_id",
+            "quantity",
+            "volume_m3",
+            "status",
+            "created_at"
+          ],
+          "startLine": 153,
+          "endLine": 170
+        },
+        {
+          "name": "trips",
+          "kind": "table",
+          "fields": [
+            "id",
+            "route_id",
+            "vehicle_id",
+            "driver_id",
+            "trip_date",
+            "status",
+            "total_volume_m3",
+            "total_weight_kg",
+            "created_by",
+            "created_at",
+            "updated_at"
+          ],
+          "startLine": 178,
+          "endLine": 198
+        },
+        {
+          "name": "trip_stops",
+          "kind": "table",
+          "fields": [
+            "id",
+            "trip_id",
+            "route_stop_id",
+            "sequence_no",
+            "estimated_arrival",
+            "actual_arrival",
+            "status"
+          ],
+          "startLine": 205,
+          "endLine": 219
+        },
+        {
+          "name": "loading_manifest_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "trip_id",
+            "trip_stop_id",
+            "order_id",
+            "load_order",
+            "volume_m3",
+            "weight_kg"
+          ],
+          "startLine": 225,
+          "endLine": 241
+        },
+        {
+          "name": "delivery_records",
+          "kind": "table",
+          "fields": [
+            "id",
+            "trip_stop_id",
+            "driver_id",
+            "status",
+            "notes",
+            "recorded_at",
+            "delivery_record_id",
+            "signature_image_url",
+            "cargo_image_urls",
+            "trip_id",
+            "trip_stop_id",
+            "description",
+            "flagged_at",
+            "resolved_at"
+          ],
+          "startLine": 247,
+          "endLine": 295
+        },
+        {
+          "name": "epod",
+          "kind": "table",
+          "fields": [
+            "id",
+            "delivery_record_id",
+            "signature_image_url",
+            "cargo_image_urls",
+            "trip_id",
+            "trip_stop_id",
+            "description",
+            "flagged_at",
+            "resolved_at"
+          ],
+          "startLine": 265,
+          "endLine": 295
+        },
+        {
+          "name": "exceptions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "trip_id",
+            "trip_stop_id",
+            "description",
+            "flagged_at",
+            "resolved_at"
+          ],
+          "startLine": 281,
+          "endLine": 295
+        },
+        {
+          "name": "idx_route_stops_route",
+          "kind": "index",
+          "fields": [],
+          "startLine": 91,
+          "endLine": 91
+        },
+        {
+          "name": "idx_orders_store",
+          "kind": "index",
+          "fields": [],
+          "startLine": 170,
+          "endLine": 170
+        },
+        {
+          "name": "idx_orders_importdate",
+          "kind": "index",
+          "fields": [],
+          "startLine": 171,
+          "endLine": 171
+        },
+        {
+          "name": "idx_trips_date",
+          "kind": "index",
+          "fields": [],
+          "startLine": 198,
+          "endLine": 198
+        },
+        {
+          "name": "idx_trips_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 199,
+          "endLine": 199
+        },
+        {
+          "name": "idx_trip_stops_trip_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 219,
+          "endLine": 219
+        },
+        {
+          "name": "idx_manifest_trip",
+          "kind": "index",
+          "fields": [],
+          "startLine": 241,
+          "endLine": 241
+        },
+        {
+          "name": "idx_exceptions_trip",
+          "kind": "index",
+          "fields": [],
+          "startLine": 295,
+          "endLine": 295
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 23
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V10__seed_us08_import_data.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 70,
+      "nonEmptyLines": 61,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V11__import_errors_extend.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 6,
+      "nonEmptyLines": 5,
+      "definitions": [
+        {
+          "name": "idx_import_errors_code",
+          "kind": "index",
+          "fields": [],
+          "startLine": 6,
+          "endLine": 6
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 1
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V12__trip_draft_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 35,
+      "nonEmptyLines": 32,
+      "definitions": [
+        {
+          "name": "trip_drafts",
+          "kind": "table",
+          "fields": [
+            "id",
+            "route_id",
+            "delivery_date",
+            "total_volume_m3",
+            "total_weight_kg",
+            "active_stop_count",
+            "skipped_stop_count",
+            "status",
+            "created_at",
+            "updated_at",
+            "trip_draft_id",
+            "route_stop_id",
+            "store_id",
+            "sequence_no",
+            "is_active",
+            "order_count",
+            "ADD"
+          ],
+          "startLine": 4,
+          "endLine": 35
+        },
+        {
+          "name": "trip_draft_stops",
+          "kind": "table",
+          "fields": [
+            "id",
+            "trip_draft_id",
+            "route_stop_id",
+            "store_id",
+            "sequence_no",
+            "is_active",
+            "order_count",
+            "ADD"
+          ],
+          "startLine": 19,
+          "endLine": 35
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 2
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V13__seed_us10_trip_draft_data.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 37,
+      "nonEmptyLines": 33,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V14__trip_draft_review_fields.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 43,
+      "nonEmptyLines": 38,
+      "definitions": [
+        {
+          "name": "system_config",
+          "kind": "table",
+          "fields": [
+            "id",
+            "config_key",
+            "config_value",
+            "description",
+            "ADD",
+            "ADD",
+            "ADD"
+          ],
+          "startLine": 7,
+          "endLine": 28
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 1
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V15__capacity_validation_fields.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 10,
+      "nonEmptyLines": 9,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V16__manifest_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 94,
+      "nonEmptyLines": 86,
+      "definitions": [
+        {
+          "name": "manifests",
+          "kind": "table",
+          "fields": [
+            "manifest_id",
+            "trip_draft_id",
+            "trip_id",
+            "generated_at",
+            "generated_by",
+            "total_lines",
+            "total_weight_kg",
+            "total_volume_m3"
+          ],
+          "startLine": 4,
+          "endLine": 18
+        },
+        {
+          "name": "manifest_lines",
+          "kind": "table",
+          "fields": [
+            "line_id",
+            "manifest_id",
+            "trip_draft_stop_id",
+            "order_item_id",
+            "lifo_sequence",
+            "stop_sequence_no",
+            "store_code",
+            "store_name",
+            "product_code",
+            "product_name",
+            "quantity",
+            "unit_volume_m3",
+            "unit_weight_kg",
+            "line_volume_m3",
+            "line_weight_kg"
+          ],
+          "startLine": 20,
+          "endLine": 39
+        },
+        {
+          "name": "idx_ml_manifest_lifo",
+          "kind": "index",
+          "fields": [],
+          "startLine": 42,
+          "endLine": 42
+        },
+        {
+          "name": "idx_ml_manifest_stop",
+          "kind": "index",
+          "fields": [],
+          "startLine": 45,
+          "endLine": 45
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 4
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V17__trip_tripstop_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 75,
+      "nonEmptyLines": 69,
+      "definitions": [
+        {
+          "name": "trips",
+          "kind": "table",
+          "fields": [
+            "trip_id",
+            "trip_draft_id",
+            "route_id",
+            "vehicle_id",
+            "driver_id",
+            "delivery_date",
+            "status",
+            "total_weight_kg",
+            "total_volume_m3",
+            "planned_departure_time",
+            "actual_departure_time",
+            "locked_at",
+            "locked_by",
+            "completed_at",
+            "created_by",
+            "created_at",
+            "trip_id",
+            "route_stop_id",
+            "trip_draft_stop_id",
+            "sequence_order",
+            "planned_eta",
+            "actual_arrival_time",
+            "status",
+            "stop_weight_kg",
+            "stop_volume_m3",
+            "notes"
+          ],
+          "startLine": 16,
+          "endLine": 64
+        },
+        {
+          "name": "trip_stops",
+          "kind": "table",
+          "fields": [
+            "trip_stop_id",
+            "trip_id",
+            "route_stop_id",
+            "trip_draft_stop_id",
+            "sequence_order",
+            "planned_eta",
+            "actual_arrival_time",
+            "status",
+            "stop_weight_kg",
+            "stop_volume_m3",
+            "notes"
+          ],
+          "startLine": 43,
+          "endLine": 64
+        },
+        {
+          "name": "idx_trips_date_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 71,
+          "endLine": 71
+        },
+        {
+          "name": "idx_trips_driver_date",
+          "kind": "index",
+          "fields": [],
+          "startLine": 72,
+          "endLine": 72
+        },
+        {
+          "name": "idx_trips_draft",
+          "kind": "index",
+          "fields": [],
+          "startLine": 73,
+          "endLine": 73
+        },
+        {
+          "name": "idx_tripstops_trip",
+          "kind": "index",
+          "fields": [],
+          "startLine": 74,
+          "endLine": 74
+        },
+        {
+          "name": "idx_tripstops_status",
+          "kind": "index",
+          "fields": [],
+          "startLine": 75,
+          "endLine": 75
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 7
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V18__progress_schema_update.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 37,
+      "nonEmptyLines": 30,
+      "definitions": [
+        {
+          "name": "delivery_exceptions",
+          "kind": "table",
+          "fields": [
+            "exception_id",
+            "trip_stop_id",
+            "exception_type",
+            "reported_by",
+            "description",
+            "created_at",
+            "resolved_at",
+            "resolved_by",
+            "resolution_notes"
+          ],
+          "startLine": 16,
+          "endLine": 33
+        },
+        {
+          "name": "idx_trips_status_date",
+          "kind": "index",
+          "fields": [],
+          "startLine": 10,
+          "endLine": 10
+        },
+        {
+          "name": "idx_tripstops_pending_eta",
+          "kind": "index",
+          "fields": [],
+          "startLine": 13,
+          "endLine": 13
+        },
+        {
+          "name": "idx_de_tripstop",
+          "kind": "index",
+          "fields": [],
+          "startLine": 33,
+          "endLine": 33
+        },
+        {
+          "name": "idx_de_type_resolved",
+          "kind": "index",
+          "fields": [],
+          "startLine": 34,
+          "endLine": 34
+        },
+        {
+          "name": "idx_de_created",
+          "kind": "index",
+          "fields": [],
+          "startLine": 35,
+          "endLine": 35
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 6
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V19__init_vietnamese_administrative_units.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 11364,
+      "nonEmptyLines": 11120,
+      "definitions": [
+        {
+          "name": "administrative_regions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "name_en",
+            "code_name",
+            "code_name_en",
+            "full_name",
+            "full_name_en",
+            "short_name",
+            "short_name_en",
+            "code_name",
+            "code_name_en",
+            "name",
+            "name_en",
+            "full_name",
+            "full_name_en",
+            "code_name",
+            "administrative_unit_id",
+            "administrative_region_id"
+          ],
+          "startLine": 8,
+          "endLine": 47
+        },
+        {
+          "name": "administrative_units",
+          "kind": "table",
+          "fields": [
+            "id",
+            "full_name",
+            "full_name_en",
+            "short_name",
+            "short_name_en",
+            "code_name",
+            "code_name_en",
+            "name",
+            "name_en",
+            "full_name",
+            "full_name_en",
+            "code_name",
+            "administrative_unit_id",
+            "administrative_region_id"
+          ],
+          "startLine": 19,
+          "endLine": 47
+        },
+        {
+          "name": "provinces",
+          "kind": "table",
+          "fields": [
+            "code",
+            "name",
+            "name_en",
+            "full_name",
+            "full_name_en",
+            "code_name",
+            "administrative_unit_id",
+            "administrative_region_id"
+          ],
+          "startLine": 32,
+          "endLine": 47
+        },
+        {
+          "name": "districts",
+          "kind": "table",
+          "fields": [
+            "code",
+            "name",
+            "name_en",
+            "full_name",
+            "full_name_en",
+            "code_name",
+            "province_code",
+            "administrative_unit_id"
+          ],
+          "startLine": 55,
+          "endLine": 70
+        },
+        {
+          "name": "wards",
+          "kind": "table",
+          "fields": [
+            "code",
+            "name",
+            "name_en",
+            "full_name",
+            "full_name_en",
+            "code_name",
+            "district_code",
+            "administrative_unit_id"
+          ],
+          "startLine": 78,
+          "endLine": 93
+        },
+        {
+          "name": "idx_provinces_region",
+          "kind": "index",
+          "fields": [],
+          "startLine": 50,
+          "endLine": 50
+        },
+        {
+          "name": "idx_provinces_unit",
+          "kind": "index",
+          "fields": [],
+          "startLine": 51,
+          "endLine": 51
+        },
+        {
+          "name": "idx_districts_province",
+          "kind": "index",
+          "fields": [],
+          "startLine": 73,
+          "endLine": 73
+        },
+        {
+          "name": "idx_districts_unit",
+          "kind": "index",
+          "fields": [],
+          "startLine": 74,
+          "endLine": 74
+        },
+        {
+          "name": "idx_wards_district",
+          "kind": "index",
+          "fields": [],
+          "startLine": 96,
+          "endLine": 96
+        },
+        {
+          "name": "idx_wards_unit",
+          "kind": "index",
+          "fields": [],
+          "startLine": 97,
+          "endLine": 97
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 11
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V2__seed_reference_data.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 94,
+      "nonEmptyLines": 83,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V20__alter_stores_address_relational.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 24,
+      "nonEmptyLines": 20,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V21__add_actual_departure_time_to_trip_stops.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 4,
+      "nonEmptyLines": 3,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V22__add_new_fields_for_additional_business_needs.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 26,
+      "nonEmptyLines": 21,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V23__remove_uq_batch_active_date.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 2,
+      "nonEmptyLines": 2,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V24__add_order_time_window_and_recipient_fields.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 11,
+      "nonEmptyLines": 10,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V25__alter_vehicles_and_users_for_license_matching.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 64,
+      "nonEmptyLines": 55,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V26__refresh_seed_data_for_northern_region.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 226,
+      "nonEmptyLines": 211,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V27__fix_stores_ward_codes.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 44,
+      "nonEmptyLines": 31,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V28__add_permissions_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 60,
+      "nonEmptyLines": 52,
+      "definitions": [
+        {
+          "name": "permissions",
+          "kind": "table",
+          "fields": [
+            "id",
+            "name",
+            "description",
+            "permission_id",
+            "or",
+            "or",
+            "and",
+            "vehicle",
+            "and"
+          ],
+          "startLine": 7,
+          "endLine": 39
+        },
+        {
+          "name": "role_permissions",
+          "kind": "table",
+          "fields": [
+            "role_id",
+            "permission_id",
+            "or",
+            "or",
+            "and",
+            "vehicle",
+            "and"
+          ],
+          "startLine": 14,
+          "endLine": 39
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 2
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V29__add_product_permissions.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 26,
+      "nonEmptyLines": 21,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V3__update_user_roles_and_email.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 29,
+      "nonEmptyLines": 23,
+      "definitions": [
+        {
+          "name": "user_roles",
+          "kind": "table",
+          "fields": [],
+          "startLine": 12,
+          "endLine": 17
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 1
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V30__add_store_constraints_and_waiting_time_fields.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 12,
+      "nonEmptyLines": 10,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V31__add_order_time_override_fields.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 6,
+      "nonEmptyLines": 6,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    }
+  ]
+}

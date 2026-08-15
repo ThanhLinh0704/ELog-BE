@@ -1,0 +1,1108 @@
+{
+  "nodes": [
+    {
+      "id": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:migration",
+      "type": "table",
+      "name": "V32__driver_app_execution_and_outcomes_schema.sql",
+      "filePath": "src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql",
+      "summary": "Tạo trip_executions, delivery_order_results và trip_outcomes để Driver App quản lý phiên thực thi chuyến, kết quả từng đơn và kết quả tổng hợp sau giao hàng.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "driver-app",
+        "kết-quả-giao-hàng"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Schema tách trạng thái thực thi chuyến, kết quả theo đơn và bản tổng hợp để mỗi lớp dữ liệu có vòng đời riêng nhưng vẫn liên kết bằng khóa ngoại."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V33__add_returned_to_warehouse_at.sql:migration",
+      "type": "table",
+      "name": "V33__add_returned_to_warehouse_at.sql",
+      "filePath": "src/main/resources/db/migration/V33__add_returned_to_warehouse_at.sql",
+      "summary": "Bổ sung thời điểm tài xế quay về kho cho trip_executions để hoàn thiện mốc kết thúc quy trình thực thi chuyến.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "driver-app",
+        "về-kho"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V34__add_assigned_driver_to_vehicles.sql:migration",
+      "type": "table",
+      "name": "V34__add_assigned_driver_to_vehicles.sql",
+      "filePath": "src/main/resources/db/migration/V34__add_assigned_driver_to_vehicles.sql",
+      "summary": "Gắn tài xế được phân công vào vehicles bằng khóa ngoại và index, sau đó backfill các cặp xe-tài xế phù hợp hạng bằng lái.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "phân-công-tài-xế",
+        "phương-tiện"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V35__allow_null_delivery_date_import_batches.sql:migration",
+      "type": "table",
+      "name": "V35__allow_null_delivery_date_import_batches.sql",
+      "filePath": "src/main/resources/db/migration/V35__allow_null_delivery_date_import_batches.sql",
+      "summary": "Cho phép delivery_date của import_batches nhận NULL để hỗ trợ các tệp import chưa xác định ngày giao.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "import-đơn-hàng",
+        "nullable"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V36__add_goong_route_info_to_trip_drafts.sql:migration",
+      "type": "table",
+      "name": "V36__add_goong_route_info_to_trip_drafts.sql",
+      "filePath": "src/main/resources/db/migration/V36__add_goong_route_info_to_trip_drafts.sql",
+      "summary": "Lưu quãng đường, encoded polyline và thời gian di chuyển từng chặng từ Goong API trên cả trip draft lẫn chuyến đã xác nhận.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "goong-api",
+        "định-tuyến",
+        "polyline"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V37__driver_active_status_schema.sql:migration",
+      "type": "table",
+      "name": "V37__driver_active_status_schema.sql",
+      "filePath": "src/main/resources/db/migration/V37__driver_active_status_schema.sql",
+      "summary": "Bổ sung trạng thái Active/Inactive của tài xế, bảng lịch sử thay đổi và quyền đọc/ghi để quản lý khả năng nhận chuyến.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "trạng-thái-tài-xế",
+        "audit",
+        "rbac"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V38__two_vehicle_safety_buffer_config.sql:migration",
+      "type": "table",
+      "name": "V38__two_vehicle_safety_buffer_config.sql",
+      "filePath": "src/main/resources/db/migration/V38__two_vehicle_safety_buffer_config.sql",
+      "summary": "Nạp tỷ lệ đệm an toàn 90% vào system_config để bộ máy đề xuất hai xe không sử dụng hết tuyệt đối tải trọng hoặc thể tích.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "safety-buffer",
+        "đề-xuất-xe"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V39__planning_history_schema.sql:migration",
+      "type": "table",
+      "name": "V39__planning_history_schema.sql",
+      "filePath": "src/main/resources/db/migration/V39__planning_history_schema.sql",
+      "summary": "Tạo trip_planning_events làm audit trail cho vòng đời lập kế hoạch chuyến và cấp quyền xem lịch sử cho các vai trò điều phối.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "audit-trail",
+        "lập-kế-hoạch-chuyến",
+        "rbac"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Bảng sự kiện lưu cả snapshot trạng thái, JSON change_detail và nhiều index theo đối tượng, loại sự kiện, tác nhân, tuyến và ngày giao."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V4__add_refresh_tokens_table.sql:migration",
+      "type": "table",
+      "name": "V4__add_refresh_tokens_table.sql",
+      "filePath": "src/main/resources/db/migration/V4__add_refresh_tokens_table.sql",
+      "summary": "Tạo bảng refresh_tokens liên kết người dùng, token, thời hạn và thời điểm phát hành để hỗ trợ vòng đời đăng nhập JWT.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "refresh-token",
+        "xác-thực",
+        "jwt"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V40__trip_outcome_history_schema.sql:migration",
+      "type": "table",
+      "name": "V40__trip_outcome_history_schema.sql",
+      "filePath": "src/main/resources/db/migration/V40__trip_outcome_history_schema.sql",
+      "summary": "Lưu mã lý do thất bại trên delivery_order_results và tạo trip_outcome_events để theo dõi toàn bộ lịch sử thay đổi kết quả chuyến.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "outcome-history",
+        "audit-trail",
+        "driver-app"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Event table giữ snapshot denormalized của đơn, cửa hàng, tài xế, tuyến và ngày giao để lịch sử vẫn đọc được độc lập với trạng thái hiện tại."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V41__add_kpi_permission.sql:migration",
+      "type": "table",
+      "name": "V41__add_kpi_permission.sql",
+      "filePath": "src/main/resources/db/migration/V41__add_kpi_permission.sql",
+      "summary": "Tạo quyền kpi:read và gán cho System Admin, Dispatcher cùng Logistics Manager để truy cập dashboard chỉ số.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "kpi",
+        "phân-quyền",
+        "rbac"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V42__decouple_history_events_from_fk_constraints.sql:migration",
+      "type": "table",
+      "name": "V42__decouple_history_events_from_fk_constraints.sql",
+      "filePath": "src/main/resources/db/migration/V42__decouple_history_events_from_fk_constraints.sql",
+      "summary": "Gỡ khóa ngoại từ các bảng lịch sử đến entity nghiệp vụ để audit transaction REQUIRES_NEW có thể ghi ID chưa commit và giữ log sau khi dữ liệu gốc bị xóa.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "audit-log",
+        "transaction-boundary",
+        "foreign-key"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Thiết kế cố ý ưu tiên tính bền vững của audit log hơn referential integrity cứng, trong khi vẫn giữ cột ID và index để truy vấn."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V43__seed_missing_system_user.sql:migration",
+      "type": "table",
+      "name": "V43__seed_missing_system_user.sql",
+      "filePath": "src/main/resources/db/migration/V43__seed_missing_system_user.sql",
+      "summary": "Khôi phục tài khoản system có ID cố định 1 và gán vai trò SYSTEM_ADMIN để các job tự động có actor hợp lệ khi tạo delivery exception.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "system-user",
+        "dữ-liệu-mẫu",
+        "phân-quyền"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V44__extend_delivery_exceptions_for_driver_app.sql:migration",
+      "type": "table",
+      "name": "V44__extend_delivery_exceptions_for_driver_app.sql",
+      "filePath": "src/main/resources/db/migration/V44__extend_delivery_exceptions_for_driver_app.sql",
+      "summary": "Mở rộng delivery_exceptions cho Driver App bằng cách cho phép thiếu trip stop và thêm tham chiếu trip execution, order cùng index tra cứu.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "driver-app",
+        "ngoại-lệ-giao-hàng"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "type": "table",
+      "name": "V45__refresh_seed_from_excel_v1.sql",
+      "filePath": "src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql",
+      "summary": "Làm mới bộ dữ liệu demo từ Excel V1: xóa dữ liệu vận hành cũ rồi nạp lại sản phẩm, phương tiện, tài xế, cửa hàng, tuyến và điểm dừng.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "dữ-liệu-mẫu",
+        "excel",
+        "reset-dữ-liệu"
+      ],
+      "complexity": "complex",
+      "languageNotes": "Migration có tính phá hủy chủ động, TRUNCATE theo thứ tự phụ thuộc trước khi nạp lại hàng trăm bản ghi tham chiếu từ nguồn Excel."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V46__make_trip_stops_route_stop_id_nullable.sql:migration",
+      "type": "table",
+      "name": "V46__make_trip_stops_route_stop_id_nullable.sql",
+      "filePath": "src/main/resources/db/migration/V46__make_trip_stops_route_stop_id_nullable.sql",
+      "summary": "Cho phép route_stop_id trên trip_stops nhận NULL để điểm dừng thực thi không bắt buộc phải xuất phát từ tuyến cố định.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "điểm-dừng",
+        "nullable"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V47__make_trip_stops_trip_draft_stop_id_nullable.sql:migration",
+      "type": "table",
+      "name": "V47__make_trip_stops_trip_draft_stop_id_nullable.sql",
+      "filePath": "src/main/resources/db/migration/V47__make_trip_stops_trip_draft_stop_id_nullable.sql",
+      "summary": "Cho phép trip_draft_stop_id trên trip_stops nhận NULL để điểm dừng thực tế có thể tồn tại ngoài bản nháp chuyến ban đầu.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "điểm-dừng",
+        "nullable"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V48__delete_stores_kh0033_kh0035.sql:migration",
+      "type": "table",
+      "name": "V48__delete_stores_kh0033_kh0035.sql",
+      "filePath": "src/main/resources/db/migration/V48__delete_stores_kh0033_kh0035.sql",
+      "summary": "Xóa hai cửa hàng KH0033 và KH0035 sau khi dọn các route_stops và orders phụ thuộc để bảo toàn ràng buộc dữ liệu.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "dọn-dữ-liệu",
+        "cửa-hàng"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V5__add_store_contact_fields.sql:migration",
+      "type": "table",
+      "name": "V5__add_store_contact_fields.sql",
+      "filePath": "src/main/resources/db/migration/V5__add_store_contact_fields.sql",
+      "summary": "Bổ sung số điện thoại và email liên hệ cho stores để lưu đầu mối nhận hàng tại cửa hàng.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "cửa-hàng",
+        "thông-tin-liên-hệ"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V6__add_route_description.sql:migration",
+      "type": "table",
+      "name": "V6__add_route_description.sql",
+      "filePath": "src/main/resources/db/migration/V6__add_route_description.sql",
+      "summary": "Thêm mô tả cho routes, dấu thời gian cho route_stops và đổi sequence_no thành sequence_order để làm rõ thứ tự điểm dừng.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "tuyến-giao-hàng",
+        "điểm-dừng"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V7__alter_products_schema.sql:migration",
+      "type": "table",
+      "name": "V7__alter_products_schema.sql",
+      "filePath": "src/main/resources/db/migration/V7__alter_products_schema.sql",
+      "summary": "Chuẩn hóa products theo US-07 bằng SKU, tên sản phẩm, ràng buộc kích thước/khối lượng dương và bộ dữ liệu sản phẩm điện tử chuẩn.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "danh-mục-sản-phẩm",
+        "data-backfill",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V8__vehicles_schema.sql:migration",
+      "type": "table",
+      "name": "V8__vehicles_schema.sql",
+      "filePath": "src/main/resources/db/migration/V8__vehicles_schema.sql",
+      "summary": "Chuyển vehicles từ schema placeholder sang master data US-06 với loại xe, tải trọng, thể tích, ràng buộc dương và dữ liệu xe mẫu.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "quản-lý-phương-tiện",
+        "data-backfill",
+        "validation"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V9__orders_schema.sql:migration",
+      "type": "table",
+      "name": "V9__orders_schema.sql",
+      "filePath": "src/main/resources/db/migration/V9__orders_schema.sql",
+      "summary": "Chuẩn hóa import đơn Excel theo mô hình batch → order → order items, tạo bảng lỗi và chuyển orders từ mỗi dòng một sản phẩm sang đơn nhiều sản phẩm.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "migration",
+        "import-excel",
+        "chuẩn-hóa-đơn-hàng",
+        "schema"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Migration tách phần đầu đơn và dòng sản phẩm, lưu snapshot trọng lượng/thể tích, đồng thời thay excel_imports bằng import_batches có ràng buộc batch hoạt động."
+    },
+    {
+      "id": "table:src/main/resources/db/setup/create_database.sql:database-setup",
+      "type": "table",
+      "name": "create_database.sql",
+      "filePath": "src/main/resources/db/setup/create_database.sql",
+      "summary": "Khởi tạo thủ công database elog_db với utf8mb4, chọn database và cung cấp mẫu tạo user ứng dụng trước khi Spring Boot khởi động.",
+      "tags": [
+        "cơ-sở-dữ-liệu",
+        "mysql",
+        "khởi-tạo-database",
+        "thiết-lập"
+      ],
+      "complexity": "simple",
+      "languageNotes": "Database dùng utf8mb4_unicode_ci để lưu nhất quán tiếng Việt và các ký tự Unicode."
+    },
+    {
+      "id": "document:CLAUDE.md",
+      "type": "document",
+      "name": "CLAUDE.md",
+      "filePath": "CLAUDE.md",
+      "summary": "Tài liệu ngữ cảnh cô đọng mô tả phạm vi ELog, tech stack, actor, vòng đời chuyến, business rules trọng yếu, cấu trúc thư mục và checklist hoàn thành.",
+      "tags": [
+        "tài-liệu",
+        "nguồn-sự-thật",
+        "business-rules",
+        "hướng-dẫn-phát-triển"
+      ],
+      "complexity": "moderate",
+      "languageNotes": "Markdown được tổ chức theo progressive disclosure: giữ quy tắc cốt lõi trong một tệp ngắn và liên kết sang docs chuyên đề khi cần."
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:trip_executions",
+      "type": "table",
+      "name": "trip_executions",
+      "filePath": "src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql",
+      "summary": "Lưu phiên thực thi của một chuyến, tài xế được giao, version phân công và các mốc bắt đầu, hoàn tất, về kho.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "thực-thi-chuyến"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:delivery_order_results",
+      "type": "table",
+      "name": "delivery_order_results",
+      "filePath": "src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql",
+      "summary": "Lưu kết quả giao của từng đơn trong một trip execution cùng điểm dừng, trạng thái và lý do thất bại.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "kết-quả-đơn-giao"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:trip_outcomes",
+      "type": "table",
+      "name": "trip_outcomes",
+      "filePath": "src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql",
+      "summary": "Lưu kết quả tổng hợp của trip execution, số đơn thành công, thất bại, một phần và trạng thái xác nhận.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "kết-quả-chuyến"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V37__driver_active_status_schema.sql:driver_status_history",
+      "type": "table",
+      "name": "driver_status_history",
+      "filePath": "src/main/resources/db/migration/V37__driver_active_status_schema.sql",
+      "summary": "Lưu lịch sử chuyển trạng thái Active/Inactive của tài xế, lý do và người thực hiện thay đổi.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "trạng-thái-tài-xế"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V39__planning_history_schema.sql:trip_planning_events",
+      "type": "table",
+      "name": "trip_planning_events",
+      "filePath": "src/main/resources/db/migration/V39__planning_history_schema.sql",
+      "summary": "Lưu audit event của quá trình lập trip draft và trip, gồm actor, trạng thái trước/sau và chi tiết thay đổi.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "audit-lập-kế-hoạch"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V4__add_refresh_tokens_table.sql:refresh_tokens",
+      "type": "table",
+      "name": "refresh_tokens",
+      "filePath": "src/main/resources/db/migration/V4__add_refresh_tokens_table.sql",
+      "summary": "Lưu refresh token theo người dùng với thời hạn và thời điểm tạo phục vụ xác thực JWT.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "xác-thực"
+      ],
+      "complexity": "simple"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V40__trip_outcome_history_schema.sql:trip_outcome_events",
+      "type": "table",
+      "name": "trip_outcome_events",
+      "filePath": "src/main/resources/db/migration/V40__trip_outcome_history_schema.sql",
+      "summary": "Lưu audit event của kết quả chuyến và đơn giao với snapshot nghiệp vụ tại thời điểm phát sinh.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "audit-kết-quả"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V9__orders_schema.sql:import_batches",
+      "type": "table",
+      "name": "import_batches",
+      "filePath": "src/main/resources/db/migration/V9__orders_schema.sql",
+      "summary": "Lưu metadata tệp import, ngày giao, thống kê dòng hợp lệ/lỗi và trạng thái xử lý batch.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "import-đơn-hàng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V9__orders_schema.sql:order_items",
+      "type": "table",
+      "name": "order_items",
+      "filePath": "src/main/resources/db/migration/V9__orders_schema.sql",
+      "summary": "Lưu các sản phẩm thuộc đơn cùng snapshot SKU, số lượng, khối lượng và thể tích tại lúc import.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "chi-tiết-đơn-hàng"
+      ],
+      "complexity": "moderate"
+    },
+    {
+      "id": "table:src/main/resources/db/migration/V9__orders_schema.sql:import_errors",
+      "type": "table",
+      "name": "import_errors",
+      "filePath": "src/main/resources/db/migration/V9__orders_schema.sql",
+      "summary": "Lưu dữ liệu thô và lý do lỗi theo từng dòng của batch import.",
+      "tags": [
+        "bảng-dữ-liệu",
+        "schema",
+        "lỗi-import"
+      ],
+      "complexity": "simple"
+    }
+  ],
+  "edges": [
+    {
+      "source": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:trip_executions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:delivery_order_results",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:trip_outcomes",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V37__driver_active_status_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V37__driver_active_status_schema.sql:driver_status_history",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V39__planning_history_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V39__planning_history_schema.sql:trip_planning_events",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V4__add_refresh_tokens_table.sql:migration",
+      "target": "table:src/main/resources/db/migration/V4__add_refresh_tokens_table.sql:refresh_tokens",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V40__trip_outcome_history_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V40__trip_outcome_history_schema.sql:trip_outcome_events",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V9__orders_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V9__orders_schema.sql:import_batches",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V9__orders_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V9__orders_schema.sql:order_items",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V9__orders_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V9__orders_schema.sql:import_errors",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trips",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_draft_stops",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V33__add_returned_to_warehouse_at.sql:migration",
+      "target": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:trip_executions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V34__add_assigned_driver_to_vehicles.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:vehicles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V34__add_assigned_driver_to_vehicles.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V35__allow_null_delivery_date_import_batches.sql:migration",
+      "target": "table:src/main/resources/db/migration/V9__orders_schema.sql:import_batches",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V36__add_goong_route_info_to_trip_drafts.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_drafts",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V36__add_goong_route_info_to_trip_drafts.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_draft_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V36__add_goong_route_info_to_trip_drafts.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trips",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V36__add_goong_route_info_to_trip_drafts.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trip_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V37__driver_active_status_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V37__driver_active_status_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:permissions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V37__driver_active_status_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:role_permissions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V38__two_vehicle_safety_buffer_config.sql:migration",
+      "target": "table:src/main/resources/db/migration/V14__trip_draft_review_fields.sql:system_config",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V39__planning_history_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:permissions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V39__planning_history_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:role_permissions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V39__planning_history_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_drafts",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V39__planning_history_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trips",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V39__planning_history_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V4__add_refresh_tokens_table.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V40__trip_outcome_history_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:delivery_order_results",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V40__trip_outcome_history_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:trip_executions",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V40__trip_outcome_history_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trips",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V40__trip_outcome_history_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V41__add_kpi_permission.sql:migration",
+      "target": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:permissions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V41__add_kpi_permission.sql:migration",
+      "target": "table:src/main/resources/db/migration/V28__add_permissions_schema.sql:role_permissions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V42__decouple_history_events_from_fk_constraints.sql:migration",
+      "target": "table:src/main/resources/db/migration/V39__planning_history_schema.sql:trip_planning_events",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V42__decouple_history_events_from_fk_constraints.sql:migration",
+      "target": "table:src/main/resources/db/migration/V40__trip_outcome_history_schema.sql:trip_outcome_events",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V43__seed_missing_system_user.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V43__seed_missing_system_user.sql:migration",
+      "target": "table:src/main/resources/db/migration/V3__update_user_roles_and_email.sql:user_roles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V43__seed_missing_system_user.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:roles",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V44__extend_delivery_exceptions_for_driver_app.sql:migration",
+      "target": "table:src/main/resources/db/migration/V18__progress_schema_update.sql:delivery_exceptions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V44__extend_delivery_exceptions_for_driver_app.sql:migration",
+      "target": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:trip_executions",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V44__extend_delivery_exceptions_for_driver_app.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V37__driver_active_status_schema.sql:driver_status_history",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V40__trip_outcome_history_schema.sql:trip_outcome_events",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:trip_outcomes",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V18__progress_schema_update.sql:delivery_exceptions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql:trip_executions",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V39__planning_history_schema.sql:trip_planning_events",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trip_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trips",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V16__manifest_schema.sql:manifest_lines",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V16__manifest_schema.sql:manifests",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_draft_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V12__trip_draft_schema.sql:trip_drafts",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:route_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:routes",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V9__orders_schema.sql:order_items",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V9__orders_schema.sql:import_errors",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V9__orders_schema.sql:import_batches",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:stores",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:vehicles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:products",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V3__update_user_roles_and_email.sql:user_roles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql:migration",
+      "target": "table:src/main/resources/db/migration/V14__trip_draft_review_fields.sql:system_config",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V46__make_trip_stops_route_stop_id_nullable.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trip_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V47__make_trip_stops_trip_draft_stop_id_nullable.sql:migration",
+      "target": "table:src/main/resources/db/migration/V17__trip_tripstop_schema.sql:trip_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V48__delete_stores_kh0033_kh0035.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:route_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V48__delete_stores_kh0033_kh0035.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V48__delete_stores_kh0033_kh0035.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:stores",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V5__add_store_contact_fields.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:stores",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V6__add_route_description.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:routes",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V6__add_route_description.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:route_stops",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V7__alter_products_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:products",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V8__vehicles_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:vehicles",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V9__orders_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:orders",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V9__orders_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:loading_manifest_items",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V9__orders_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:excel_imports",
+      "type": "migrates",
+      "direction": "forward",
+      "weight": 0.7
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V9__orders_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:users",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "table:src/main/resources/db/migration/V9__orders_schema.sql:migration",
+      "target": "table:src/main/resources/db/migration/V1__init_schema.sql:products",
+      "type": "depends_on",
+      "direction": "forward",
+      "weight": 0.6
+    },
+    {
+      "source": "document:CLAUDE.md",
+      "target": "file:src/main/java/com/elog/ElogApplication.java",
+      "type": "documents",
+      "direction": "forward",
+      "weight": 0.5
+    }
+  ]
+}

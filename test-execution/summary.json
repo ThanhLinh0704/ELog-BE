@@ -21,13 +21,8 @@
     },
     {
         "level":  "L3",
-        "status":  "Not Run",
-        "count":  57
-    },
-    {
-        "level":  "L3",
         "status":  "Pass",
-        "count":  73
+        "count":  130
     },
     {
         "level":  "L4",

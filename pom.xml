@@ -144,24 +144,6 @@
                         <usePhrasedTestCaseClassName>false</usePhrasedTestCaseClassName>
                         <usePhrasedTestCaseMethodName>true</usePhrasedTestCaseMethodName>
                     </statelessTestsetReporter>
-                    <excludes>
-                        <exclude>**/integration/AddressServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/AuthServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/CapacityValidationServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/ConsolidationServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/ConstraintValidationServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/DriverTripServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/ExceptionServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/ImportServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/KpiServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/RouteServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/StoreServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/TripDraftServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/TripMonitoringServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/TripServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/UserServiceIntegrationTest.java</exclude>
-                        <exclude>**/integration/VehicleServiceIntegrationTest.java</exclude>
-                    </excludes>
                 </configuration>
             </plugin>
             <plugin>
@@ -180,6 +162,15 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.12</version>
+                <configuration>
+                    <excludes>
+                        <exclude>com/elog/dto/**</exclude>
+                        <exclude>com/elog/entity/**</exclude>
+                        <exclude>com/elog/config/**</exclude>
+                        <exclude>com/elog/controller/**</exclude>
+                        <exclude>com/elog/repository/specification/**</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>

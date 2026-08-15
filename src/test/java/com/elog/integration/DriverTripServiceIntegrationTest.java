@@ -1,212 +1,192 @@
 package com.elog.integration;
 
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.service.DriverTripService;
+import com.elog.service.TripOutcomeHistoryService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.time.LocalDate;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
+@ActiveProfiles("dev")
 @Transactional
-public class DriverTripServiceIntegrationTest {
+@ExtendWith(Report5L2EvidenceExtension.class)
+class DriverTripServiceIntegrationTest {
 
-    /**
-     * TEST ID: INT-DRIV-01
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
+    private static final AtomicInteger DAY_SEQUENCE = new AtomicInteger(1);
+
+    @Autowired DriverTripService driverTripService;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired EntityManager entityManager;
+
+    @MockBean TripOutcomeHistoryService tripOutcomeHistoryService;
+
     @Test
-    void integrationTest_Scenario1() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-01");
+    void l2Drv01DispatchedExecutionStartsWithoutChangingTripOrVehicle() {
+        Fixture fixture = seedExecution("DISPATCHED", null);
+        String tripStatusBefore = scalar("SELECT status FROM trips WHERE trip_id = ?", fixture.tripId());
+        String vehicleStatusBefore = scalar("SELECT status FROM vehicles WHERE id = ?", 1L);
+
+        driverTripService.startTrip(fixture.executionId(), "driver01");
+        Map<String, Object> execution = reloadExecution(fixture.executionId());
+
+        assertThat(execution.get("status")).isEqualTo("IN_PROGRESS");
+        assertThat(execution.get("started_at")).isNotNull();
+        assertThat(scalar("SELECT status FROM trips WHERE trip_id = ?", fixture.tripId())).isEqualTo(tripStatusBefore);
+        assertThat(scalar("SELECT status FROM vehicles WHERE id = ?", 1L)).isEqualTo(vehicleStatusBefore);
     }
 
-    /**
-     * TEST ID: INT-DRIV-02
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario2() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-02");
+    void l2Drv02DifferentDriverCannotStartExecution() {
+        Fixture fixture = seedExecution("DISPATCHED", null);
+
+        assertThatThrownBy(() -> driverTripService.startTrip(fixture.executionId(), "driver02"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.UNAUTHORIZED_ACCESS));
+
+        Map<String, Object> execution = reloadExecution(fixture.executionId());
+        assertThat(execution.get("status")).isEqualTo("DISPATCHED");
+        assertThat(execution.get("started_at")).isNull();
     }
 
-    /**
-     * TEST ID: INT-DRIV-03
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario3() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-03");
+    void l2Drv03AlreadyStartedExecutionIsUnchanged() {
+        Fixture fixture = seedExecution("IN_PROGRESS", "2026-08-14 07:30:00");
+
+        assertThatThrownBy(() -> driverTripService.startTrip(fixture.executionId(), "driver01"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+
+        Map<String, Object> execution = reloadExecution(fixture.executionId());
+        assertThat(execution.get("status")).isEqualTo("IN_PROGRESS");
+        assertThat(execution.get("started_at").toString()).startsWith("2026-08-14T07:30");
     }
 
-    /**
-     * TEST ID: INT-DRIV-04
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario4() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-04");
+    void l2Drv07TerminalResultsCreateOutcomeWithExactAggregates() {
+        Fixture fixture = seedExecution("IN_PROGRESS", "2026-08-14 07:30:00");
+        seedOrderResult(fixture, "DRV07-A", "DELIVERED");
+        seedOrderResult(fixture, "DRV07-B", "FAILED");
+        String vehicleStatusBefore = scalar("SELECT status FROM vehicles WHERE id = ?", 1L);
+
+        driverTripService.completeTrip(fixture.executionId(), "driver01");
+        Map<String, Object> execution = reloadExecution(fixture.executionId());
+        Map<String, Object> outcome = jdbc.queryForMap("""
+                SELECT status, total_orders, delivered_count, failed_count, partial_count
+                FROM trip_outcomes WHERE trip_execution_id = ?
+                """, fixture.executionId());
+
+        assertThat(execution.get("status")).isEqualTo("COMPLETED_WITH_EXCEPTIONS");
+        assertThat(execution.get("completed_at")).isNotNull();
+        assertThat(outcome.get("status")).isEqualTo("SUBMITTED");
+        assertThat(((Number) outcome.get("total_orders")).intValue()).isEqualTo(2);
+        assertThat(((Number) outcome.get("delivered_count")).intValue()).isEqualTo(1);
+        assertThat(((Number) outcome.get("failed_count")).intValue()).isEqualTo(1);
+        assertThat(((Number) outcome.get("partial_count")).intValue()).isZero();
+        assertThat(scalar("SELECT status FROM vehicles WHERE id = ?", 1L)).isEqualTo(vehicleStatusBefore);
     }
 
-    /**
-     * TEST ID: INT-DRIV-05
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario5() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-05");
+    void l2Drv08PendingResultPreventsCompletionAndOutcomeInsert() {
+        Fixture fixture = seedExecution("IN_PROGRESS", "2026-08-14 07:30:00");
+        seedOrderResult(fixture, "DRV08-A", "PENDING");
+
+        assertThatThrownBy(() -> driverTripService.completeTrip(fixture.executionId(), "driver01"))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        ex -> assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.VALIDATION_FAILED));
+
+        assertThat(reloadExecution(fixture.executionId()).get("status")).isEqualTo("IN_PROGRESS");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM trip_outcomes WHERE trip_execution_id = ?",
+                Integer.class, fixture.executionId())).isZero();
     }
 
-    /**
-     * TEST ID: INT-DRIV-06
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario6() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-06");
+    private Fixture seedExecution(String executionStatus, String startedAt) {
+        LocalDate today = LocalDate.now().minusDays(DAY_SEQUENCE.getAndIncrement());
+        jdbc.update("""
+                INSERT INTO trip_drafts
+                    (route_id, delivery_date, total_volume_m3, total_weight_kg,
+                     active_stop_count, skipped_stop_count, status)
+                VALUES (1, ?, 1.000000, 100.000, 1, 0, 'VALIDATED')
+                """, today);
+        long draftId = lastInsertId();
+
+        jdbc.update("""
+                INSERT INTO trip_draft_stops
+                    (trip_draft_id, route_stop_id, store_id, sequence_no, is_active, order_count)
+                VALUES (?, 2, 136, 1, 1, 2)
+                """, draftId);
+        long stopId = lastInsertId();
+
+        jdbc.update("""
+                INSERT INTO trips
+                    (trip_draft_id, route_id, vehicle_id, driver_id, delivery_date,
+                     status, total_weight_kg, total_volume_m3, created_by)
+                VALUES (?, 1, 1, 6, ?, 'DISPATCHED', 100.000, 1.000000, 2)
+                """, draftId, today);
+        long tripId = lastInsertId();
+
+        jdbc.update("""
+                INSERT INTO trip_executions
+                    (trip_id, driver_id, status, assignment_version, started_at)
+                VALUES (?, 6, ?, 1, ?)
+                """, tripId, executionStatus, startedAt);
+        return new Fixture(draftId, stopId, tripId, lastInsertId(), today);
     }
 
-    /**
-     * TEST ID: INT-DRIV-07
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario7() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-07");
+    private void seedOrderResult(Fixture fixture, String orderRef, String status) {
+        jdbc.update("""
+                INSERT INTO import_batches
+                    (delivery_date, file_name, uploaded_by, total_rows, accepted_rows,
+                     rejected_rows, status, is_active)
+                VALUES (?, ?, 2, 1, 1, 0, 'COMPLETED', 0)
+                """, LocalDate.now(), orderRef + ".xlsx");
+        long batchId = lastInsertId();
+
+        jdbc.update("""
+                INSERT INTO orders
+                    (import_batch_id, order_ref, store_id, delivery_date, status, trip_draft_id)
+                VALUES (?, ?, 136, ?, 'ACCEPTED', ?)
+                """, batchId, orderRef, fixture.deliveryDate(), fixture.draftId());
+        long orderId = lastInsertId();
+
+        jdbc.update("""
+                INSERT INTO delivery_order_results
+                    (trip_execution_id, order_id, stop_id, status, updated_at)
+                VALUES (?, ?, ?, ?, NOW())
+                """, fixture.executionId(), orderId, fixture.stopId(), status);
     }
 
-    /**
-     * TEST ID: INT-DRIV-08
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario8() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-08");
+    private long lastInsertId() {
+        return jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     }
 
-    /**
-     * TEST ID: INT-DRIV-09
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario9() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-09");
+    private Map<String, Object> reloadExecution(long executionId) {
+        entityManager.flush();
+        entityManager.clear();
+        return jdbc.queryForMap("""
+                SELECT status, started_at, completed_at
+                FROM trip_executions WHERE id = ?
+                """, executionId);
     }
 
-    /**
-     * TEST ID: INT-DRIV-10
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario10() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-10");
+    private String scalar(String sql, Object value) {
+        return jdbc.queryForObject(sql, String.class, value);
     }
 
-    /**
-     * TEST ID: INT-DRIV-11
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario11() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-11");
-    }
-
-    /**
-     * TEST ID: INT-DRIV-12
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario12() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-12");
-    }
-
-    /**
-     * TEST ID: INT-DRIV-13
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario13() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-13");
-    }
-
-    /**
-     * TEST ID: INT-DRIV-14
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario14() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-14");
-    }
-
-    /**
-     * TEST ID: INT-DRIV-15
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario15() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-15");
-    }
-
-    /**
-     * TEST ID: INT-DRIV-16
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario16() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-16");
-    }
-
-    /**
-     * TEST ID: INT-DRIV-17
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario17() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-17");
-    }
-
-    /**
-     * TEST ID: INT-DRIV-18
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario18() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-18");
-    }
-
-    /**
-     * TEST ID: INT-DRIV-19
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario19() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-19");
-    }
-
-    /**
-     * TEST ID: INT-DRIV-20
-     * COVERS: Integration of DriverTrip service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario20() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-DRIV-20");
-    }
-
+    private record Fixture(long draftId, long stopId, long tripId, long executionId, LocalDate deliveryDate) {}
 }
+

@@ -613,4 +613,56 @@ class TripServiceImplTest {
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.VEHICLE_NOT_ELIGIBLE)
                 .hasMessageContaining("90% safety buffer");
     }
+
+    @Test
+    void getTripsByTripDraftId_success() {
+        Trip trip = Trip.builder().tripId(100L).tripDraft(testDraft).route(testDraft.getRoute()).vehicle(testVehicle).driver(testDriver).status(TripStatus.DISPATCHED).build();
+        when(tripRepository.findByTripDraftIdWithDetails(1L)).thenReturn(List.of(trip));
+
+        List<TripResponse> resp = tripService.getTripsByTripDraftId(1L);
+
+        assertThat(resp).hasSize(1);
+        assertThat(resp.get(0).getTripId()).isEqualTo(100L);
+    }
+
+    @Test
+    void assignSplit_duplicatedStops_throwsException() {
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
+
+        TripDraftStop s1 = TripDraftStop.builder().id(10L).isActive(true).sequenceNo(1).build();
+        when(tripDraftStopRepository.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(1L)).thenReturn(List.of(s1));
+
+        com.elog.dto.request.TripSplitAssignRequest req = new com.elog.dto.request.TripSplitAssignRequest();
+        com.elog.dto.request.TripSplitAssignRequest.SplitAssignment a1 = new com.elog.dto.request.TripSplitAssignRequest.SplitAssignment();
+        a1.setVehicleId(1L); a1.setStopIds(List.of(10L));
+        com.elog.dto.request.TripSplitAssignRequest.SplitAssignment a2 = new com.elog.dto.request.TripSplitAssignRequest.SplitAssignment();
+        a2.setVehicleId(2L); a2.setStopIds(List.of(10L));
+        req.setAssignments(List.of(a1, a2));
+
+        assertThatThrownBy(() -> tripService.assignSplit(1L, req, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SPLIT_PLAN_STOP_DUPLICATED);
+    }
+
+    @Test
+    void assignSplit_incompleteStops_throwsException() {
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
+
+        TripDraftStop s1 = TripDraftStop.builder().id(10L).isActive(true).sequenceNo(1).build();
+        TripDraftStop s2 = TripDraftStop.builder().id(20L).isActive(true).sequenceNo(2).build();
+        when(tripDraftStopRepository.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(1L)).thenReturn(List.of(s1, s2));
+
+        com.elog.dto.request.TripSplitAssignRequest req = new com.elog.dto.request.TripSplitAssignRequest();
+        com.elog.dto.request.TripSplitAssignRequest.SplitAssignment a1 = new com.elog.dto.request.TripSplitAssignRequest.SplitAssignment();
+        a1.setVehicleId(1L); a1.setStopIds(List.of(10L));
+        req.setAssignments(List.of(a1));
+
+        assertThatThrownBy(() -> tripService.assignSplit(1L, req, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SPLIT_PLAN_STOP_INCOMPLETE);
+    }
 }

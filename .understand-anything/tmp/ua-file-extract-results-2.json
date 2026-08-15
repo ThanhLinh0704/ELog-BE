@@ -1,0 +1,718 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 25,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 48,
+      "nonEmptyLines": 45,
+      "definitions": [
+        {
+          "name": "trip_executions",
+          "kind": "table",
+          "fields": [],
+          "startLine": 5,
+          "endLine": 10
+        },
+        {
+          "name": "delivery_order_results",
+          "kind": "table",
+          "fields": [],
+          "startLine": 19,
+          "endLine": 24
+        },
+        {
+          "name": "trip_outcomes",
+          "kind": "table",
+          "fields": [],
+          "startLine": 33,
+          "endLine": 38
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 3
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V33__add_returned_to_warehouse_at.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 1,
+      "nonEmptyLines": 1,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V34__add_assigned_driver_to_vehicles.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 15,
+      "nonEmptyLines": 12,
+      "definitions": [
+        {
+          "name": "idx_vehicles_assigned_driver",
+          "kind": "index",
+          "fields": [],
+          "startLine": 7,
+          "endLine": 7
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 1
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V35__allow_null_delivery_date_import_batches.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 2,
+      "nonEmptyLines": 2,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V36__add_goong_route_info_to_trip_drafts.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 17,
+      "nonEmptyLines": 13,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V37__driver_active_status_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 40,
+      "nonEmptyLines": 33,
+      "definitions": [
+        {
+          "name": "driver_status_history",
+          "kind": "table",
+          "fields": [
+            "id",
+            "driver_id",
+            "status_before",
+            "status_after",
+            "reason_code",
+            "reason_note",
+            "changed_by",
+            "changed_at"
+          ],
+          "startLine": 13,
+          "endLine": 26
+        },
+        {
+          "name": "idx_dsh_driver",
+          "kind": "index",
+          "fields": [],
+          "startLine": 26,
+          "endLine": 26
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 2
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V38__two_vehicle_safety_buffer_config.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 5,
+      "nonEmptyLines": 4,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V39__planning_history_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 41,
+      "nonEmptyLines": 37,
+      "definitions": [
+        {
+          "name": "trip_planning_events",
+          "kind": "table",
+          "fields": [
+            "id",
+            "trip_draft_id",
+            "trip_id",
+            "event_type",
+            "actor_type",
+            "actor_id",
+            "actor_username",
+            "actor_role",
+            "occurred_at",
+            "status_before",
+            "status_after",
+            "change_summary",
+            "change_detail",
+            "note",
+            "plan_version",
+            "option_code",
+            "route_code",
+            "delivery_date"
+          ],
+          "startLine": 4,
+          "endLine": 28
+        },
+        {
+          "name": "idx_tpe_trip_draft",
+          "kind": "index",
+          "fields": [],
+          "startLine": 28,
+          "endLine": 28
+        },
+        {
+          "name": "idx_tpe_trip",
+          "kind": "index",
+          "fields": [],
+          "startLine": 29,
+          "endLine": 29
+        },
+        {
+          "name": "idx_tpe_event_type",
+          "kind": "index",
+          "fields": [],
+          "startLine": 30,
+          "endLine": 30
+        },
+        {
+          "name": "idx_tpe_occurred_at",
+          "kind": "index",
+          "fields": [],
+          "startLine": 31,
+          "endLine": 31
+        },
+        {
+          "name": "idx_tpe_actor",
+          "kind": "index",
+          "fields": [],
+          "startLine": 32,
+          "endLine": 32
+        },
+        {
+          "name": "idx_tpe_route_date",
+          "kind": "index",
+          "fields": [],
+          "startLine": 33,
+          "endLine": 33
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 7
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V4__add_refresh_tokens_table.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 14,
+      "nonEmptyLines": 12,
+      "definitions": [
+        {
+          "name": "refresh_tokens",
+          "kind": "table",
+          "fields": [
+            "id",
+            "token",
+            "user_id",
+            "expiry_date",
+            "created_at"
+          ],
+          "startLine": 3,
+          "endLine": 14
+        },
+        {
+          "name": "idx_refresh_tokens_token",
+          "kind": "index",
+          "fields": [],
+          "startLine": 14,
+          "endLine": 14
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 2
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V40__trip_outcome_history_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 42,
+      "nonEmptyLines": 39,
+      "definitions": [
+        {
+          "name": "trip_outcome_events",
+          "kind": "table",
+          "fields": [
+            "id",
+            "trip_execution_id",
+            "trip_id",
+            "event_type",
+            "actor_type",
+            "actor_id",
+            "actor_username",
+            "actor_role",
+            "occurred_at",
+            "status_before",
+            "status_after",
+            "order_id",
+            "order_ref",
+            "stop_id",
+            "store_code",
+            "delivery_result",
+            "reason_code",
+            "exception_text",
+            "validation_note",
+            "route_code",
+            "delivery_date",
+            "driver_username"
+          ],
+          "startLine": 8,
+          "endLine": 36
+        },
+        {
+          "name": "idx_toe_trip_execution",
+          "kind": "index",
+          "fields": [],
+          "startLine": 36,
+          "endLine": 36
+        },
+        {
+          "name": "idx_toe_trip",
+          "kind": "index",
+          "fields": [],
+          "startLine": 37,
+          "endLine": 37
+        },
+        {
+          "name": "idx_toe_event_type",
+          "kind": "index",
+          "fields": [],
+          "startLine": 38,
+          "endLine": 38
+        },
+        {
+          "name": "idx_toe_occurred_at",
+          "kind": "index",
+          "fields": [],
+          "startLine": 39,
+          "endLine": 39
+        },
+        {
+          "name": "idx_toe_order",
+          "kind": "index",
+          "fields": [],
+          "startLine": 40,
+          "endLine": 40
+        },
+        {
+          "name": "idx_toe_driver",
+          "kind": "index",
+          "fields": [],
+          "startLine": 41,
+          "endLine": 41
+        },
+        {
+          "name": "idx_toe_route_date",
+          "kind": "index",
+          "fields": [],
+          "startLine": 42,
+          "endLine": 42
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 8
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V41__add_kpi_permission.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 18,
+      "nonEmptyLines": 14,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V42__decouple_history_events_from_fk_constraints.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 21,
+      "nonEmptyLines": 19,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V43__seed_missing_system_user.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 16,
+      "nonEmptyLines": 14,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V44__extend_delivery_exceptions_for_driver_app.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 12,
+      "nonEmptyLines": 11,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 883,
+      "nonEmptyLines": 872,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V46__make_trip_stops_route_stop_id_nullable.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 4,
+      "nonEmptyLines": 3,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V47__make_trip_stops_trip_draft_stop_id_nullable.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 4,
+      "nonEmptyLines": 3,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V48__delete_stores_kh0033_kh0035.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 8,
+      "nonEmptyLines": 7,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V5__add_store_contact_fields.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 3,
+      "nonEmptyLines": 3,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V6__add_route_description.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 7,
+      "nonEmptyLines": 7,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V7__alter_products_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 39,
+      "nonEmptyLines": 36,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V8__vehicles_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 58,
+      "nonEmptyLines": 49,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "src/main/resources/db/migration/V9__orders_schema.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 111,
+      "nonEmptyLines": 96,
+      "definitions": [
+        {
+          "name": "import_batches",
+          "kind": "table",
+          "fields": [
+            "id",
+            "delivery_date",
+            "file_name",
+            "uploaded_by",
+            "total_rows",
+            "accepted_rows",
+            "rejected_rows",
+            "status",
+            "is_active",
+            "created_at",
+            "then",
+            "weight_kg",
+            "items",
+            "never",
+            "DROP",
+            "DROP",
+            "DROP",
+            "DROP",
+            "later",
+            "so",
+            "ADD",
+            "ADD"
+          ],
+          "startLine": 10,
+          "endLine": 69
+        },
+        {
+          "name": "order_items",
+          "kind": "table",
+          "fields": [
+            "id",
+            "order_id",
+            "product_id",
+            "sku",
+            "quantity",
+            "unit_weight_kg",
+            "unit_volume_m3",
+            "line_weight_kg",
+            "line_volume_m3",
+            "created_at",
+            "import_batch_id",
+            "row_num",
+            "raw_data",
+            "error_reason",
+            "created_at"
+          ],
+          "startLine": 74,
+          "endLine": 106
+        },
+        {
+          "name": "import_errors",
+          "kind": "table",
+          "fields": [
+            "id",
+            "import_batch_id",
+            "row_num",
+            "raw_data",
+            "error_reason",
+            "created_at"
+          ],
+          "startLine": 92,
+          "endLine": 106
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 3
+      }
+    },
+    {
+      "path": "src/main/resources/db/setup/create_database.sql",
+      "language": "sql",
+      "fileCategory": "data",
+      "totalLines": 22,
+      "nonEmptyLines": 18,
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "definitionCount": 0
+      }
+    },
+    {
+      "path": "CLAUDE.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 164,
+      "nonEmptyLines": 120,
+      "sections": [
+        {
+          "heading": "ELog Delivery Management System — CLAUDE.md",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "1. System One-liner + 3 Key Constraints",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "2. Tech Stack",
+          "level": 2,
+          "line": 19
+        },
+        {
+          "heading": "3. Actors",
+          "level": 2,
+          "line": 36
+        },
+        {
+          "heading": "4. Trip Lifecycle",
+          "level": 2,
+          "line": 47
+        },
+        {
+          "heading": "5. Top 5 Most-Violated Business Rules",
+          "level": 2,
+          "line": 57
+        },
+        {
+          "heading": "6. Out-of-Scope (NEVER invent these features)",
+          "level": 2,
+          "line": 71
+        },
+        {
+          "heading": "7. Folder Structure (2 levels)",
+          "level": 2,
+          "line": 85
+        },
+        {
+          "heading": "8. API Base URL Convention",
+          "level": 2,
+          "line": 112
+        },
+        {
+          "heading": "9. Definition of Done (Universal Checklist)",
+          "level": 2,
+          "line": 128
+        },
+        {
+          "heading": "10. On-Demand Loading Guide",
+          "level": 2,
+          "line": 141
+        },
+        {
+          "heading": "11. Git Workflow Policy",
+          "level": 2,
+          "line": 155
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 12
+      }
+    }
+  ]
+}

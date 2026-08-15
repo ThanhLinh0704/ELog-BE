@@ -1,0 +1,3019 @@
+{
+  "scriptCompleted": true,
+  "filesAnalyzed": 25,
+  "filesSkipped": [],
+  "results": [
+    {
+      "path": "docs/api-conventions.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 158,
+      "nonEmptyLines": 125,
+      "sections": [
+        {
+          "heading": "ELog — API Conventions",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Base URL",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "Authentication",
+          "level": 2,
+          "line": 17
+        },
+        {
+          "heading": "Standard Response Envelope",
+          "level": 2,
+          "line": 31
+        },
+        {
+          "heading": "Success (2xx)",
+          "level": 3,
+          "line": 33
+        },
+        {
+          "heading": "Paginated Success",
+          "level": 3,
+          "line": 43
+        },
+        {
+          "heading": "Error (4xx / 5xx)",
+          "level": 3,
+          "line": 57
+        },
+        {
+          "heading": "HTTP Status Code Convention",
+          "level": 2,
+          "line": 71
+        },
+        {
+          "heading": "Error Codes (Application-level)",
+          "level": 2,
+          "line": 88
+        },
+        {
+          "heading": "Pagination Convention",
+          "level": 2,
+          "line": 103
+        },
+        {
+          "heading": "Resource Naming Rules",
+          "level": 2,
+          "line": 115
+        },
+        {
+          "heading": "File Upload Convention (Excel Import)",
+          "level": 2,
+          "line": 126
+        },
+        {
+          "heading": "Swagger / OpenAPI",
+          "level": 2,
+          "line": 154
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 13
+      }
+    },
+    {
+      "path": "docs/business-rules.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 104,
+      "nonEmptyLines": 81,
+      "sections": [
+        {
+          "heading": "ELog — Business Rules Reference",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Full Business Rule Register (BR-01 → BR-11)",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "Edge Cases — Most Commonly Missed",
+          "level": 2,
+          "line": 25
+        },
+        {
+          "heading": "BR-02 Edge Cases",
+          "level": 3,
+          "line": 27
+        },
+        {
+          "heading": "BR-03 Edge Cases",
+          "level": 3,
+          "line": 31
+        },
+        {
+          "heading": "BR-04 Edge Cases",
+          "level": 3,
+          "line": 35
+        },
+        {
+          "heading": "BR-07 Edge Cases",
+          "level": 3,
+          "line": 39
+        },
+        {
+          "heading": "BR-11 Edge Cases",
+          "level": 3,
+          "line": 43
+        },
+        {
+          "heading": "DC-01 — Invalid Trip State Transitions",
+          "level": 2,
+          "line": 49
+        },
+        {
+          "heading": "GAP Log — Implementation Impact",
+          "level": 2,
+          "line": 68
+        },
+        {
+          "heading": "Actors — Role & Permission Matrix",
+          "level": 2,
+          "line": 78
+        },
+        {
+          "heading": "Use Case → Business Rule Traceability",
+          "level": 2,
+          "line": 92
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 12
+      }
+    },
+    {
+      "path": "docs/commit-helper-skill.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 115,
+      "nonEmptyLines": 92,
+      "sections": [
+        {
+          "heading": "Commit Helper Skill",
+          "level": 1,
+          "line": 6
+        },
+        {
+          "heading": "Core Constraint",
+          "level": 2,
+          "line": 10
+        },
+        {
+          "heading": "When to Use This Skill",
+          "level": 2,
+          "line": 17
+        },
+        {
+          "heading": "Commit Format Guidelines",
+          "level": 2,
+          "line": 26
+        },
+        {
+          "heading": "1. Types",
+          "level": 3,
+          "line": 37
+        },
+        {
+          "heading": "2. Scope",
+          "level": 3,
+          "line": 50
+        },
+        {
+          "heading": "3. Description (Subject)",
+          "level": 3,
+          "line": 60
+        },
+        {
+          "heading": "Workflow Steps for the Agent",
+          "level": 2,
+          "line": 67
+        },
+        {
+          "heading": "Step 1: Analyze Current Git State",
+          "level": 3,
+          "line": 69
+        },
+        {
+          "heading": "Step 2: Formulate the Commit Message",
+          "level": 3,
+          "line": 83
+        },
+        {
+          "heading": "Step 3: Present Commands and Explanation",
+          "level": 3,
+          "line": 89
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 11
+      }
+    },
+    {
+      "path": "docs/data-model.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 172,
+      "nonEmptyLines": 141,
+      "sections": [
+        {
+          "heading": "ELog — Data Model Reference",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Key Data Concepts (Canonical Definitions)",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "Entity Overview",
+          "level": 2,
+          "line": 20
+        },
+        {
+          "heading": "Core Tables — Field Notes",
+          "level": 2,
+          "line": 51
+        },
+        {
+          "heading": "`users`",
+          "level": 3,
+          "line": 53
+        },
+        {
+          "heading": "`roles`",
+          "level": 3,
+          "line": 60
+        },
+        {
+          "heading": "`routes`",
+          "level": 3,
+          "line": 65
+        },
+        {
+          "heading": "`route_stops`",
+          "level": 3,
+          "line": 72
+        },
+        {
+          "heading": "`stores`",
+          "level": 3,
+          "line": 80
+        },
+        {
+          "heading": "`vehicles`",
+          "level": 3,
+          "line": 86
+        },
+        {
+          "heading": "`orders`",
+          "level": 3,
+          "line": 94
+        },
+        {
+          "heading": "`trips`",
+          "level": 3,
+          "line": 102
+        },
+        {
+          "heading": "`trip_stops`",
+          "level": 3,
+          "line": 110
+        },
+        {
+          "heading": "`loading_manifest_items`",
+          "level": 3,
+          "line": 117
+        },
+        {
+          "heading": "`delivery_records`",
+          "level": 3,
+          "line": 125
+        },
+        {
+          "heading": "`epod`",
+          "level": 3,
+          "line": 132
+        },
+        {
+          "heading": "`exceptions`",
+          "level": 3,
+          "line": 140
+        },
+        {
+          "heading": "Relationships Summary",
+          "level": 2,
+          "line": 149
+        },
+        {
+          "heading": "NFR Constraints Affecting Schema",
+          "level": 2,
+          "line": 168
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 19
+      }
+    },
+    {
+      "path": "docs/tech-stack.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 190,
+      "nonEmptyLines": 156,
+      "sections": [
+        {
+          "heading": "ELog — Tech Stack Details",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Backend — Spring Boot 3.x",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "Project Structure Pattern",
+          "level": 3,
+          "line": 9
+        },
+        {
+          "heading": "Key Dependencies (pom.xml)",
+          "level": 3,
+          "line": 26
+        },
+        {
+          "heading": "application.yml Key Sections",
+          "level": 3,
+          "line": 41
+        },
+        {
+          "heading": "Flyway Migration Naming Convention",
+          "level": 3,
+          "line": 61
+        },
+        {
+          "heading": "Frontend — ReactJS 18.x",
+          "level": 2,
+          "line": 70
+        },
+        {
+          "heading": "Project Bootstrap",
+          "level": 3,
+          "line": 73
+        },
+        {
+          "heading": "Key Dependencies (package.json)",
+          "level": 3,
+          "line": 80
+        },
+        {
+          "heading": "Folder Conventions",
+          "level": 3,
+          "line": 91
+        },
+        {
+          "heading": "Axios Base Config",
+          "level": 3,
+          "line": 103
+        },
+        {
+          "heading": "Database — MySQL 8.x",
+          "level": 2,
+          "line": 116
+        },
+        {
+          "heading": "Authentication — JWT",
+          "level": 2,
+          "line": 127
+        },
+        {
+          "heading": "Firebase (Deferred — INC-2+)",
+          "level": 2,
+          "line": 140
+        },
+        {
+          "heading": "AWS (Deferred)",
+          "level": 2,
+          "line": 147
+        },
+        {
+          "heading": "Git Strategy",
+          "level": 2,
+          "line": 153
+        },
+        {
+          "heading": "Branches",
+          "level": 3,
+          "line": 155
+        },
+        {
+          "heading": "PR Template (minimum)",
+          "level": 3,
+          "line": 163
+        },
+        {
+          "heading": "CI Pipeline (GitHub Actions)",
+          "level": 2,
+          "line": 179
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 19
+      }
+    },
+    {
+      "path": "docs/us01-checklist.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 177,
+      "nonEmptyLines": 137,
+      "sections": [
+        {
+          "heading": "ELog — US-01 Project Skeleton Checklist",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "US-01 Goal",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "Task Breakdown",
+          "level": 2,
+          "line": 17
+        },
+        {
+          "heading": "T-01 Database: Initial Schema + Flyway Migration",
+          "level": 3,
+          "line": 19
+        },
+        {
+          "heading": "T-02 Backend: Spring Boot Project Structure",
+          "level": 3,
+          "line": 34
+        },
+        {
+          "heading": "T-03 Frontend: ReactJS Project Structure",
+          "level": 3,
+          "line": 56
+        },
+        {
+          "heading": "T-04 Git Strategy Setup",
+          "level": 3,
+          "line": 82
+        },
+        {
+          "heading": "T-06 Environment Setup Guide",
+          "level": 3,
+          "line": 108
+        },
+        {
+          "heading": "US-01 Definition of Done",
+          "level": 2,
+          "line": 119
+        },
+        {
+          "heading": "Sprint 1 Scope Reminder",
+          "level": 2,
+          "line": 132
+        },
+        {
+          "heading": "File Naming Conventions (US-01 scope)",
+          "level": 2,
+          "line": 144
+        },
+        {
+          "heading": "Java",
+          "level": 3,
+          "line": 146
+        },
+        {
+          "heading": "SQL",
+          "level": 3,
+          "line": 155
+        },
+        {
+          "heading": "React",
+          "level": 3,
+          "line": 160
+        },
+        {
+          "heading": "Known Issues / Decisions for US-01",
+          "level": 2,
+          "line": 170
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 15
+      }
+    },
+    {
+      "path": "ELog_kehoachphattrien.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 400,
+      "nonEmptyLines": 263,
+      "sections": [
+        {
+          "heading": "ELog Delivery Management System",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Incremental Development Plan",
+          "level": 2,
+          "line": 3
+        },
+        {
+          "heading": "Project Context",
+          "level": 2,
+          "line": 5
+        },
+        {
+          "heading": "Scope",
+          "level": 2,
+          "line": 17
+        },
+        {
+          "heading": "Included",
+          "level": 3,
+          "line": 19
+        },
+        {
+          "heading": "Deferred",
+          "level": 3,
+          "line": 27
+        },
+        {
+          "heading": "INC-1 Foundation & Master Data",
+          "level": 1,
+          "line": 35
+        },
+        {
+          "heading": "EP-01 Project Setup & Infrastructure",
+          "level": 2,
+          "line": 37
+        },
+        {
+          "heading": "US-01 Project Skeleton",
+          "level": 3,
+          "line": 39
+        },
+        {
+          "heading": "EP-02 Authentication & Authorization",
+          "level": 2,
+          "line": 55
+        },
+        {
+          "heading": "US-02 JWT Authentication",
+          "level": 3,
+          "line": 57
+        },
+        {
+          "heading": "US-03 User Management",
+          "level": 3,
+          "line": 71
+        },
+        {
+          "heading": "EP-03 Master Data",
+          "level": 2,
+          "line": 84
+        },
+        {
+          "heading": "US-04 Route Management",
+          "level": 3,
+          "line": 86
+        },
+        {
+          "heading": "US-05 Store Management",
+          "level": 3,
+          "line": 98
+        },
+        {
+          "heading": "US-06 Vehicle Management",
+          "level": 3,
+          "line": 109
+        },
+        {
+          "heading": "US-07 Product Management",
+          "level": 3,
+          "line": 121
+        },
+        {
+          "heading": "INC-2 Order Import & Route Consolidation",
+          "level": 1,
+          "line": 137
+        },
+        {
+          "heading": "EP-04 Excel Import & Route Grouping",
+          "level": 2,
+          "line": 139
+        },
+        {
+          "heading": "US-08 Excel Import",
+          "level": 3,
+          "line": 141
+        },
+        {
+          "heading": "US-09 Import Validation",
+          "level": 3,
+          "line": 154
+        },
+        {
+          "heading": "US-10 Route Consolidation",
+          "level": 3,
+          "line": 166
+        },
+        {
+          "heading": "INC-3 Capacity Planning, LIFO & ETA",
+          "level": 1,
+          "line": 181
+        },
+        {
+          "heading": "EP-05 Capacity Validation & LIFO",
+          "level": 2,
+          "line": 183
+        },
+        {
+          "heading": "US-11 Capacity Validation",
+          "level": 3,
+          "line": 185
+        },
+        {
+          "heading": "US-12 LIFO Manifest",
+          "level": 3,
+          "line": 197
+        },
+        {
+          "heading": "EP-06 Route Planning & ETA",
+          "level": 2,
+          "line": 212
+        },
+        {
+          "heading": "US-13 Stop Filtering",
+          "level": 3,
+          "line": 214
+        },
+        {
+          "heading": "US-14 ETA Calculation",
+          "level": 3,
+          "line": 226
+        },
+        {
+          "heading": "INC-4 Vehicle Assignment & Dispatching",
+          "level": 1,
+          "line": 241
+        },
+        {
+          "heading": "EP-07 Dispatch Planning",
+          "level": 2,
+          "line": 243
+        },
+        {
+          "heading": "US-15 Vehicle Assignment",
+          "level": 3,
+          "line": 245
+        },
+        {
+          "heading": "US-16 Dispatch Execution",
+          "level": 3,
+          "line": 258
+        },
+        {
+          "heading": "INC-5 Monitoring & KPI",
+          "level": 1,
+          "line": 274
+        },
+        {
+          "heading": "EP-08 Trip Monitoring",
+          "level": 2,
+          "line": 276
+        },
+        {
+          "heading": "US-17 Dashboard Monitoring",
+          "level": 3,
+          "line": 278
+        },
+        {
+          "heading": "US-18 Exception Management",
+          "level": 3,
+          "line": 291
+        },
+        {
+          "heading": "EP-09 KPI Reporting",
+          "level": 2,
+          "line": 304
+        },
+        {
+          "heading": "US-19 KPI Dashboard",
+          "level": 3,
+          "line": 306
+        },
+        {
+          "heading": "Sprint Plan",
+          "level": 1,
+          "line": 322
+        },
+        {
+          "heading": "Sprint 1",
+          "level": 2,
+          "line": 324
+        },
+        {
+          "heading": "Sprint 2",
+          "level": 2,
+          "line": 338
+        },
+        {
+          "heading": "Sprint 3",
+          "level": 2,
+          "line": 350
+        },
+        {
+          "heading": "Sprint 4",
+          "level": 2,
+          "line": 360
+        },
+        {
+          "heading": "Sprint 5",
+          "level": 2,
+          "line": 370
+        },
+        {
+          "heading": "Sprint 6",
+          "level": 2,
+          "line": 382
+        },
+        {
+          "heading": "Sprint 7",
+          "level": 2,
+          "line": 390
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 47
+      }
+    },
+    {
+      "path": "ELog_Project_Context.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 162,
+      "nonEmptyLines": 121,
+      "sections": [
+        {
+          "heading": "ELog Delivery Management System — Project Context",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "1. Identity & Role",
+          "level": 2,
+          "line": 6
+        },
+        {
+          "heading": "2. System Summary",
+          "level": 2,
+          "line": 15
+        },
+        {
+          "heading": "3. Actors",
+          "level": 2,
+          "line": 22
+        },
+        {
+          "heading": "4. Feature Map",
+          "level": 2,
+          "line": 31
+        },
+        {
+          "heading": "5. Business Rules",
+          "level": 2,
+          "line": 44
+        },
+        {
+          "heading": "6. Trip Lifecycle",
+          "level": 2,
+          "line": 62
+        },
+        {
+          "heading": "7. Scope Exclusions (NEVER invent these)",
+          "level": 2,
+          "line": 72
+        },
+        {
+          "heading": "8. Working Rules (BA Conventions)",
+          "level": 2,
+          "line": 86
+        },
+        {
+          "heading": "9. Key Data Concepts",
+          "level": 2,
+          "line": 99
+        },
+        {
+          "heading": "10. Use Case Index (UC-01 → UC-20) — v2.0 Official Baseline",
+          "level": 2,
+          "line": 110
+        },
+        {
+          "heading": "12. NFR Highlights (from SRS)",
+          "level": 2,
+          "line": 144
+        },
+        {
+          "heading": "13. GAP Log",
+          "level": 2,
+          "line": 154
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 13
+      }
+    },
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "fileCategory": "docs",
+      "totalLines": 76,
+      "nonEmptyLines": 53,
+      "sections": [
+        {
+          "heading": "ELog Delivery Management System",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "Prerequisites",
+          "level": 2,
+          "line": 7
+        },
+        {
+          "heading": "Local Setup",
+          "level": 2,
+          "line": 18
+        },
+        {
+          "heading": "Git Workflow",
+          "level": 2,
+          "line": 39
+        },
+        {
+          "heading": "Branch naming",
+          "level": 3,
+          "line": 41
+        },
+        {
+          "heading": "Flow",
+          "level": 3,
+          "line": 50
+        },
+        {
+          "heading": "Project Structure",
+          "level": 2,
+          "line": 64
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 7
+      }
+    },
+    {
+      "path": "pom.xml",
+      "language": "xml",
+      "fileCategory": "config",
+      "totalLines": 164,
+      "nonEmptyLines": 146,
+      "metrics": {}
+    },
+    {
+      "path": "src/main/resources/application-dev.yml",
+      "language": "yaml",
+      "fileCategory": "config",
+      "totalLines": 19,
+      "nonEmptyLines": 18,
+      "sections": [
+        {
+          "heading": "spring",
+          "level": 1,
+          "line": 3
+        },
+        {
+          "heading": "logging",
+          "level": 1,
+          "line": 15
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 2
+      }
+    },
+    {
+      "path": "src/main/resources/application.yml",
+      "language": "yaml",
+      "fileCategory": "config",
+      "totalLines": 51,
+      "nonEmptyLines": 43,
+      "sections": [
+        {
+          "heading": "spring",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "heading": "server",
+          "level": 1,
+          "line": 25
+        },
+        {
+          "heading": "springdoc",
+          "level": 1,
+          "line": 31
+        },
+        {
+          "heading": "elog",
+          "level": 1,
+          "line": 39
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 0,
+        "functionCount": 0,
+        "classCount": 0,
+        "sectionCount": 4
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/config/CorsConfig.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 35,
+      "nonEmptyLines": 29,
+      "functions": [
+        {
+          "name": "corsConfigurationSource",
+          "startLine": 23,
+          "endLine": 34,
+          "params": []
+        }
+      ],
+      "classes": [
+        {
+          "name": "CorsConfig",
+          "startLine": 17,
+          "endLine": 35,
+          "methods": [
+            "corsConfigurationSource"
+          ],
+          "properties": [
+            "allowedOrigins"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "corsConfigurationSource",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "CorsConfig",
+          "line": 17,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "corsConfigurationSource",
+          "callee": "new CorsConfiguration",
+          "lineNumber": 25
+        },
+        {
+          "caller": "corsConfigurationSource",
+          "callee": "config.setAllowedOrigins",
+          "lineNumber": 26
+        },
+        {
+          "caller": "corsConfigurationSource",
+          "callee": "Arrays.asList",
+          "lineNumber": 26
+        },
+        {
+          "caller": "corsConfigurationSource",
+          "callee": "allowedOrigins.split",
+          "lineNumber": 26
+        },
+        {
+          "caller": "corsConfigurationSource",
+          "callee": "config.setAllowedMethods",
+          "lineNumber": 27
+        },
+        {
+          "caller": "corsConfigurationSource",
+          "callee": "List.of",
+          "lineNumber": 27
+        },
+        {
+          "caller": "corsConfigurationSource",
+          "callee": "config.setAllowedHeaders",
+          "lineNumber": 28
+        },
+        {
+          "caller": "corsConfigurationSource",
+          "callee": "List.of",
+          "lineNumber": 28
+        },
+        {
+          "caller": "corsConfigurationSource",
+          "callee": "config.setAllowCredentials",
+          "lineNumber": 29
+        },
+        {
+          "caller": "corsConfigurationSource",
+          "callee": "new UrlBasedCorsConfigurationSource",
+          "lineNumber": 31
+        },
+        {
+          "caller": "corsConfigurationSource",
+          "callee": "source.registerCorsConfiguration",
+          "lineNumber": 32
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/config/DataInitializer.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 68,
+      "nonEmptyLines": 59,
+      "functions": [
+        {
+          "name": "run",
+          "startLine": 30,
+          "endLine": 67,
+          "params": []
+        }
+      ],
+      "classes": [
+        {
+          "name": "DataInitializer",
+          "startLine": 21,
+          "endLine": 68,
+          "methods": [
+            "run"
+          ],
+          "properties": [
+            "userRepository",
+            "roleRepository",
+            "passwordEncoder"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "run",
+          "line": 30,
+          "isDefault": false
+        },
+        {
+          "name": "DataInitializer",
+          "line": 21,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "run",
+          "callee": "roleRepository.findByName(\"SYSTEM_ADMIN\").orElseGet",
+          "lineNumber": 34
+        },
+        {
+          "caller": "run",
+          "callee": "roleRepository.findByName",
+          "lineNumber": 34
+        },
+        {
+          "caller": "run",
+          "callee": "log.info",
+          "lineNumber": 36
+        },
+        {
+          "caller": "run",
+          "callee": "Role.builder()\r\n                            .name(\"SYSTEM_ADMIN\").build",
+          "lineNumber": 37
+        },
+        {
+          "caller": "run",
+          "callee": "Role.builder().name",
+          "lineNumber": 37
+        },
+        {
+          "caller": "run",
+          "callee": "Role.builder",
+          "lineNumber": 37
+        },
+        {
+          "caller": "run",
+          "callee": "roleRepository.save",
+          "lineNumber": 40
+        },
+        {
+          "caller": "run",
+          "callee": "userRepository.existsByUsername",
+          "lineNumber": 44
+        },
+        {
+          "caller": "run",
+          "callee": "log.info",
+          "lineNumber": 45
+        },
+        {
+          "caller": "run",
+          "callee": "userRepository.existsByEmail",
+          "lineNumber": 49
+        },
+        {
+          "caller": "run",
+          "callee": "User.builder()\r\n                    .username(\"admin\")\r\n                    .passwordHash(passwordEncoder.encode(\"Admin@2025\"))\r\n                    .fullName(\"System Administrator\")\r\n                    .email(email)\r\n                    .isActive(true)\r\n                    .roles(new HashSet<>(Collections.singletonList(adminRole))).build",
+          "lineNumber": 53
+        },
+        {
+          "caller": "run",
+          "callee": "User.builder()\r\n                    .username(\"admin\")\r\n                    .passwordHash(passwordEncoder.encode(\"Admin@2025\"))\r\n                    .fullName(\"System Administrator\")\r\n                    .email(email)\r\n                    .isActive(true).roles",
+          "lineNumber": 53
+        },
+        {
+          "caller": "run",
+          "callee": "User.builder()\r\n                    .username(\"admin\")\r\n                    .passwordHash(passwordEncoder.encode(\"Admin@2025\"))\r\n                    .fullName(\"System Administrator\")\r\n                    .email(email).isActive",
+          "lineNumber": 53
+        },
+        {
+          "caller": "run",
+          "callee": "User.builder()\r\n                    .username(\"admin\")\r\n                    .passwordHash(passwordEncoder.encode(\"Admin@2025\"))\r\n                    .fullName(\"System Administrator\").email",
+          "lineNumber": 53
+        },
+        {
+          "caller": "run",
+          "callee": "User.builder()\r\n                    .username(\"admin\")\r\n                    .passwordHash(passwordEncoder.encode(\"Admin@2025\")).fullName",
+          "lineNumber": 53
+        },
+        {
+          "caller": "run",
+          "callee": "User.builder()\r\n                    .username(\"admin\").passwordHash",
+          "lineNumber": 53
+        },
+        {
+          "caller": "run",
+          "callee": "User.builder().username",
+          "lineNumber": 53
+        },
+        {
+          "caller": "run",
+          "callee": "User.builder",
+          "lineNumber": 53
+        },
+        {
+          "caller": "run",
+          "callee": "passwordEncoder.encode",
+          "lineNumber": 55
+        },
+        {
+          "caller": "run",
+          "callee": "new HashSet<>",
+          "lineNumber": 59
+        },
+        {
+          "caller": "run",
+          "callee": "Collections.singletonList",
+          "lineNumber": 59
+        },
+        {
+          "caller": "run",
+          "callee": "userRepository.save",
+          "lineNumber": 62
+        },
+        {
+          "caller": "run",
+          "callee": "log.info",
+          "lineNumber": 63
+        },
+        {
+          "caller": "run",
+          "callee": "log.debug",
+          "lineNumber": 65
+        }
+      ],
+      "metrics": {
+        "importCount": 4,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/config/FlywayConfig.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 18,
+      "nonEmptyLines": 15,
+      "functions": [
+        {
+          "name": "flywayMigrationStrategy",
+          "startLine": 10,
+          "endLine": 17,
+          "params": []
+        }
+      ],
+      "classes": [
+        {
+          "name": "FlywayConfig",
+          "startLine": 7,
+          "endLine": 18,
+          "methods": [
+            "flywayMigrationStrategy"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "flywayMigrationStrategy",
+          "line": 10,
+          "isDefault": false
+        },
+        {
+          "name": "FlywayConfig",
+          "line": 7,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "flywayMigrationStrategy",
+          "callee": "flyway.repair",
+          "lineNumber": 14
+        },
+        {
+          "caller": "flywayMigrationStrategy",
+          "callee": "flyway.migrate",
+          "lineNumber": 15
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/config/SecurityConfig.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 77,
+      "nonEmptyLines": 68,
+      "functions": [
+        {
+          "name": "filterChain",
+          "startLine": 49,
+          "endLine": 65,
+          "params": [
+            "http"
+          ]
+        },
+        {
+          "name": "passwordEncoder",
+          "startLine": 67,
+          "endLine": 70,
+          "params": []
+        },
+        {
+          "name": "authenticationManager",
+          "startLine": 72,
+          "endLine": 76,
+          "params": [
+            "config"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "SecurityConfig",
+          "startLine": 28,
+          "endLine": 77,
+          "methods": [
+            "filterChain",
+            "passwordEncoder",
+            "authenticationManager"
+          ],
+          "properties": [
+            "jwtAuthFilter",
+            "corsConfigurationSource",
+            "unauthorizedHandler",
+            "accessDeniedHandler",
+            "PUBLIC_URLS"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "filterChain",
+          "line": 49,
+          "isDefault": false
+        },
+        {
+          "name": "passwordEncoder",
+          "line": 67,
+          "isDefault": false
+        },
+        {
+          "name": "authenticationManager",
+          "line": 72,
+          "isDefault": false
+        },
+        {
+          "name": "SecurityConfig",
+          "line": 28,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "filterChain",
+          "callee": "http\r\n                                .csrf(AbstractHttpConfigurer::disable)\r\n                                .cors(cors -> cors.configurationSource(corsConfigurationSource))\r\n                                .exceptionHandling(exception -> exception\r\n                                                .authenticationEntryPoint(unauthorizedHandler)\r\n                                                .accessDeniedHandler(accessDeniedHandler))\r\n                                .sessionManagement(session -> session\r\n                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))\r\n                                .authorizeHttpRequests(auth -> auth\r\n                                                .requestMatchers(PUBLIC_URLS).permitAll()\r\n                                                .anyRequest().authenticated()).addFilterBefore",
+          "lineNumber": 51
+        },
+        {
+          "caller": "filterChain",
+          "callee": "http\r\n                                .csrf(AbstractHttpConfigurer::disable)\r\n                                .cors(cors -> cors.configurationSource(corsConfigurationSource))\r\n                                .exceptionHandling(exception -> exception\r\n                                                .authenticationEntryPoint(unauthorizedHandler)\r\n                                                .accessDeniedHandler(accessDeniedHandler))\r\n                                .sessionManagement(session -> session\r\n                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)).authorizeHttpRequests",
+          "lineNumber": 51
+        },
+        {
+          "caller": "filterChain",
+          "callee": "http\r\n                                .csrf(AbstractHttpConfigurer::disable)\r\n                                .cors(cors -> cors.configurationSource(corsConfigurationSource))\r\n                                .exceptionHandling(exception -> exception\r\n                                                .authenticationEntryPoint(unauthorizedHandler)\r\n                                                .accessDeniedHandler(accessDeniedHandler)).sessionManagement",
+          "lineNumber": 51
+        },
+        {
+          "caller": "filterChain",
+          "callee": "http\r\n                                .csrf(AbstractHttpConfigurer::disable)\r\n                                .cors(cors -> cors.configurationSource(corsConfigurationSource)).exceptionHandling",
+          "lineNumber": 51
+        },
+        {
+          "caller": "filterChain",
+          "callee": "http\r\n                                .csrf(AbstractHttpConfigurer::disable).cors",
+          "lineNumber": 51
+        },
+        {
+          "caller": "filterChain",
+          "callee": "http.csrf",
+          "lineNumber": 51
+        },
+        {
+          "caller": "filterChain",
+          "callee": "cors.configurationSource",
+          "lineNumber": 53
+        },
+        {
+          "caller": "filterChain",
+          "callee": "exception\r\n                                                .authenticationEntryPoint(unauthorizedHandler).accessDeniedHandler",
+          "lineNumber": 54
+        },
+        {
+          "caller": "filterChain",
+          "callee": "exception.authenticationEntryPoint",
+          "lineNumber": 54
+        },
+        {
+          "caller": "filterChain",
+          "callee": "session.sessionCreationPolicy",
+          "lineNumber": 57
+        },
+        {
+          "caller": "filterChain",
+          "callee": "auth\r\n                                                .requestMatchers(PUBLIC_URLS).permitAll()\r\n                                                .anyRequest().authenticated",
+          "lineNumber": 59
+        },
+        {
+          "caller": "filterChain",
+          "callee": "auth\r\n                                                .requestMatchers(PUBLIC_URLS).permitAll().anyRequest",
+          "lineNumber": 59
+        },
+        {
+          "caller": "filterChain",
+          "callee": "auth\r\n                                                .requestMatchers(PUBLIC_URLS).permitAll",
+          "lineNumber": 59
+        },
+        {
+          "caller": "filterChain",
+          "callee": "auth.requestMatchers",
+          "lineNumber": 59
+        },
+        {
+          "caller": "filterChain",
+          "callee": "http.build",
+          "lineNumber": 64
+        },
+        {
+          "caller": "passwordEncoder",
+          "callee": "new BCryptPasswordEncoder",
+          "lineNumber": 69
+        },
+        {
+          "caller": "authenticationManager",
+          "callee": "config.getAuthenticationManager",
+          "lineNumber": 75
+        }
+      ],
+      "metrics": {
+        "importCount": 3,
+        "exportCount": 4,
+        "functionCount": 3,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/config/SwaggerConfig.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 40,
+      "nonEmptyLines": 36,
+      "functions": [
+        {
+          "name": "elogOpenAPI",
+          "startLine": 21,
+          "endLine": 39,
+          "params": []
+        }
+      ],
+      "classes": [
+        {
+          "name": "SwaggerConfig",
+          "startLine": 16,
+          "endLine": 40,
+          "methods": [
+            "elogOpenAPI"
+          ],
+          "properties": [
+            "SECURITY_SCHEME_NAME"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "elogOpenAPI",
+          "line": 21,
+          "isDefault": false
+        },
+        {
+          "name": "SwaggerConfig",
+          "line": 16,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new OpenAPI()\r\n                .info(new Info()\r\n                        .title(\"ELog Delivery Management API\")\r\n                        .description(\"SEP490_G104 — Electronics Logistics Backend\")\r\n                        .version(\"v1.0.0\")\r\n                        .contact(new Contact()\r\n                                .name(\"SEP490_G104\")\r\n                                .email(\"sep490.g104@example.com\")))\r\n                .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME)).components",
+          "lineNumber": 23
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new OpenAPI()\r\n                .info(new Info()\r\n                        .title(\"ELog Delivery Management API\")\r\n                        .description(\"SEP490_G104 — Electronics Logistics Backend\")\r\n                        .version(\"v1.0.0\")\r\n                        .contact(new Contact()\r\n                                .name(\"SEP490_G104\")\r\n                                .email(\"sep490.g104@example.com\"))).addSecurityItem",
+          "lineNumber": 23
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new OpenAPI().info",
+          "lineNumber": 23
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new OpenAPI",
+          "lineNumber": 23
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new Info()\r\n                        .title(\"ELog Delivery Management API\")\r\n                        .description(\"SEP490_G104 — Electronics Logistics Backend\")\r\n                        .version(\"v1.0.0\").contact",
+          "lineNumber": 24
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new Info()\r\n                        .title(\"ELog Delivery Management API\")\r\n                        .description(\"SEP490_G104 — Electronics Logistics Backend\").version",
+          "lineNumber": 24
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new Info()\r\n                        .title(\"ELog Delivery Management API\").description",
+          "lineNumber": 24
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new Info().title",
+          "lineNumber": 24
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new Info",
+          "lineNumber": 24
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new Contact()\r\n                                .name(\"SEP490_G104\").email",
+          "lineNumber": 28
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new Contact().name",
+          "lineNumber": 28
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new Contact",
+          "lineNumber": 28
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new SecurityRequirement().addList",
+          "lineNumber": 31
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new SecurityRequirement",
+          "lineNumber": 31
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new Components().addSecuritySchemes",
+          "lineNumber": 32
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new Components",
+          "lineNumber": 32
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new SecurityScheme()\r\n                                        .name(SECURITY_SCHEME_NAME)\r\n                                        .type(SecurityScheme.Type.HTTP)\r\n                                        .scheme(\"bearer\").bearerFormat",
+          "lineNumber": 34
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new SecurityScheme()\r\n                                        .name(SECURITY_SCHEME_NAME)\r\n                                        .type(SecurityScheme.Type.HTTP).scheme",
+          "lineNumber": 34
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new SecurityScheme()\r\n                                        .name(SECURITY_SCHEME_NAME).type",
+          "lineNumber": 34
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new SecurityScheme().name",
+          "lineNumber": 34
+        },
+        {
+          "caller": "elogOpenAPI",
+          "callee": "new SecurityScheme",
+          "lineNumber": 34
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/controller/AddressController.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 47,
+      "nonEmptyLines": 40,
+      "functions": [
+        {
+          "name": "getAllProvinces",
+          "startLine": 22,
+          "endLine": 28,
+          "params": []
+        },
+        {
+          "name": "getDistrictsByProvince",
+          "startLine": 30,
+          "endLine": 37,
+          "params": [
+            "provinceCode"
+          ]
+        },
+        {
+          "name": "getWardsByDistrict",
+          "startLine": 39,
+          "endLine": 46,
+          "params": [
+            "districtCode"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "AddressController",
+          "startLine": 14,
+          "endLine": 47,
+          "methods": [
+            "getAllProvinces",
+            "getDistrictsByProvince",
+            "getWardsByDistrict"
+          ],
+          "properties": [
+            "addressService"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "getAllProvinces",
+          "line": 22,
+          "isDefault": false
+        },
+        {
+          "name": "getDistrictsByProvince",
+          "line": 30,
+          "isDefault": false
+        },
+        {
+          "name": "getWardsByDistrict",
+          "line": 39,
+          "isDefault": false
+        },
+        {
+          "name": "AddressController",
+          "line": 14,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getAllProvinces",
+          "callee": "addressService.getAllProvinces",
+          "lineNumber": 26
+        },
+        {
+          "caller": "getAllProvinces",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 27
+        },
+        {
+          "caller": "getAllProvinces",
+          "callee": "ApiResponse.success",
+          "lineNumber": 27
+        },
+        {
+          "caller": "getDistrictsByProvince",
+          "callee": "addressService.getDistrictsByProvince",
+          "lineNumber": 35
+        },
+        {
+          "caller": "getDistrictsByProvince",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 36
+        },
+        {
+          "caller": "getDistrictsByProvince",
+          "callee": "ApiResponse.success",
+          "lineNumber": 36
+        },
+        {
+          "caller": "getWardsByDistrict",
+          "callee": "addressService.getWardsByDistrict",
+          "lineNumber": 44
+        },
+        {
+          "caller": "getWardsByDistrict",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 45
+        },
+        {
+          "caller": "getWardsByDistrict",
+          "callee": "ApiResponse.success",
+          "lineNumber": 45
+        }
+      ],
+      "metrics": {
+        "importCount": 67,
+        "exportCount": 4,
+        "functionCount": 3,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/controller/AuthController.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 49,
+      "nonEmptyLines": 42,
+      "functions": [
+        {
+          "name": "login",
+          "startLine": 27,
+          "endLine": 32,
+          "params": [
+            "request"
+          ]
+        },
+        {
+          "name": "refresh",
+          "startLine": 34,
+          "endLine": 39,
+          "params": [
+            "request"
+          ]
+        },
+        {
+          "name": "logout",
+          "startLine": 41,
+          "endLine": 48,
+          "params": [
+            "request"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "AuthController",
+          "startLine": 19,
+          "endLine": 49,
+          "methods": [
+            "login",
+            "refresh",
+            "logout"
+          ],
+          "properties": [
+            "authService"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "login",
+          "line": 27,
+          "isDefault": false
+        },
+        {
+          "name": "refresh",
+          "line": 34,
+          "isDefault": false
+        },
+        {
+          "name": "logout",
+          "line": 41,
+          "isDefault": false
+        },
+        {
+          "name": "AuthController",
+          "line": 19,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "login",
+          "callee": "authService.login",
+          "lineNumber": 30
+        },
+        {
+          "caller": "login",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 31
+        },
+        {
+          "caller": "login",
+          "callee": "ApiResponse.success",
+          "lineNumber": 31
+        },
+        {
+          "caller": "refresh",
+          "callee": "authService.refresh",
+          "lineNumber": 37
+        },
+        {
+          "caller": "refresh",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 38
+        },
+        {
+          "caller": "refresh",
+          "callee": "ApiResponse.success",
+          "lineNumber": 38
+        },
+        {
+          "caller": "logout",
+          "callee": "authService.logout",
+          "lineNumber": 44
+        },
+        {
+          "caller": "logout",
+          "callee": "request.getRefreshToken",
+          "lineNumber": 44
+        },
+        {
+          "caller": "logout",
+          "callee": "new HashMap<>",
+          "lineNumber": 45
+        },
+        {
+          "caller": "logout",
+          "callee": "response.put",
+          "lineNumber": 46
+        },
+        {
+          "caller": "logout",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 47
+        },
+        {
+          "caller": "logout",
+          "callee": "ApiResponse.success",
+          "lineNumber": 47
+        }
+      ],
+      "metrics": {
+        "importCount": 6,
+        "exportCount": 4,
+        "functionCount": 3,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/controller/DashboardController.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 47,
+      "nonEmptyLines": 40,
+      "functions": [
+        {
+          "name": "getActiveTrips",
+          "startLine": 26,
+          "endLine": 35,
+          "params": [
+            "date"
+          ]
+        },
+        {
+          "name": "getTripProgress",
+          "startLine": 40,
+          "endLine": 46,
+          "params": [
+            "id"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "DashboardController",
+          "startLine": 15,
+          "endLine": 47,
+          "methods": [
+            "getActiveTrips",
+            "getTripProgress"
+          ],
+          "properties": [
+            "tripMonitoringService"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "getActiveTrips",
+          "line": 26,
+          "isDefault": false
+        },
+        {
+          "name": "getTripProgress",
+          "line": 40,
+          "isDefault": false
+        },
+        {
+          "name": "DashboardController",
+          "line": 15,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getActiveTrips",
+          "callee": "LocalDate.now",
+          "lineNumber": 32
+        },
+        {
+          "caller": "getActiveTrips",
+          "callee": "tripMonitoringService.getActiveTripsDashboard",
+          "lineNumber": 33
+        },
+        {
+          "caller": "getActiveTrips",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 34
+        },
+        {
+          "caller": "getActiveTrips",
+          "callee": "ApiResponse.success",
+          "lineNumber": 34
+        },
+        {
+          "caller": "getTripProgress",
+          "callee": "tripMonitoringService.getTripProgress",
+          "lineNumber": 44
+        },
+        {
+          "caller": "getTripProgress",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 45
+        },
+        {
+          "caller": "getTripProgress",
+          "callee": "ApiResponse.success",
+          "lineNumber": 45
+        }
+      ],
+      "metrics": {
+        "importCount": 67,
+        "exportCount": 3,
+        "functionCount": 2,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/controller/DriverStatusController.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 66,
+      "nonEmptyLines": 58,
+      "functions": [
+        {
+          "name": "getDrivers",
+          "startLine": 30,
+          "endLine": 38,
+          "params": [
+            "keyword",
+            "status",
+            "pageable"
+          ]
+        },
+        {
+          "name": "getDriverById",
+          "startLine": 40,
+          "endLine": 45,
+          "params": [
+            "id"
+          ]
+        },
+        {
+          "name": "updateStatus",
+          "startLine": 47,
+          "endLine": 56,
+          "params": [
+            "id",
+            "request"
+          ]
+        },
+        {
+          "name": "getStatusHistory",
+          "startLine": 58,
+          "endLine": 65,
+          "params": [
+            "id",
+            "pageable"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "DriverStatusController",
+          "startLine": 22,
+          "endLine": 66,
+          "methods": [
+            "getDrivers",
+            "getDriverById",
+            "updateStatus",
+            "getStatusHistory"
+          ],
+          "properties": [
+            "driverStatusService"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "getDrivers",
+          "line": 30,
+          "isDefault": false
+        },
+        {
+          "name": "getDriverById",
+          "line": 40,
+          "isDefault": false
+        },
+        {
+          "name": "updateStatus",
+          "line": 47,
+          "isDefault": false
+        },
+        {
+          "name": "getStatusHistory",
+          "line": 58,
+          "isDefault": false
+        },
+        {
+          "name": "DriverStatusController",
+          "line": 22,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getDrivers",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 37
+        },
+        {
+          "caller": "getDrivers",
+          "callee": "driverStatusService.getDrivers",
+          "lineNumber": 37
+        },
+        {
+          "caller": "getDriverById",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 44
+        },
+        {
+          "caller": "getDriverById",
+          "callee": "ApiResponse.success",
+          "lineNumber": 44
+        },
+        {
+          "caller": "getDriverById",
+          "callee": "driverStatusService.getDriverById",
+          "lineNumber": 44
+        },
+        {
+          "caller": "updateStatus",
+          "callee": "SecurityContextHolder.getContext().getAuthentication().getName",
+          "lineNumber": 53
+        },
+        {
+          "caller": "updateStatus",
+          "callee": "SecurityContextHolder.getContext().getAuthentication",
+          "lineNumber": 53
+        },
+        {
+          "caller": "updateStatus",
+          "callee": "SecurityContextHolder.getContext",
+          "lineNumber": 53
+        },
+        {
+          "caller": "updateStatus",
+          "callee": "driverStatusService.updateStatus",
+          "lineNumber": 54
+        },
+        {
+          "caller": "updateStatus",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 55
+        },
+        {
+          "caller": "updateStatus",
+          "callee": "ApiResponse.success",
+          "lineNumber": 55
+        },
+        {
+          "caller": "getStatusHistory",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 64
+        },
+        {
+          "caller": "getStatusHistory",
+          "callee": "driverStatusService.getStatusHistory",
+          "lineNumber": 64
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 5,
+        "functionCount": 4,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/controller/DriverTripController.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 84,
+      "nonEmptyLines": 75,
+      "functions": [
+        {
+          "name": "getActiveTrip",
+          "startLine": 25,
+          "endLine": 32,
+          "params": []
+        },
+        {
+          "name": "getPendingReturnTrips",
+          "startLine": 34,
+          "endLine": 41,
+          "params": []
+        },
+        {
+          "name": "startTrip",
+          "startLine": 43,
+          "endLine": 51,
+          "params": [
+            "executionId"
+          ]
+        },
+        {
+          "name": "updateOrderResult",
+          "startLine": 53,
+          "endLine": 63,
+          "params": [
+            "executionId",
+            "orderId",
+            "request"
+          ]
+        },
+        {
+          "name": "completeTrip",
+          "startLine": 65,
+          "endLine": 73,
+          "params": [
+            "executionId"
+          ]
+        },
+        {
+          "name": "returnToWarehouse",
+          "startLine": 75,
+          "endLine": 83,
+          "params": [
+            "executionId"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "DriverTripController",
+          "startLine": 17,
+          "endLine": 84,
+          "methods": [
+            "getActiveTrip",
+            "getPendingReturnTrips",
+            "startTrip",
+            "updateOrderResult",
+            "completeTrip",
+            "returnToWarehouse"
+          ],
+          "properties": [
+            "driverTripService"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "getActiveTrip",
+          "line": 25,
+          "isDefault": false
+        },
+        {
+          "name": "getPendingReturnTrips",
+          "line": 34,
+          "isDefault": false
+        },
+        {
+          "name": "startTrip",
+          "line": 43,
+          "isDefault": false
+        },
+        {
+          "name": "updateOrderResult",
+          "line": 53,
+          "isDefault": false
+        },
+        {
+          "name": "completeTrip",
+          "line": 65,
+          "isDefault": false
+        },
+        {
+          "name": "returnToWarehouse",
+          "line": 75,
+          "isDefault": false
+        },
+        {
+          "name": "DriverTripController",
+          "line": 17,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "getActiveTrip",
+          "callee": "SecurityContextHolder.getContext().getAuthentication().getName",
+          "lineNumber": 29
+        },
+        {
+          "caller": "getActiveTrip",
+          "callee": "SecurityContextHolder.getContext().getAuthentication",
+          "lineNumber": 29
+        },
+        {
+          "caller": "getActiveTrip",
+          "callee": "SecurityContextHolder.getContext",
+          "lineNumber": 29
+        },
+        {
+          "caller": "getActiveTrip",
+          "callee": "driverTripService.getActiveTrip",
+          "lineNumber": 30
+        },
+        {
+          "caller": "getActiveTrip",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 31
+        },
+        {
+          "caller": "getActiveTrip",
+          "callee": "ApiResponse.success",
+          "lineNumber": 31
+        },
+        {
+          "caller": "getPendingReturnTrips",
+          "callee": "SecurityContextHolder.getContext().getAuthentication().getName",
+          "lineNumber": 38
+        },
+        {
+          "caller": "getPendingReturnTrips",
+          "callee": "SecurityContextHolder.getContext().getAuthentication",
+          "lineNumber": 38
+        },
+        {
+          "caller": "getPendingReturnTrips",
+          "callee": "SecurityContextHolder.getContext",
+          "lineNumber": 38
+        },
+        {
+          "caller": "getPendingReturnTrips",
+          "callee": "driverTripService.getPendingReturnTrips",
+          "lineNumber": 39
+        },
+        {
+          "caller": "getPendingReturnTrips",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 40
+        },
+        {
+          "caller": "getPendingReturnTrips",
+          "callee": "ApiResponse.success",
+          "lineNumber": 40
+        },
+        {
+          "caller": "startTrip",
+          "callee": "SecurityContextHolder.getContext().getAuthentication().getName",
+          "lineNumber": 48
+        },
+        {
+          "caller": "startTrip",
+          "callee": "SecurityContextHolder.getContext().getAuthentication",
+          "lineNumber": 48
+        },
+        {
+          "caller": "startTrip",
+          "callee": "SecurityContextHolder.getContext",
+          "lineNumber": 48
+        },
+        {
+          "caller": "startTrip",
+          "callee": "driverTripService.startTrip",
+          "lineNumber": 49
+        },
+        {
+          "caller": "startTrip",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 50
+        },
+        {
+          "caller": "startTrip",
+          "callee": "ApiResponse.success",
+          "lineNumber": 50
+        },
+        {
+          "caller": "updateOrderResult",
+          "callee": "SecurityContextHolder.getContext().getAuthentication().getName",
+          "lineNumber": 60
+        },
+        {
+          "caller": "updateOrderResult",
+          "callee": "SecurityContextHolder.getContext().getAuthentication",
+          "lineNumber": 60
+        },
+        {
+          "caller": "updateOrderResult",
+          "callee": "SecurityContextHolder.getContext",
+          "lineNumber": 60
+        },
+        {
+          "caller": "updateOrderResult",
+          "callee": "driverTripService.updateOrderResult",
+          "lineNumber": 61
+        },
+        {
+          "caller": "updateOrderResult",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 62
+        },
+        {
+          "caller": "updateOrderResult",
+          "callee": "ApiResponse.success",
+          "lineNumber": 62
+        },
+        {
+          "caller": "completeTrip",
+          "callee": "SecurityContextHolder.getContext().getAuthentication().getName",
+          "lineNumber": 70
+        },
+        {
+          "caller": "completeTrip",
+          "callee": "SecurityContextHolder.getContext().getAuthentication",
+          "lineNumber": 70
+        },
+        {
+          "caller": "completeTrip",
+          "callee": "SecurityContextHolder.getContext",
+          "lineNumber": 70
+        },
+        {
+          "caller": "completeTrip",
+          "callee": "driverTripService.completeTrip",
+          "lineNumber": 71
+        },
+        {
+          "caller": "completeTrip",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 72
+        },
+        {
+          "caller": "completeTrip",
+          "callee": "ApiResponse.success",
+          "lineNumber": 72
+        },
+        {
+          "caller": "returnToWarehouse",
+          "callee": "SecurityContextHolder.getContext().getAuthentication().getName",
+          "lineNumber": 80
+        },
+        {
+          "caller": "returnToWarehouse",
+          "callee": "SecurityContextHolder.getContext().getAuthentication",
+          "lineNumber": 80
+        },
+        {
+          "caller": "returnToWarehouse",
+          "callee": "SecurityContextHolder.getContext",
+          "lineNumber": 80
+        },
+        {
+          "caller": "returnToWarehouse",
+          "callee": "driverTripService.returnToWarehouse",
+          "lineNumber": 81
+        },
+        {
+          "caller": "returnToWarehouse",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 82
+        },
+        {
+          "caller": "returnToWarehouse",
+          "callee": "ApiResponse.success",
+          "lineNumber": 82
+        }
+      ],
+      "metrics": {
+        "importCount": 5,
+        "exportCount": 7,
+        "functionCount": 6,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/controller/ExceptionController.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 81,
+      "nonEmptyLines": 72,
+      "functions": [
+        {
+          "name": "rejectStop",
+          "startLine": 30,
+          "endLine": 40,
+          "params": [
+            "id",
+            "request"
+          ]
+        },
+        {
+          "name": "listExceptions",
+          "startLine": 42,
+          "endLine": 52,
+          "params": [
+            "date",
+            "type",
+            "resolved"
+          ]
+        },
+        {
+          "name": "getException",
+          "startLine": 54,
+          "endLine": 59,
+          "params": [
+            "id"
+          ]
+        },
+        {
+          "name": "resolveException",
+          "startLine": 61,
+          "endLine": 70,
+          "params": [
+            "id",
+            "request"
+          ]
+        },
+        {
+          "name": "listViolations",
+          "startLine": 72,
+          "endLine": 80,
+          "params": [
+            "date"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "ExceptionController",
+          "startLine": 23,
+          "endLine": 81,
+          "methods": [
+            "rejectStop",
+            "listExceptions",
+            "getException",
+            "resolveException",
+            "listViolations"
+          ],
+          "properties": [
+            "exceptionService"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "rejectStop",
+          "line": 30,
+          "isDefault": false
+        },
+        {
+          "name": "listExceptions",
+          "line": 42,
+          "isDefault": false
+        },
+        {
+          "name": "getException",
+          "line": 54,
+          "isDefault": false
+        },
+        {
+          "name": "resolveException",
+          "line": 61,
+          "isDefault": false
+        },
+        {
+          "name": "listViolations",
+          "line": 72,
+          "isDefault": false
+        },
+        {
+          "name": "ExceptionController",
+          "line": 23,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "rejectStop",
+          "callee": "SecurityContextHolder.getContext().getAuthentication().getName",
+          "lineNumber": 36
+        },
+        {
+          "caller": "rejectStop",
+          "callee": "SecurityContextHolder.getContext().getAuthentication",
+          "lineNumber": 36
+        },
+        {
+          "caller": "rejectStop",
+          "callee": "SecurityContextHolder.getContext",
+          "lineNumber": 36
+        },
+        {
+          "caller": "rejectStop",
+          "callee": "exceptionService.rejectStop",
+          "lineNumber": 37
+        },
+        {
+          "caller": "rejectStop",
+          "callee": "ResponseEntity.status(HttpStatus.CREATED).body",
+          "lineNumber": 38
+        },
+        {
+          "caller": "rejectStop",
+          "callee": "ResponseEntity.status",
+          "lineNumber": 38
+        },
+        {
+          "caller": "rejectStop",
+          "callee": "ApiResponse.success",
+          "lineNumber": 39
+        },
+        {
+          "caller": "rejectStop",
+          "callee": "response.getMessage",
+          "lineNumber": 39
+        },
+        {
+          "caller": "listExceptions",
+          "callee": "LocalDate.now",
+          "lineNumber": 49
+        },
+        {
+          "caller": "listExceptions",
+          "callee": "exceptionService.listExceptions",
+          "lineNumber": 50
+        },
+        {
+          "caller": "listExceptions",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 51
+        },
+        {
+          "caller": "listExceptions",
+          "callee": "ApiResponse.success",
+          "lineNumber": 51
+        },
+        {
+          "caller": "getException",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 58
+        },
+        {
+          "caller": "getException",
+          "callee": "ApiResponse.success",
+          "lineNumber": 58
+        },
+        {
+          "caller": "getException",
+          "callee": "exceptionService.getException",
+          "lineNumber": 58
+        },
+        {
+          "caller": "resolveException",
+          "callee": "SecurityContextHolder.getContext().getAuthentication().getName",
+          "lineNumber": 67
+        },
+        {
+          "caller": "resolveException",
+          "callee": "SecurityContextHolder.getContext().getAuthentication",
+          "lineNumber": 67
+        },
+        {
+          "caller": "resolveException",
+          "callee": "SecurityContextHolder.getContext",
+          "lineNumber": 67
+        },
+        {
+          "caller": "resolveException",
+          "callee": "exceptionService.resolveException",
+          "lineNumber": 68
+        },
+        {
+          "caller": "resolveException",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 69
+        },
+        {
+          "caller": "resolveException",
+          "callee": "ApiResponse.success",
+          "lineNumber": 69
+        },
+        {
+          "caller": "resolveException",
+          "callee": "response.getMessage",
+          "lineNumber": 69
+        },
+        {
+          "caller": "listViolations",
+          "callee": "LocalDate.now",
+          "lineNumber": 77
+        },
+        {
+          "caller": "listViolations",
+          "callee": "exceptionService.listExceptions",
+          "lineNumber": 78
+        },
+        {
+          "caller": "listViolations",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 79
+        },
+        {
+          "caller": "listViolations",
+          "callee": "ApiResponse.success",
+          "lineNumber": 79
+        }
+      ],
+      "metrics": {
+        "importCount": 6,
+        "exportCount": 6,
+        "functionCount": 5,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/controller/HealthController.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 32,
+      "nonEmptyLines": 28,
+      "functions": [
+        {
+          "name": "health",
+          "startLine": 23,
+          "endLine": 31,
+          "params": []
+        }
+      ],
+      "classes": [
+        {
+          "name": "HealthController",
+          "startLine": 18,
+          "endLine": 32,
+          "methods": [
+            "health"
+          ],
+          "properties": []
+        }
+      ],
+      "exports": [
+        {
+          "name": "health",
+          "line": 23,
+          "isDefault": false
+        },
+        {
+          "name": "HealthController",
+          "line": 18,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "health",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 26
+        },
+        {
+          "caller": "health",
+          "callee": "Map.of",
+          "lineNumber": 26
+        }
+      ],
+      "metrics": {
+        "importCount": 0,
+        "exportCount": 2,
+        "functionCount": 1,
+        "classCount": 1
+      }
+    },
+    {
+      "path": "src/main/java/com/elog/controller/ImportController.java",
+      "language": "java",
+      "fileCategory": "code",
+      "totalLines": 108,
+      "nonEmptyLines": 95,
+      "functions": [
+        {
+          "name": "importOrders",
+          "startLine": 36,
+          "endLine": 54,
+          "params": [
+            "file",
+            "deliveryDate",
+            "confirmReplace",
+            "authentication"
+          ]
+        },
+        {
+          "name": "getBatches",
+          "startLine": 56,
+          "endLine": 65,
+          "params": [
+            "deliveryDate",
+            "pageable"
+          ]
+        },
+        {
+          "name": "getBatchById",
+          "startLine": 67,
+          "endLine": 73,
+          "params": [
+            "batchId"
+          ]
+        },
+        {
+          "name": "getImportedOrders",
+          "startLine": 75,
+          "endLine": 83,
+          "params": [
+            "batchId",
+            "deliveryDate"
+          ]
+        },
+        {
+          "name": "getBatchErrors",
+          "startLine": 85,
+          "endLine": 94,
+          "params": [
+            "batchId",
+            "errorCode",
+            "pageable"
+          ]
+        },
+        {
+          "name": "exportBatchErrors",
+          "startLine": 96,
+          "endLine": 107,
+          "params": [
+            "batchId"
+          ]
+        }
+      ],
+      "classes": [
+        {
+          "name": "ImportController",
+          "startLine": 27,
+          "endLine": 108,
+          "methods": [
+            "importOrders",
+            "getBatches",
+            "getBatchById",
+            "getImportedOrders",
+            "getBatchErrors",
+            "exportBatchErrors"
+          ],
+          "properties": [
+            "importService",
+            "userRepository"
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "name": "importOrders",
+          "line": 36,
+          "isDefault": false
+        },
+        {
+          "name": "getBatches",
+          "line": 56,
+          "isDefault": false
+        },
+        {
+          "name": "getBatchById",
+          "line": 67,
+          "isDefault": false
+        },
+        {
+          "name": "getImportedOrders",
+          "line": 75,
+          "isDefault": false
+        },
+        {
+          "name": "getBatchErrors",
+          "line": 85,
+          "isDefault": false
+        },
+        {
+          "name": "exportBatchErrors",
+          "line": 96,
+          "isDefault": false
+        },
+        {
+          "name": "ImportController",
+          "line": 27,
+          "isDefault": false
+        }
+      ],
+      "callGraph": [
+        {
+          "caller": "importOrders",
+          "callee": "authentication.getName",
+          "lineNumber": 46
+        },
+        {
+          "caller": "importOrders",
+          "callee": "userRepository.findByUsername(username).orElseThrow",
+          "lineNumber": 47
+        },
+        {
+          "caller": "importOrders",
+          "callee": "userRepository.findByUsername",
+          "lineNumber": 47
+        },
+        {
+          "caller": "importOrders",
+          "callee": "new RuntimeException",
+          "lineNumber": 48
+        },
+        {
+          "caller": "importOrders",
+          "callee": "user.getId",
+          "lineNumber": 49
+        },
+        {
+          "caller": "importOrders",
+          "callee": "importService.importExcel",
+          "lineNumber": 51
+        },
+        {
+          "caller": "importOrders",
+          "callee": "ResponseEntity.status(HttpStatus.CREATED).body",
+          "lineNumber": 52
+        },
+        {
+          "caller": "importOrders",
+          "callee": "ResponseEntity.status",
+          "lineNumber": 52
+        },
+        {
+          "caller": "importOrders",
+          "callee": "ApiResponse.success",
+          "lineNumber": 53
+        },
+        {
+          "caller": "getBatches",
+          "callee": "importService.getBatches",
+          "lineNumber": 63
+        },
+        {
+          "caller": "getBatches",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 64
+        },
+        {
+          "caller": "getBatchById",
+          "callee": "importService.getBatchById",
+          "lineNumber": 71
+        },
+        {
+          "caller": "getBatchById",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 72
+        },
+        {
+          "caller": "getBatchById",
+          "callee": "ApiResponse.success",
+          "lineNumber": 72
+        },
+        {
+          "caller": "getImportedOrders",
+          "callee": "importService.getImportedOrders",
+          "lineNumber": 81
+        },
+        {
+          "caller": "getImportedOrders",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 82
+        },
+        {
+          "caller": "getImportedOrders",
+          "callee": "ApiResponse.success",
+          "lineNumber": 82
+        },
+        {
+          "caller": "getBatchErrors",
+          "callee": "importService.getBatchErrors",
+          "lineNumber": 92
+        },
+        {
+          "caller": "getBatchErrors",
+          "callee": "ResponseEntity.ok",
+          "lineNumber": 93
+        },
+        {
+          "caller": "exportBatchErrors",
+          "callee": "importService.exportBatchErrors",
+          "lineNumber": 100
+        },
+        {
+          "caller": "exportBatchErrors",
+          "callee": "new org.springframework.http.HttpHeaders",
+          "lineNumber": 101
+        },
+        {
+          "caller": "exportBatchErrors",
+          "callee": "headers.setContentType",
+          "lineNumber": 102
+        },
+        {
+          "caller": "exportBatchErrors",
+          "callee": "org.springframework.http.MediaType.parseMediaType",
+          "lineNumber": 102
+        },
+        {
+          "caller": "exportBatchErrors",
+          "callee": "headers.setContentDispositionFormData",
+          "lineNumber": 104
+        },
+        {
+          "caller": "exportBatchErrors",
+          "callee": "headers.setCacheControl",
+          "lineNumber": 105
+        },
+        {
+          "caller": "exportBatchErrors",
+          "callee": "new ResponseEntity<>",
+          "lineNumber": 106
+        }
+      ],
+      "metrics": {
+        "importCount": 8,
+        "exportCount": 7,
+        "functionCount": 6,
+        "classCount": 1
+      }
+    }
+  ]
+}

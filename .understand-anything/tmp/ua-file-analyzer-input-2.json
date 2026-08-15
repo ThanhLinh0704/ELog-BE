@@ -1,0 +1,182 @@
+{
+  "projectRoot": "D:\\FULearning\\semester 9\\Elog\\ELog-BE",
+  "batchFiles": [
+    {
+      "path": "src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql",
+      "language": "sql",
+      "sizeLines": 48,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V33__add_returned_to_warehouse_at.sql",
+      "language": "sql",
+      "sizeLines": 1,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V34__add_assigned_driver_to_vehicles.sql",
+      "language": "sql",
+      "sizeLines": 15,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V35__allow_null_delivery_date_import_batches.sql",
+      "language": "sql",
+      "sizeLines": 2,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V36__add_goong_route_info_to_trip_drafts.sql",
+      "language": "sql",
+      "sizeLines": 17,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V37__driver_active_status_schema.sql",
+      "language": "sql",
+      "sizeLines": 40,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V38__two_vehicle_safety_buffer_config.sql",
+      "language": "sql",
+      "sizeLines": 5,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V39__planning_history_schema.sql",
+      "language": "sql",
+      "sizeLines": 41,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V4__add_refresh_tokens_table.sql",
+      "language": "sql",
+      "sizeLines": 13,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V40__trip_outcome_history_schema.sql",
+      "language": "sql",
+      "sizeLines": 42,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V41__add_kpi_permission.sql",
+      "language": "sql",
+      "sizeLines": 18,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V42__decouple_history_events_from_fk_constraints.sql",
+      "language": "sql",
+      "sizeLines": 21,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V43__seed_missing_system_user.sql",
+      "language": "sql",
+      "sizeLines": 16,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V44__extend_delivery_exceptions_for_driver_app.sql",
+      "language": "sql",
+      "sizeLines": 12,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql",
+      "language": "sql",
+      "sizeLines": 883,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V46__make_trip_stops_route_stop_id_nullable.sql",
+      "language": "sql",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V47__make_trip_stops_trip_draft_stop_id_nullable.sql",
+      "language": "sql",
+      "sizeLines": 4,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V48__delete_stores_kh0033_kh0035.sql",
+      "language": "sql",
+      "sizeLines": 8,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V5__add_store_contact_fields.sql",
+      "language": "sql",
+      "sizeLines": 3,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V6__add_route_description.sql",
+      "language": "sql",
+      "sizeLines": 7,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V7__alter_products_schema.sql",
+      "language": "sql",
+      "sizeLines": 39,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V8__vehicles_schema.sql",
+      "language": "sql",
+      "sizeLines": 58,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/migration/V9__orders_schema.sql",
+      "language": "sql",
+      "sizeLines": 111,
+      "fileCategory": "data"
+    },
+    {
+      "path": "src/main/resources/db/setup/create_database.sql",
+      "language": "sql",
+      "sizeLines": 22,
+      "fileCategory": "data"
+    },
+    {
+      "path": "CLAUDE.md",
+      "language": "markdown",
+      "sizeLines": 164,
+      "fileCategory": "docs"
+    }
+  ],
+  "batchImportData": {
+    "src/main/resources/db/migration/V32__driver_app_execution_and_outcomes_schema.sql": [],
+    "src/main/resources/db/migration/V33__add_returned_to_warehouse_at.sql": [],
+    "src/main/resources/db/migration/V34__add_assigned_driver_to_vehicles.sql": [],
+    "src/main/resources/db/migration/V35__allow_null_delivery_date_import_batches.sql": [],
+    "src/main/resources/db/migration/V36__add_goong_route_info_to_trip_drafts.sql": [],
+    "src/main/resources/db/migration/V37__driver_active_status_schema.sql": [],
+    "src/main/resources/db/migration/V38__two_vehicle_safety_buffer_config.sql": [],
+    "src/main/resources/db/migration/V39__planning_history_schema.sql": [],
+    "src/main/resources/db/migration/V4__add_refresh_tokens_table.sql": [],
+    "src/main/resources/db/migration/V40__trip_outcome_history_schema.sql": [],
+    "src/main/resources/db/migration/V41__add_kpi_permission.sql": [],
+    "src/main/resources/db/migration/V42__decouple_history_events_from_fk_constraints.sql": [],
+    "src/main/resources/db/migration/V43__seed_missing_system_user.sql": [],
+    "src/main/resources/db/migration/V44__extend_delivery_exceptions_for_driver_app.sql": [],
+    "src/main/resources/db/migration/V45__refresh_seed_from_excel_v1.sql": [],
+    "src/main/resources/db/migration/V46__make_trip_stops_route_stop_id_nullable.sql": [],
+    "src/main/resources/db/migration/V47__make_trip_stops_trip_draft_stop_id_nullable.sql": [],
+    "src/main/resources/db/migration/V48__delete_stores_kh0033_kh0035.sql": [],
+    "src/main/resources/db/migration/V5__add_store_contact_fields.sql": [],
+    "src/main/resources/db/migration/V6__add_route_description.sql": [],
+    "src/main/resources/db/migration/V7__alter_products_schema.sql": [],
+    "src/main/resources/db/migration/V8__vehicles_schema.sql": [],
+    "src/main/resources/db/migration/V9__orders_schema.sql": [],
+    "src/main/resources/db/setup/create_database.sql": [],
+    "CLAUDE.md": []
+  }
+}

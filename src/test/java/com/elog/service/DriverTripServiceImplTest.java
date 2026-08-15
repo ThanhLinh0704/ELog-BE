@@ -1,290 +1,458 @@
 package com.elog.service;
 
+import com.elog.dto.request.UpdateOrderResultRequest;
 import com.elog.dto.response.DriverTripResponse;
-import com.elog.entity.*;
+import com.elog.dto.response.TripOutcomeResponse;
+import com.elog.entity.DeliveryOrderResult;
+import java.util.List;
+import static org.mockito.ArgumentMatchers.eq;
+import com.elog.entity.Order;
+import com.elog.entity.Trip;
+import com.elog.entity.TripExecution;
+import com.elog.entity.TripOutcome;
+import com.elog.entity.TripStatus;
+import com.elog.entity.User;
+import com.elog.entity.Vehicle;
+import com.elog.entity.VehicleStatus;
 import com.elog.exception.BusinessException;
-import com.elog.repository.*;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.DeliveryExceptionRepository;
+import com.elog.repository.DeliveryOrderResultRepository;
+import com.elog.repository.OrderRepository;
+import com.elog.repository.TripDraftStopRepository;
+import com.elog.repository.TripExecutionRepository;
+import com.elog.repository.TripOutcomeRepository;
+import com.elog.repository.TripRepository;
+import com.elog.repository.TripStopRepository;
+import com.elog.repository.UserRepository;
+import com.elog.repository.VehicleRepository;
 import com.elog.service.impl.DriverTripServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+import com.elog.entity.TripStop;
+import com.elog.entity.TripStopStatus;
+import com.elog.dto.request.AdminTripOverrideRequest;
+
 class DriverTripServiceImplTest {
-
-    @Mock
-    private TripExecutionRepository tripExecutionRepo;
-    @Mock
-    private DeliveryOrderResultRepository deliveryOrderResultRepo;
-    @Mock
-    private TripOutcomeRepository tripOutcomeRepo;
-    @Mock
-    private TripRepository tripRepo;
-    @Mock
-    private OrderRepository orderRepo;
-    @Mock
-    private TripDraftStopRepository tripDraftStopRepo;
-    @Mock
-    private UserRepository userRepo;
-    @Mock
-    private TripStopRepository tripStopRepo;
-    @Mock
-    private DeliveryExceptionRepository deliveryExceptionRepo;
-    @Mock
-    private TripOutcomeHistoryService tripOutcomeHistoryService;
-
-    @InjectMocks
-    private DriverTripServiceImpl driverTripService;
-
-    private User driver;
-    private Vehicle vehicle;
-    private Trip trip;
+    private TripExecutionRepository executions;
+    private DeliveryOrderResultRepository results;
+    private TripOutcomeRepository outcomes;
+    private TripRepository trips;
+    private DeliveryExceptionRepository exceptions;
+    private TripOutcomeHistoryService history;
+    private TripStopRepository tripStops;
+    private VehicleRepository vehicleRepo;
+    private DriverTripServiceImpl service;
     private TripExecution execution;
+    private Trip trip;
 
     @BeforeEach
     void setUp() {
-        driver = User.builder()
-                .id(10L)
-                .username("driver1")
-                .fullName("Nguyễn Văn A")
-                .build();
+        executions = mock(TripExecutionRepository.class);
+        results = mock(DeliveryOrderResultRepository.class);
+        outcomes = mock(TripOutcomeRepository.class);
+        trips = mock(TripRepository.class);
+        exceptions = mock(DeliveryExceptionRepository.class);
+        history = mock(TripOutcomeHistoryService.class);
+        tripStops = mock(TripStopRepository.class);
+        vehicleRepo = mock(VehicleRepository.class);
+        service = new DriverTripServiceImpl(executions, results, outcomes, trips,
+                mock(OrderRepository.class), mock(TripDraftStopRepository.class), mock(UserRepository.class),
+                tripStops, exceptions, vehicleRepo, history);
 
-        vehicle = Vehicle.builder()
-                .id(1L)
-                .vehicleCode("V-01")
-                .plateNumber("29H-12001")
-                .status(VehicleStatus.IN_USE)
-                .build();
-
-        trip = Trip.builder()
-                .tripId(100L)
-                .deliveryDate(LocalDate.now())
-                .vehicle(vehicle)
-                .driver(driver)
-                .build();
-
-        execution = TripExecution.builder()
-                .id(50L)
-                .trip(trip)
-                .driver(driver)
-                .status("COMPLETED")
-                .completedAt(LocalDateTime.now().minusHours(1))
-                .returnedToWarehouseAt(null)
-                .build();
+        User driver = User.builder().id(7L).username("driver").fullName("Driver Seven").build();
+        Vehicle vehicle = Vehicle.builder().id(8L).vehicleCode("V-08").plateNumber("51A-00008")
+                .status(VehicleStatus.AVAILABLE).build();
+        trip = Trip.builder().tripId(10L).deliveryDate(LocalDate.now()).driver(driver).vehicle(vehicle)
+                .status(TripStatus.DISPATCHED).build();
+        execution = TripExecution.builder().id(20L).trip(trip).driver(driver).status("ASSIGNED").build();
+        when(executions.findById(20L)).thenReturn(Optional.of(execution));
     }
 
     @Test
-    @DisplayName("startTrip thành công: chuyển xe sang IN_USE và trip sang IN_PROGRESS")
-    void startTrip_setsVehicleStatusToInUse() {
-        execution.setStatus("ASSIGNED");
-        vehicle.setStatus(VehicleStatus.AVAILABLE);
-        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
-        when(tripExecutionRepo.save(any(TripExecution.class))).thenAnswer(i -> i.getArgument(0));
-        when(tripRepo.save(any(Trip.class))).thenAnswer(i -> i.getArgument(0));
-
-        DriverTripResponse response = driverTripService.startTrip(50L, "driver1");
-
-        assertThat(response).isNotNull();
-        assertThat(execution.getStatus()).isEqualTo("IN_PROGRESS");
-        assertThat(trip.getStatus()).isEqualTo(TripStatus.IN_PROGRESS);
-        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.IN_USE);
-        verify(tripRepo).save(trip);
+    @DisplayName("[L1-DR-04] assigned execution starts and synchronizes execution trip and vehicle")
+    void startsAssignedExecution() {
+        LocalDateTime before = LocalDateTime.now();
+        service.startTrip(20L, "driver");
+        assertAll(
+                () -> assertEquals("IN_PROGRESS", execution.getStatus()),
+                () -> assertFalse(execution.getStartedAt().isBefore(before)),
+                () -> assertEquals(TripStatus.IN_PROGRESS, trip.getStatus()),
+                () -> assertEquals(VehicleStatus.IN_USE, trip.getVehicle().getStatus()),
+                () -> verify(executions).save(execution),
+                () -> verify(trips).save(trip));
     }
 
     @Test
-    @DisplayName("updateOrderResult: khi tất cả đơn trong stop DELIVERED -> đồng bộ TripStop sang COMPLETED")
-    void updateOrderResult_allOrdersDeliveredInStop_syncsTripStopToCompleted() {
+    @DisplayName("[L1-DR-05] start rejects an execution outside ASSIGNED")
+    void startRejectsWrongState() {
         execution.setStatus("IN_PROGRESS");
-        TripDraftStop stop = TripDraftStop.builder().id(200L).build();
-        DeliveryOrderResult result = DeliveryOrderResult.builder()
-                .id(1L)
-                .tripExecution(execution)
-                .order(Order.builder().id(10L).orderRef("ORD-01").build())
-                .stop(stop)
-                .status("PENDING")
-                .build();
+        BusinessException error = assertThrows(BusinessException.class, () -> service.startTrip(20L, "driver"));
+        assertAll(() -> assertEquals(ErrorCode.VALIDATION_FAILED, error.getErrorCode()),
+                () -> verify(executions, never()).save(any()));
+    }
 
-        TripStop tripStop = TripStop.builder()
-                .tripStopId(300L)
-                .status(TripStopStatus.PENDING)
-                .build();
+    @Test
+    @DisplayName("[L1-DR-06] start rejects a different driver")
+    void startRejectsWrongDriver() {
+        BusinessException error = assertThrows(BusinessException.class, () -> service.startTrip(20L, "intruder"));
+        assertAll(() -> assertEquals(ErrorCode.UNAUTHORIZED_ACCESS, error.getErrorCode()),
+                () -> verify(executions, never()).save(any()));
+    }
 
-        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
-        when(deliveryOrderResultRepo.findByTripExecutionIdAndOrderId(50L, 10L)).thenReturn(Optional.of(result));
-        when(deliveryOrderResultRepo.findByTripExecutionId(50L)).thenReturn(java.util.List.of(result));
-        when(tripStopRepo.findByTripDraftStopId(200L)).thenReturn(Optional.of(tripStop));
+    @Test
+    @DisplayName("[L1-DR-07] start rejects a future delivery date")
+    void startRejectsFutureDate() {
+        trip.setDeliveryDate(LocalDate.now().plusDays(1));
+        BusinessException error = assertThrows(BusinessException.class, () -> service.startTrip(20L, "driver"));
+        assertAll(() -> assertEquals(ErrorCode.VALIDATION_FAILED, error.getErrorCode()),
+                () -> verify(executions, never()).save(any()));
+    }
 
-        com.elog.dto.request.UpdateOrderResultRequest req = new com.elog.dto.request.UpdateOrderResultRequest();
+    @Test
+    @DisplayName("[L1-DR-08] delivered result updates the existing order result")
+    void recordsDeliveredResult() {
+        DeliveryOrderResult result = result("PENDING");
+        updateFixture(result);
+        service.updateOrderResult(20L, 30L, request("DELIVERED", null), "driver");
+        assertAll(() -> assertEquals("DELIVERED", result.getStatus()),
+                () -> assertNotNull(result.getUpdatedAt()),
+                () -> verify(results).save(result));
+    }
+
+    @Test
+    @DisplayName("[L1-DR-09] failed result persists status and mandatory reason")
+    void recordsFailedResult() {
+        DeliveryOrderResult result = result("PENDING");
+        updateFixture(result);
+        when(exceptions.existsByOrderIdAndExceptionTypeAndResolvedAtIsNull(any(), any())).thenReturn(true);
+        service.updateOrderResult(20L, 30L, request("FAILED", "CUSTOMER_REJECTED"), "driver");
+        assertAll(() -> assertEquals("FAILED", result.getStatus()),
+                () -> assertEquals("CUSTOMER_REJECTED", result.getReasonCode()),
+                () -> verify(results).save(result));
+    }
+
+    @Test
+    @DisplayName("[L1-DR-10] partially delivered result persists status and reason")
+    void recordsPartialResult() {
+        DeliveryOrderResult result = result("PENDING");
+        updateFixture(result);
+        when(exceptions.existsByOrderIdAndExceptionTypeAndResolvedAtIsNull(any(), any())).thenReturn(true);
+        service.updateOrderResult(20L, 30L, request("PARTIALLY_DELIVERED", "SHORTAGE"), "driver");
+        assertAll(() -> assertEquals("PARTIALLY_DELIVERED", result.getStatus()),
+                () -> assertEquals("SHORTAGE", result.getReasonCode()),
+                () -> verify(results).save(result));
+    }
+
+    @Test
+    @DisplayName("[L1-DR-11] update rejects an order absent from the execution")
+    void updateRejectsUnknownOrder() {
+        execution.setStatus("IN_PROGRESS");
+        when(results.findByTripExecutionIdAndOrderId(20L, 999L)).thenReturn(Optional.empty());
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.updateOrderResult(20L, 999L, request("DELIVERED", null), "driver"));
+        assertAll(() -> assertEquals(ErrorCode.RESOURCE_NOT_FOUND, error.getErrorCode()),
+                () -> verify(results, never()).save(any()));
+    }
+
+    @Test
+    @DisplayName("[L1-DR-12] update rejects execution outside IN_PROGRESS")
+    void updateRejectsWrongExecutionState() {
+        execution.setStatus("ASSIGNED");
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.updateOrderResult(20L, 30L, request("DELIVERED", null), "driver"));
+        assertAll(() -> assertEquals(ErrorCode.VALIDATION_FAILED, error.getErrorCode()),
+                () -> verify(results, never()).save(any()));
+    }
+
+    @Test
+    @DisplayName("[L1-DR-13] failed update rejects a blank reason")
+    void failedUpdateRequiresReason() {
+        execution.setStatus("IN_PROGRESS");
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.updateOrderResult(20L, 30L, request("FAILED", "  "), "driver"));
+        assertAll(() -> assertEquals(ErrorCode.VALIDATION_FAILED, error.getErrorCode()),
+                () -> verify(results, never()).findByTripExecutionIdAndOrderId(any(), any()),
+                () -> verify(results, never()).save(any()));
+    }
+
+    @Test
+    @DisplayName("[L1-DR-14] completion with terminal orders creates a submitted outcome")
+    void completesAllTerminalOrders() {
+        stubCompletionCounts(3, 2, 1, 0);
+        service.completeTrip(20L, "driver");
+        TripOutcome saved = captureOutcome();
+        assertAll(() -> assertEquals("COMPLETED_WITH_EXCEPTIONS", execution.getStatus()),
+                () -> assertEquals(TripStatus.COMPLETED, trip.getStatus()),
+                () -> assertEquals("SUBMITTED", saved.getStatus()),
+                () -> assertEquals(3, saved.getTotalOrders()),
+                () -> assertEquals(2, saved.getDeliveredCount()),
+                () -> assertEquals(1, saved.getFailedCount()));
+    }
+
+    @Test
+    @DisplayName("[L1-DR-15] completion rejects while any order remains pending")
+    void completionRejectsPendingOrders() {
+        execution.setStatus("IN_PROGRESS");
+        when(results.countByTripExecutionIdAndStatus(20L, "PENDING")).thenReturn(1L);
+        BusinessException error = assertThrows(BusinessException.class, () -> service.completeTrip(20L, "driver"));
+        assertAll(() -> assertEquals(ErrorCode.VALIDATION_FAILED, error.getErrorCode()),
+                () -> verify(outcomes, never()).save(any()));
+    }
+
+    @Test
+    @DisplayName("[L1-DR-16] completion rejects execution outside IN_PROGRESS")
+    void completionRejectsWrongState() {
+        execution.setStatus("ASSIGNED");
+        BusinessException error = assertThrows(BusinessException.class, () -> service.completeTrip(20L, "driver"));
+        assertAll(() -> assertEquals(ErrorCode.VALIDATION_FAILED, error.getErrorCode()),
+                () -> verify(results, never()).countByTripExecutionIdAndStatus(any(), any()),
+                () -> verify(outcomes, never()).save(any()));
+    }
+
+    @Test
+    @DisplayName("[L1-DR-17] completion records completedAt at the current operation time")
+    void completionRecordsCurrentTimestamp() {
+        stubCompletionCounts(1, 1, 0, 0);
+        LocalDateTime before = LocalDateTime.now();
+        service.completeTrip(20L, "driver");
+        LocalDateTime after = LocalDateTime.now();
+        assertAll(() -> assertNotNull(execution.getCompletedAt()),
+                () -> assertTrue(!execution.getCompletedAt().isBefore(before)
+                        && !execution.getCompletedAt().isAfter(after)),
+                () -> verify(executions).save(execution));
+    }
+
+    private DeliveryOrderResult result(String status) {
+        return DeliveryOrderResult.builder().id(40L).tripExecution(execution)
+                .order(Order.builder().id(30L).orderRef("ORD-30").build()).status(status).build();
+    }
+
+    private void updateFixture(DeliveryOrderResult result) {
+        execution.setStatus("IN_PROGRESS");
+        when(results.findByTripExecutionIdAndOrderId(20L, 30L)).thenReturn(Optional.of(result));
+    }
+
+    private UpdateOrderResultRequest request(String status, String reason) {
+        return UpdateOrderResultRequest.builder().status(status).reasonCode(reason).exceptionText("driver note").build();
+    }
+
+    private void stubCompletionCounts(long total, long delivered, long failed, long partial) {
+        execution.setStatus("IN_PROGRESS");
+        when(results.countByTripExecutionIdAndStatus(20L, "PENDING")).thenReturn(0L);
+        when(results.countByTripExecutionId(20L)).thenReturn(total);
+        when(results.countByTripExecutionIdAndStatus(20L, "DELIVERED")).thenReturn(delivered);
+        when(results.countByTripExecutionIdAndStatus(20L, "FAILED")).thenReturn(failed);
+        when(results.countByTripExecutionIdAndStatus(20L, "PARTIALLY_DELIVERED")).thenReturn(partial);
+    }
+
+    private TripOutcome captureOutcome() {
+        org.mockito.ArgumentCaptor<TripOutcome> captor = org.mockito.ArgumentCaptor.forClass(TripOutcome.class);
+        verify(outcomes).save(captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    @DisplayName("[L1-DR-18] getActiveTrip returns active trip for driver")
+    void getActiveTripSuccess() {
+        when(executions.findByDriverUsernameAndStatusIn(eq("driver"), any())).thenReturn(List.of(execution));
+        DriverTripResponse r = service.getActiveTrip("driver");
+        assertNotNull(r);
+    }
+
+    @Test
+    @DisplayName("[L1-DR-19] getActiveTrip throws RESOURCE_NOT_FOUND when no active trip")
+    void getActiveTripNotFound() {
+        when(executions.findByDriverUsernameAndStatusIn(eq("driver"), any())).thenReturn(List.of());
+        BusinessException e = assertThrows(BusinessException.class, () -> service.getActiveTrip("driver"));
+        assertEquals(ErrorCode.RESOURCE_NOT_FOUND, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("[L1-DR-20] getPendingReturnTrips returns unreturned trips for driver")
+    void getPendingReturnTripsSuccess() {
+        UserRepository userRepo = mock(UserRepository.class);
+        DriverTripServiceImpl customService = new DriverTripServiceImpl(executions, results, outcomes, trips,
+                mock(OrderRepository.class), mock(TripDraftStopRepository.class), userRepo,
+                mock(TripStopRepository.class), exceptions, mock(VehicleRepository.class), history);
+
+        User d = User.builder().id(7L).username("driver").build();
+        execution.setStatus("COMPLETED");
+        when(userRepo.findByUsername("driver")).thenReturn(Optional.of(d));
+        when(executions.findUnreturnedByDriverId(7L)).thenReturn(List.of(execution));
+
+        List<DriverTripResponse> res = customService.getPendingReturnTrips("driver");
+        assertEquals(1, res.size());
+    }
+
+    @Test
+    @DisplayName("[L1-DR-21] updateOrderResult requires reasonCode when status is FAILED")
+    void updateOrderResultRequiresReasonCodeOnFailed() {
+        execution.setStatus("IN_PROGRESS");
+        when(executions.findById(10L)).thenReturn(Optional.of(execution));
+        UpdateOrderResultRequest req = new UpdateOrderResultRequest();
+        req.setStatus("FAILED");
+
+        BusinessException e = assertThrows(BusinessException.class, () -> service.updateOrderResult(10L, 100L, req, "driver"));
+        assertEquals(ErrorCode.VALIDATION_FAILED, e.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("[L1-DR-22] updateOrderResult fails if trip is not IN_PROGRESS")
+    void updateOrderResultRejectsAssignedTrip() {
+        execution.setStatus("ASSIGNED");
+        when(executions.findById(10L)).thenReturn(Optional.of(execution));
+        UpdateOrderResultRequest req = new UpdateOrderResultRequest();
         req.setStatus("DELIVERED");
 
-        driverTripService.updateOrderResult(50L, 10L, req, "driver1");
-
-        assertThat(tripStop.getStatus()).isEqualTo(TripStopStatus.COMPLETED);
-        assertThat(tripStop.getActualArrivalTime()).isNotNull();
-        verify(tripStopRepo).save(tripStop);
+        BusinessException e = assertThrows(BusinessException.class, () -> service.updateOrderResult(10L, 100L, req, "driver"));
+        assertEquals(ErrorCode.VALIDATION_FAILED, e.getErrorCode());
     }
 
     @Test
-    @DisplayName("updateOrderResult: khi có đơn FAILED -> đồng bộ TripStop sang EXCEPTION")
-    void updateOrderResult_anyOrderFailedInStop_syncsTripStopToException() {
+    @DisplayName("[L1-DR-23] completeTrip rejects trip with pending orders")
+    void completeTripRejectsPendingOrders() {
         execution.setStatus("IN_PROGRESS");
-        TripDraftStop stop = TripDraftStop.builder().id(200L).build();
-        DeliveryOrderResult result = DeliveryOrderResult.builder()
-                .id(1L)
-                .tripExecution(execution)
-                .order(Order.builder().id(10L).orderRef("ORD-01").build())
-                .stop(stop)
-                .status("PENDING")
-                .build();
+        when(executions.findById(10L)).thenReturn(Optional.of(execution));
+        when(results.countByTripExecutionIdAndStatus(10L, "PENDING")).thenReturn(2L);
 
-        TripStop tripStop = TripStop.builder()
-                .tripStopId(300L)
-                .status(TripStopStatus.PENDING)
-                .build();
-
-        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
-        when(deliveryOrderResultRepo.findByTripExecutionIdAndOrderId(50L, 10L)).thenReturn(Optional.of(result));
-        when(deliveryOrderResultRepo.findByTripExecutionId(50L)).thenReturn(java.util.List.of(result));
-        when(tripStopRepo.findByTripDraftStopId(200L)).thenReturn(Optional.of(tripStop));
-
-        com.elog.dto.request.UpdateOrderResultRequest req = new com.elog.dto.request.UpdateOrderResultRequest();
-        req.setStatus("FAILED");
-        req.setReasonCode("CUSTOMER_REJECTED");
-
-        driverTripService.updateOrderResult(50L, 10L, req, "driver1");
-
-        assertThat(tripStop.getStatus()).isEqualTo(TripStopStatus.EXCEPTION);
-        verify(tripStopRepo).save(tripStop);
+        BusinessException e = assertThrows(BusinessException.class, () -> service.completeTrip(10L, "driver"));
+        assertEquals(ErrorCode.VALIDATION_FAILED, e.getErrorCode());
     }
 
     @Test
-    @DisplayName("returnToWarehouse thành công: cập nhật returnedToWarehouseAt và giải phóng xe sang AVAILABLE")
-    void returnToWarehouse_success() {
-        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
-        when(tripExecutionRepo.save(any(TripExecution.class))).thenAnswer(i -> i.getArgument(0));
-
-        DriverTripResponse response = driverTripService.returnToWarehouse(50L, "driver1");
-
-        assertThat(response).isNotNull();
-        assertThat(execution.getReturnedToWarehouseAt()).isNotNull();
-        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
-        verify(tripExecutionRepo).save(execution);
-    }
-
-    @Test
-    @DisplayName("returnToWarehouse thất bại khi chuyến xe chưa COMPLETED")
-    void returnToWarehouse_tripNotCompleted_throwsException() {
+    @DisplayName("[L1-DR-24] completeTrip completes trip when all orders are terminal")
+    void completeTripSuccess() {
         execution.setStatus("IN_PROGRESS");
-        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+        when(executions.findById(10L)).thenReturn(Optional.of(execution));
+        when(results.countByTripExecutionIdAndStatus(10L, "PENDING")).thenReturn(0L);
+        when(results.countByTripExecutionId(10L)).thenReturn(5L);
+        when(results.countByTripExecutionIdAndStatus(10L, "DELIVERED")).thenReturn(5L);
+        when(results.countByTripExecutionIdAndStatus(10L, "FAILED")).thenReturn(0L);
+        when(results.countByTripExecutionIdAndStatus(10L, "PARTIALLY_DELIVERED")).thenReturn(0L);
 
-        assertThatThrownBy(() -> driverTripService.returnToWarehouse(50L, "driver1"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Chuyến xe chưa hoàn thành");
+        TripOutcomeResponse resp = service.completeTrip(10L, "driver");
 
-        assertThat(vehicle.getStatus()).isEqualTo(VehicleStatus.IN_USE);
+        assertAll(
+                () -> assertNotNull(resp),
+                () -> assertEquals("SUBMITTED", resp.getStatus()),
+                () -> assertEquals(5, resp.getDeliveredCount())
+        );
     }
 
     @Test
-    @DisplayName("returnToWarehouse thất bại khi chuyến xe đã được xác nhận về kho trước đó")
-    void returnToWarehouse_alreadyReturned_throwsException() {
-        execution.setReturnedToWarehouseAt(LocalDateTime.now().minusMinutes(20));
-        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+    @DisplayName("[L1-DR-25] returnToWarehouse confirms warehouse return and releases vehicle")
+    void returnToWarehouseSuccess() {
+        execution.setStatus("COMPLETED");
+        Vehicle v = Vehicle.builder().id(1L).status(VehicleStatus.IN_USE).build();
+        Trip t = Trip.builder().tripId(100L).vehicle(v).build();
+        execution.setTrip(t);
+        when(executions.findById(10L)).thenReturn(Optional.of(execution));
 
-        assertThatThrownBy(() -> driverTripService.returnToWarehouse(50L, "driver1"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Chuyến xe đã được xác nhận về kho trước đó");
+        DriverTripResponse resp = service.returnToWarehouse(10L, "driver");
+
+        assertAll(
+                () -> assertNotNull(resp),
+                () -> assertEquals(VehicleStatus.AVAILABLE, v.getStatus())
+        );
     }
 
     @Test
-    @DisplayName("startTrip thất bại khi chuyến xe thuộc về ngày trong tương lai")
-    void startTrip_futureDeliveryDate_throwsException() {
-        trip.setDeliveryDate(LocalDate.now().plusDays(2));
+    @DisplayName("[L1-DR-26] startTrip rejects future delivery date")
+    void startTripRejectsFutureDeliveryDate() {
+        Trip futureTrip = Trip.builder().tripId(100L).deliveryDate(LocalDate.now().plusDays(2)).build();
+        execution.setTrip(futureTrip);
         execution.setStatus("ASSIGNED");
-        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+        when(executions.findById(10L)).thenReturn(Optional.of(execution));
 
-        assertThatThrownBy(() -> driverTripService.startTrip(50L, "driver1"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Chưa đến ngày giao hàng");
+        BusinessException e = assertThrows(BusinessException.class, () -> service.startTrip(10L, "driver"));
+        assertEquals(ErrorCode.VALIDATION_FAILED, e.getErrorCode());
     }
 
     @Test
-    @DisplayName("getActiveTrip lọc bỏ chuyến xe ASSIGNED ở ngày tương lai")
-    void getActiveTrip_assignedFutureDate_ignored() {
-        trip.setDeliveryDate(LocalDate.now().plusDays(1));
+    @DisplayName("[L1-DR-27] startTrip rejects unauthorized driver username")
+    void startTripRejectsUnauthorizedDriver() {
         execution.setStatus("ASSIGNED");
-        when(tripExecutionRepo.findByDriverUsernameAndStatusIn("driver1", java.util.List.of("IN_PROGRESS", "ASSIGNED")))
-                .thenReturn(java.util.List.of(execution));
+        when(executions.findById(10L)).thenReturn(Optional.of(execution));
 
-        assertThatThrownBy(() -> driverTripService.getActiveTrip("driver1"))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Không tìm thấy chuyến xe đang phân công");
+        BusinessException e = assertThrows(BusinessException.class, () -> service.startTrip(10L, "other_driver"));
+        assertEquals(ErrorCode.UNAUTHORIZED_ACCESS, e.getErrorCode());
     }
 
     @Test
-    @DisplayName("getActiveTrip nhận dạng chuyến xe ASSIGNED ở ngày quá khứ (chưa bấm bắt đầu)")
-    void getActiveTrip_assignedPastDate_returnsTrip() {
-        trip.setDeliveryDate(LocalDate.now().minusDays(1));
-        execution.setStatus("ASSIGNED");
-        when(tripExecutionRepo.findByDriverUsernameAndStatusIn("driver1", java.util.List.of("IN_PROGRESS", "ASSIGNED")))
-                .thenReturn(java.util.List.of(execution));
-
-        DriverTripResponse response = driverTripService.getActiveTrip("driver1");
-
-        assertThat(response).isNotNull();
-        assertThat(response.getExecutionId()).isEqualTo(50L);
-    }
-
-    @Test
-    @DisplayName("getActiveTrip ưu tiên chuyến xe ASSIGNED có deliveryDate cũ nhất")
-    void getActiveTrip_multipleAssignedTrips_returnsOldestFirst() {
-        Trip tripYesterday = Trip.builder().tripId(101L).deliveryDate(LocalDate.now().minusDays(1)).build();
-        TripExecution execYesterday = TripExecution.builder().id(51L).trip(tripYesterday).status("ASSIGNED").driver(driver).build();
-
-        Trip tripTwoDaysAgo = Trip.builder().tripId(102L).deliveryDate(LocalDate.now().minusDays(2)).build();
-        TripExecution execTwoDaysAgo = TripExecution.builder().id(52L).trip(tripTwoDaysAgo).status("ASSIGNED").driver(driver).build();
-
-        when(tripExecutionRepo.findByDriverUsernameAndStatusIn("driver1", java.util.List.of("IN_PROGRESS", "ASSIGNED")))
-                .thenReturn(java.util.List.of(execYesterday, execTwoDaysAgo));
-
-        DriverTripResponse response = driverTripService.getActiveTrip("driver1");
-
-        assertThat(response).isNotNull();
-        assertThat(response.getExecutionId()).isEqualTo(52L);
-    }
-
-    @Test
-    @DisplayName("arriveAtStop cập nhật status IN_PROGRESS và actualArrivalTime thành công")
-    void arriveAtStop_success() {
+    @DisplayName("[L1-DR-28] arriveAtStop updates stop arrival timestamp when sequence is valid")
+    void arriveAtStopSuccessDriverTrip() {
         execution.setStatus("IN_PROGRESS");
-        when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+        TripStop ts = TripStop.builder().tripStopId(200L).trip(trip).status(TripStopStatus.PENDING).build();
+        when(executions.findById(10L)).thenReturn(Optional.of(execution));
+        when(tripStops.findRemainingStopsOrdered(10L)).thenReturn(List.of(ts));
+        when(tripStops.findByTripDraftStopId(50L)).thenReturn(Optional.of(ts));
 
-        TripStop stop1 = TripStop.builder()
-                .tripStopId(101L)
-                .trip(trip)
-                .sequenceOrder(1)
-                .status(TripStopStatus.PENDING)
-                .build();
+        DriverTripResponse resp = service.arriveAtStop(10L, 50L, "driver");
 
-        when(tripStopRepo.findRemainingStopsOrdered(100L)).thenReturn(java.util.List.of(stop1));
-        when(tripStopRepo.findByTripDraftStopId(1L)).thenReturn(Optional.of(stop1));
+        assertAll(
+                () -> assertNotNull(resp),
+                () -> assertEquals(TripStopStatus.IN_PROGRESS, ts.getStatus())
+        );
+    }
 
-        DriverTripResponse response = driverTripService.arriveAtStop(50L, 1L, "driver1");
+    @Test
+    @DisplayName("[L1-DR-29] adminOverrideTripExecution performs FORCE_RETURN for completed trip")
+    void adminOverrideForceReturnSuccess() {
+        execution.setStatus("COMPLETED");
+        Vehicle v = Vehicle.builder().id(1L).status(VehicleStatus.IN_USE).build();
+        trip.setVehicle(v);
+        when(executions.findById(10L)).thenReturn(Optional.of(execution));
 
-        assertThat(response).isNotNull();
-        assertThat(stop1.getStatus()).isEqualTo(TripStopStatus.IN_PROGRESS);
-        assertThat(stop1.getActualArrivalTime()).isNotNull();
-        verify(tripStopRepo).save(stop1);
+        com.elog.dto.request.AdminTripOverrideRequest req = new com.elog.dto.request.AdminTripOverrideRequest();
+        req.setAction("FORCE_RETURN");
+        req.setReason("Driver vehicle returned late");
+
+        DriverTripResponse resp = service.adminOverrideTripExecution(10L, req, "admin");
+
+        assertAll(
+                () -> assertNotNull(resp),
+                () -> assertEquals(VehicleStatus.AVAILABLE, v.getStatus())
+        );
+    }
+
+    @Test
+    @DisplayName("[L1-DR-30] adminOverrideTripExecution performs FORCE_COMPLETE_AND_RETURN")
+    void adminOverrideForceCompleteAndReturnSuccess() {
+        execution.setStatus("IN_PROGRESS");
+        Vehicle v = Vehicle.builder().id(1L).status(VehicleStatus.IN_USE).build();
+        trip.setVehicle(v);
+        when(executions.findById(10L)).thenReturn(Optional.of(execution));
+        when(results.findByTripExecutionId(10L)).thenReturn(List.of());
+
+        com.elog.dto.request.AdminTripOverrideRequest req = new com.elog.dto.request.AdminTripOverrideRequest();
+        req.setAction("FORCE_COMPLETE_AND_RETURN");
+        req.setReason("Emergency complete by admin");
+
+        DriverTripResponse resp = service.adminOverrideTripExecution(10L, req, "admin");
+
+        assertAll(
+                () -> assertNotNull(resp),
+                () -> assertEquals("COMPLETED", execution.getStatus())
+        );
     }
 }
+

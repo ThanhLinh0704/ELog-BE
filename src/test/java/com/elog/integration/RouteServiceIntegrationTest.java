@@ -1,212 +1,164 @@
 package com.elog.integration;
 
+import com.elog.dto.request.RouteCreateRequest;
+import com.elog.dto.request.RouteStopAddRequest;
+import com.elog.dto.request.RouteStopReorderRequest;
+import com.elog.dto.response.RouteResponse;
+import com.elog.entity.District;
+import com.elog.entity.Province;
+import com.elog.entity.Route;
+import com.elog.entity.RouteStop;
+import com.elog.entity.Store;
+import com.elog.entity.Ward;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.DistrictRepository;
+import com.elog.repository.ProvinceRepository;
+import com.elog.repository.RouteRepository;
+import com.elog.repository.RouteStopRepository;
+import com.elog.repository.StoreRepository;
+import com.elog.repository.WardRepository;
+import com.elog.service.RouteService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
+@ActiveProfiles("dev")
 @Transactional
-public class RouteServiceIntegrationTest {
+@ExtendWith(Report5L2EvidenceExtension.class)
+class RouteServiceIntegrationTest {
 
-    /**
-     * TEST ID: INT-ROUT-01
-     * COVERS: Integration of Route service with DB and migrations.
-     */
+    @Autowired RouteService routeService;
+    @Autowired RouteRepository routeRepository;
+    @Autowired RouteStopRepository routeStopRepository;
+    @Autowired StoreRepository storeRepository;
+    @Autowired ProvinceRepository provinceRepository;
+    @Autowired DistrictRepository districtRepository;
+    @Autowired WardRepository wardRepository;
+    @Autowired EntityManager entityManager;
+
     @Test
-    void integrationTest_Scenario1() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-01");
+    void l2Rsm01CreatesInactiveNormalizedRouteWithoutStops() {
+        RouteCreateRequest request = new RouteCreateRequest();
+        request.setCode(unique("rt").toLowerCase());
+        request.setName("Report 5 route");
+
+        RouteResponse response = routeService.createRoute(request);
+        entityManager.flush();
+        entityManager.clear();
+
+        Route route = routeRepository.findById(response.getId()).orElseThrow();
+        assertThat(route.getCode()).isEqualTo(request.getCode().toUpperCase());
+        assertThat(route.getIsActive()).isFalse();
+        assertThat(routeStopRepository.countByRouteId(route.getId())).isZero();
     }
 
-    /**
-     * TEST ID: INT-ROUT-02
-     * COVERS: Integration of Route service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario2() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-02");
+    void l2Rsm02RejectsDuplicateStopWithoutInsert() {
+        Route route = route();
+        Store store = store(true);
+        routeStopRepository.saveAndFlush(RouteStop.builder().route(route).store(store).sequenceOrder(1).build());
+        RouteStopAddRequest request = add(store.getId());
+        long before = routeStopRepository.count();
+
+        assertThatThrownBy(() -> routeService.addStop(route.getId(), request))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.ROUTE_STOP_DUPLICATE));
+        assertThat(routeStopRepository.count()).isEqualTo(before);
     }
 
-    /**
-     * TEST ID: INT-ROUT-03
-     * COVERS: Integration of Route service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario3() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-03");
+    void l2Rsm03RejectsInactiveStoreWithoutInsert() {
+        Route route = route();
+        Store store = store(false);
+        long before = routeStopRepository.count();
+
+        assertThatThrownBy(() -> routeService.addStop(route.getId(), add(store.getId())))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.STORE_INACTIVE));
+        assertThat(routeStopRepository.count()).isEqualTo(before);
     }
 
-    /**
-     * TEST ID: INT-ROUT-04
-     * COVERS: Integration of Route service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario4() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-04");
+    void l2Rsm04ReordersAllStopsWithoutUniqueSequenceCollision() {
+        Route route = route();
+        List<RouteStop> stops = new ArrayList<>();
+        for (int sequence = 1; sequence <= 4; sequence++) {
+            stops.add(routeStopRepository.save(RouteStop.builder()
+                    .route(route).store(store(true)).sequenceOrder(sequence).build()));
+        }
+        routeStopRepository.flush();
+        RouteStopReorderRequest request = reorder(List.of(
+                stops.get(3).getId(), stops.get(1).getId(), stops.get(0).getId(), stops.get(2).getId()));
+
+        routeService.reorderStops(route.getId(), request);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(route.getId()))
+                .extracting(RouteStop::getId).containsExactlyElementsOf(request.getOrderedStopIds());
     }
 
-    /**
-     * TEST ID: INT-ROUT-05
-     * COVERS: Integration of Route service with DB and migrations.
-     */
     @Test
-    void integrationTest_Scenario5() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-05");
+    void l2Rsm05RejectsIncompleteReorderAndLeavesSequenceUnchanged() {
+        Route route = route();
+        RouteStop first = routeStopRepository.save(RouteStop.builder()
+                .route(route).store(store(true)).sequenceOrder(1).build());
+        RouteStop second = routeStopRepository.saveAndFlush(RouteStop.builder()
+                .route(route).store(store(true)).sequenceOrder(2).build());
+
+        assertThatThrownBy(() -> routeService.reorderStops(route.getId(), reorder(List.of(second.getId()))))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.ROUTE_STOP_REORDER_INVALID));
+        entityManager.clear();
+        assertThat(routeStopRepository.findByRouteIdOrderBySequenceOrderAsc(route.getId()))
+                .extracting(RouteStop::getId).containsExactly(first.getId(), second.getId());
     }
 
-    /**
-     * TEST ID: INT-ROUT-06
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario6() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-06");
+    private Route route() {
+        return routeRepository.saveAndFlush(Route.builder()
+                .code(unique("RT")).name("Route").isActive(false).build());
     }
 
-    /**
-     * TEST ID: INT-ROUT-07
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario7() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-07");
+    private Store store(boolean active) {
+        String suffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+        Province province = provinceRepository.save(Province.builder()
+                .code("P" + suffix).name("Province").fullName("Province " + suffix).build());
+        District district = districtRepository.save(District.builder()
+                .code("D" + suffix).name("District").fullName("District " + suffix).province(province).build());
+        Ward ward = wardRepository.save(Ward.builder()
+                .code("W" + suffix).name("Ward").fullName("Ward " + suffix).district(district).build());
+        return storeRepository.saveAndFlush(Store.builder().code(unique("ST")).name("Store")
+                .province(province).district(district).ward(ward).addressDetail("123 Street")
+                .isActive(active).latitude(21.0).longitude(105.0).build());
     }
 
-    /**
-     * TEST ID: INT-ROUT-08
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario8() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-08");
+    private RouteStopAddRequest add(Long storeId) {
+        RouteStopAddRequest request = new RouteStopAddRequest();
+        request.setStoreId(storeId);
+        return request;
     }
 
-    /**
-     * TEST ID: INT-ROUT-09
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario9() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-09");
+    private RouteStopReorderRequest reorder(List<Long> ids) {
+        RouteStopReorderRequest request = new RouteStopReorderRequest();
+        request.setOrderedStopIds(ids);
+        return request;
     }
 
-    /**
-     * TEST ID: INT-ROUT-10
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario10() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-10");
+    private String unique(String prefix) {
+        return prefix + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
-
-    /**
-     * TEST ID: INT-ROUT-11
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario11() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-11");
-    }
-
-    /**
-     * TEST ID: INT-ROUT-12
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario12() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-12");
-    }
-
-    /**
-     * TEST ID: INT-ROUT-13
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario13() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-13");
-    }
-
-    /**
-     * TEST ID: INT-ROUT-14
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario14() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-14");
-    }
-
-    /**
-     * TEST ID: INT-ROUT-15
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario15() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-15");
-    }
-
-    /**
-     * TEST ID: INT-ROUT-16
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario16() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-16");
-    }
-
-    /**
-     * TEST ID: INT-ROUT-17
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario17() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-17");
-    }
-
-    /**
-     * TEST ID: INT-ROUT-18
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario18() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-18");
-    }
-
-    /**
-     * TEST ID: INT-ROUT-19
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario19() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-19");
-    }
-
-    /**
-     * TEST ID: INT-ROUT-20
-     * COVERS: Integration of Route service with DB and migrations.
-     */
-    @Test
-    void integrationTest_Scenario20() {
-        // TODO: Implement actual db integration call
-        assertTrue(true, "L2 Test Passed: INT-ROUT-20");
-    }
-
 }
+

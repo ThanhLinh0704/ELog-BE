@@ -1,248 +1,60 @@
 package com.elog.service;
 
-import com.elog.dto.response.*;
+import com.elog.dto.response.CapacityValidationResultResponse;
 import com.elog.entity.*;
-import com.elog.repository.OrderRepository;
-import com.elog.repository.TripDraftRepository;
-import com.elog.repository.UserRepository;
-import com.elog.repository.VehicleRepository;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
+import com.elog.repository.*;
 import com.elog.service.impl.CapacityValidationServiceImpl;
+import com.elog.service.impl.ConstraintValidationServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Optional;
+import java.time.*;
+import java.util.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CapacityValidationServiceImplTest {
+    @Mock TripDraftRepository draftRepo; @Mock VehicleRepository vehicleRepo; @Mock UserRepository userRepo; @Mock OrderRepository orderRepo; @Mock RecommendationService recommendationService;
+    CapacityValidationServiceImpl service; TripDraft draft; TripDraftStop stop; Store store; User user;
+    @BeforeEach void setUp(){service=new CapacityValidationServiceImpl(draftRepo,vehicleRepo,userRepo,orderRepo,recommendationService,new ConstraintValidationServiceImpl());store=Store.builder().id(10L).code("S1").allowedDeliveryHours("08:00-17:00").maxAllowedVehicleWeight(new BigDecimal("20000")).build();draft=TripDraft.builder().id(1L).route(Route.builder().code("R1").build()).deliveryDate(LocalDate.of(2026,8,14)).status("PLANNED").totalVolumeM3(new BigDecimal("5")).totalWeightKg(new BigDecimal("1000")).build();stop=TripDraftStop.builder().id(2L).tripDraft(draft).store(store).isActive(true).sequenceNo(1).plannedEta(LocalDateTime.of(2026,8,14,10,0)).build();draft.setStops(List.of(stop));user=User.builder().id(3L).username("dispatcher").fullName("Dispatcher").build();}
+    Vehicle vehicle(long id,String volume,String weight){return Vehicle.builder().id(id).plateNumber("P"+id).vehicleType("VAN").maxVolumeM3(volume==null?null:new BigDecimal(volume)).payloadKg(weight==null?null:new BigDecimal(weight)).isActive(true).build();}
+    CapacityValidationResultResponse run(List<Vehicle> vehicles,List<Order> orders){when(draftRepo.findById(1L)).thenReturn(Optional.of(draft));when(vehicleRepo.findByIsActiveTrue()).thenReturn(vehicles);when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.of(user));when(orderRepo.findByTripDraftId(1L)).thenReturn(orders);return service.validate(1L,"dispatcher");}
+    BusinessException error(){return assertThrows(BusinessException.class,()->service.validate(1L,"dispatcher"));}
 
-    @Mock
-    private TripDraftRepository tripDraftRepo;
-
-    @Mock
-    private VehicleRepository vehicleRepo;
-
-    @Mock
-    private UserRepository userRepo;
-
-    @Mock
-    private OrderRepository orderRepository;
-
-    @Mock
-    private RecommendationService recommendationService;
-
-    @org.mockito.Spy
-    private ConstraintValidationService constraintValidationService = new com.elog.service.impl.ConstraintValidationServiceImpl();
-
-    @InjectMocks
-    private CapacityValidationServiceImpl capacityValidationService;
-
-    private User testUser;
-    private TripDraft testDraft;
-    private Route testRoute;
-    private Vehicle testVehicle;
-    private Store testStore;
-    private TripDraftStop testStop;
-
-    @BeforeEach
-    void setUp() {
-        testUser = User.builder().id(1L).username("dispatcher").fullName("Dispatcher Test").build();
-
-        testRoute = Route.builder().id(10L).code("RT-010").name("Route 10").isActive(true).build();
-
-        testStore = Store.builder()
-                .id(100L)
-                .code("ST-001")
-                .name("Store 1")
-                .maxAllowedVehicleWeight(BigDecimal.valueOf(10000))
-                .allowedDeliveryHours("08:00-17:00")
-                .isActive(true)
-                .build();
-
-        testDraft = TripDraft.builder()
-                .id(1L)
-                .route(testRoute)
-                .deliveryDate(LocalDate.now())
-                .status("PLANNED")
-                .totalVolumeM3(BigDecimal.valueOf(5.0))
-                .totalWeightKg(BigDecimal.valueOf(2000.0))
-                .volumeCheckResult(ConstraintResult.NOT_CHECKED)
-                .weightCheckResult(ConstraintResult.NOT_CHECKED)
-                .build();
-
-        testStop = TripDraftStop.builder()
-                .id(200L)
-                .tripDraft(testDraft)
-                .store(testStore)
-                .isActive(true)
-                .sequenceNo(1)
-                .plannedEta(LocalDateTime.of(LocalDate.now(), java.time.LocalTime.of(10, 0)))
-                .build();
-
-        testDraft.setStops(Arrays.asList(testStop));
-
-        testVehicle = Vehicle.builder()
-                .id(1L)
-                .plateNumber("29A-12345")
-                .vehicleType("1.25 TONS")
-                .maxVolumeM3(BigDecimal.valueOf(10.0))
-                .payloadKg(BigDecimal.valueOf(3000.0))
-                .isActive(true)
-                .build();
-    }
-
-    @Test
-    void validate_success_eligibleVehicle() {
-        when(tripDraftRepo.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(vehicleRepo.findByIsActiveTrue()).thenReturn(Collections.singletonList(testVehicle));
-        when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.of(testUser));
-        when(orderRepository.findByTripDraftId(1L)).thenReturn(Collections.emptyList());
-
-        CapacityValidationResultResponse response = capacityValidationService.validate(1L, "dispatcher");
-
-        assertThat(response.isValidationPassed()).isTrue();
-        assertThat(response.getEligibleVehicles()).hasSize(1);
-        assertThat(response.getIneligibleVehicles()).isEmpty();
-        assertThat(response.getNewStatus()).isEqualTo("VALIDATED");
-
-        verify(tripDraftRepo).save(testDraft);
-    }
-
-    @Test
-    void validate_fails_whenVolumeExceedsSafetyBuffer() {
-        // Safe volume buffer is 10.0 * 0.9 = 9.0. Let's make draft volume 9.5
-        testDraft.setTotalVolumeM3(BigDecimal.valueOf(9.5));
-
-        when(tripDraftRepo.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(vehicleRepo.findByIsActiveTrue()).thenReturn(Collections.singletonList(testVehicle));
-        when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.of(testUser));
-        when(orderRepository.findByTripDraftId(1L)).thenReturn(Collections.emptyList());
-
-        CapacityValidationResultResponse response = capacityValidationService.validate(1L, "dispatcher");
-
-        assertThat(response.isValidationPassed()).isFalse();
-        assertThat(response.getEligibleVehicles()).isEmpty();
-        assertThat(response.getIneligibleVehicles()).hasSize(1);
-        assertThat(response.getIneligibleVehicles().get(0).getFailureReason()).contains("Volume exceeds safety limit");
-    }
-
-    @Test
-    void validate_fails_whenWeightExceedsStoreLimit() {
-        // Store max allowed vehicle weight is 10000. Let's set vehicle weight capacity to 12000, which exceeds store limit.
-        testVehicle.setPayloadKg(BigDecimal.valueOf(12000.0));
-
-        when(tripDraftRepo.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(vehicleRepo.findByIsActiveTrue()).thenReturn(Collections.singletonList(testVehicle));
-        when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.of(testUser));
-        when(orderRepository.findByTripDraftId(1L)).thenReturn(Collections.emptyList());
-
-        CapacityValidationResultResponse response = capacityValidationService.validate(1L, "dispatcher");
-
-        assertThat(response.isValidationPassed()).isFalse();
-        assertThat(response.getEligibleVehicles()).isEmpty();
-        assertThat(response.getIneligibleVehicles()).hasSize(1);
-        assertThat(response.getIneligibleVehicles().get(0).getFailureReason()).contains("exceeds store ST-001 limit");
-    }
-
-    @Test
-    void validate_fails_whenEtaOutsideStoreAllowedHours() {
-        // Allowed hours: 08:00-17:00. Let's set plannedEta to 20:00.
-        testStop.setPlannedEta(LocalDateTime.of(LocalDate.now(), java.time.LocalTime.of(20, 0)));
-
-        when(tripDraftRepo.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(vehicleRepo.findByIsActiveTrue()).thenReturn(Collections.singletonList(testVehicle));
-        when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.of(testUser));
-        when(orderRepository.findByTripDraftId(1L)).thenReturn(Collections.emptyList());
-
-        CapacityValidationResultResponse response = capacityValidationService.validate(1L, "dispatcher");
-
-        assertThat(response.isValidationPassed()).isFalse();
-        assertThat(response.getEligibleVehicles()).isEmpty();
-        assertThat(response.getIneligibleVehicles()).hasSize(1);
-        assertThat(response.getIneligibleVehicles().get(0).getFailureReason()).contains("is outside store ST-001 allowed delivery hours");
-    }
-
-    @Test
-    void validate_fails_whenEtaOutsideOrderTimeWindow() {
-        // ETA is 10:00. Order requires delivery before 09:00.
-        Order testOrder = Order.builder()
-                .id(500L)
-                .orderRef("ORD-999")
-                .store(testStore)
-                .deliveryTimeWindow("Trước 9h")
-                .build();
-
-        when(tripDraftRepo.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(vehicleRepo.findByIsActiveTrue()).thenReturn(Collections.singletonList(testVehicle));
-        when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.of(testUser));
-        when(orderRepository.findByTripDraftId(1L)).thenReturn(Collections.singletonList(testOrder));
-
-        CapacityValidationResultResponse response = capacityValidationService.validate(1L, "dispatcher");
-
-        assertThat(response.isValidationPassed()).isFalse();
-        assertThat(response.getEligibleVehicles()).isEmpty();
-        assertThat(response.getIneligibleVehicles()).hasSize(1);
-        assertThat(response.getIneligibleVehicles().get(0).getFailureReason()).contains("violates delivery window (Trước 9h) for order ORD-999");
-    }
-
-    @Test
-    void validate_success_viaTwoVehicleFallback_whenNoSingleVehicleFitsButPairDoes() {
-        // 9.5 m³ exceeds safety buffer of single vehicle (10.0 * 0.9 = 9.0) -> no single vehicle fits,
-        // but Recommendation Engine confirms a two-vehicle split is feasible (BR-07).
-        testDraft.setTotalVolumeM3(BigDecimal.valueOf(9.5));
-
-        when(tripDraftRepo.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(vehicleRepo.findByIsActiveTrue()).thenReturn(Collections.singletonList(testVehicle));
-        when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.of(testUser));
-        when(orderRepository.findByTripDraftId(1L)).thenReturn(Collections.emptyList());
-        when(recommendationService.isTwoVehicleFeasible(1L)).thenReturn(true);
-
-        CapacityValidationResultResponse response = capacityValidationService.validate(1L, "dispatcher");
-
-        assertThat(response.isValidationPassed()).isTrue();
-        assertThat(response.getNewStatus()).isEqualTo("VALIDATED");
-        assertThat(response.getEligibleVehicles()).isEmpty();
-        assertThat(response.getIneligibleVehicles()).hasSize(1);
-        assertThat(response.getSuggestion()).contains("two-vehicle split is feasible");
-        assertThat(response.getMessage()).contains("two-vehicle split");
-        assertThat(testDraft.getStatus()).isEqualTo("VALIDATED");
-        assertThat(testDraft.getValidatedAt()).isNotNull();
-
-        verify(recommendationService).isTwoVehicleFeasible(1L);
-        verify(tripDraftRepo).save(testDraft);
-    }
-
-    @Test
-    void validate_fails_whenNeitherSingleNorTwoVehicleFits() {
-        // Same draft exceeding single vehicle limit, but this time Recommendation Engine also says
-        // no two-vehicle pair fits -> must stay at PLANNED, must NOT accidentally pass.
-        testDraft.setTotalVolumeM3(BigDecimal.valueOf(9.5));
-
-        when(tripDraftRepo.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(vehicleRepo.findByIsActiveTrue()).thenReturn(Collections.singletonList(testVehicle));
-        when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.of(testUser));
-        when(orderRepository.findByTripDraftId(1L)).thenReturn(Collections.emptyList());
-        when(recommendationService.isTwoVehicleFeasible(1L)).thenReturn(false);
-
-        CapacityValidationResultResponse response = capacityValidationService.validate(1L, "dispatcher");
-
-        assertThat(response.isValidationPassed()).isFalse();
-        assertThat(response.getNewStatus()).isEqualTo("PLANNED");
-        assertThat(response.getBindingConstraint()).isEqualTo("VOLUME");
-        assertThat(response.getSuggestion()).contains("no two-vehicle split is feasible either");
-        assertThat(testDraft.getStatus()).isEqualTo("PLANNED");
-
-        verify(recommendationService).isTwoVehicleFeasible(1L);
-    }
+    @Test @DisplayName("[L1-CV-01] load within both safety limits validates one eligible vehicle") void withinLimitsPasses(){CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of());assertAll(()->assertTrue(r.isValidationPassed()),()->assertEquals("VALIDATED",r.getNewStatus()),()->assertEquals(1,r.getEligibleVehicles().size()),()->assertSame(user,draft.getValidatedBy()));}
+    @Test @DisplayName("[L1-CV-02] volume exactly at ninety-percent boundary remains eligible") void exactVolumeBoundaryPasses(){draft.setTotalVolumeM3(new BigDecimal("9.0"));CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of());assertEquals(1,r.getEligibleVehicles().size());}
+    @Test @DisplayName("[L1-CV-03] eligible vehicles are sorted by maximum volume ascending") void eligibleVehiclesAreSorted(){CapacityValidationResultResponse r=run(List.of(vehicle(1,"20","3000"),vehicle(2,"10","3000"),vehicle(3,"15","3000")),List.of());assertEquals(List.of(new BigDecimal("10"),new BigDecimal("15"),new BigDecimal("20")),r.getEligibleVehicles().stream().map(v->v.getMaxVolumeM3()).toList());}
+    @Test @DisplayName("[L1-CV-04] volume above safety limit makes vehicle ineligible") void volumeOverLimitFails(){draft.setTotalVolumeM3(new BigDecimal("9.5"));CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","3000")),List.of());assertTrue(r.getIneligibleVehicles().getFirst().getFailureReason().contains("Volume exceeds safety limit"));}
+    @Test @DisplayName("[L1-CV-06] weight above safety limit makes vehicle ineligible") void weightOverLimitFails(){draft.setTotalWeightKg(new BigDecimal("1801"));CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of());assertTrue(r.getIneligibleVehicles().getFirst().getFailureReason().contains("Weight exceeds safety limit"));}
+    @Test @DisplayName("[L1-CV-07] simultaneous volume and weight failures are joined in one reason") void bothCapacityFailuresAreJoined(){draft.setTotalVolumeM3(new BigDecimal("9.5"));draft.setTotalWeightKg(new BigDecimal("1801"));CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of());String reason=r.getIneligibleVehicles().getFirst().getFailureReason();assertTrue(reason.contains("Volume exceeds safety limit")&&reason.contains(" and Weight exceeds safety limit"));}
+    @Test @DisplayName("[L1-CV-08] vehicle above store route weight limit is rejected") void routeWeightLimitRejectsVehicle(){store.setMaxAllowedVehicleWeight(new BigDecimal("10000"));CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","10001")),List.of());assertTrue(r.getIneligibleVehicles().getFirst().getFailureReason().contains("exceeds store S1 limit"));}
+    @Test @DisplayName("[L1-CV-09] ETA outside store delivery hours rejects vehicle") void storeHoursRejectEta(){stop.setPlannedEta(LocalDateTime.of(2026,8,14,20,0));CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of());assertTrue(r.getIneligibleVehicles().getFirst().getFailureReason().contains("outside store S1 allowed delivery hours"));}
+    @Test @DisplayName("[L1-CV-10] ETA after before-nine order window rejects vehicle") void orderWindowRejectsEta(){Order order=Order.builder().id(4L).orderRef("O1").store(store).deliveryTimeWindow("Trước 9h").build();CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of(order));assertTrue(r.getIneligibleVehicles().getFirst().getFailureReason().contains("violates delivery window"));}
+    @Test @DisplayName("[L1-CV-11] overridden order time window is skipped") void overriddenOrderWindowIsSkipped(){Order order=Order.builder().id(4L).orderRef("O1").store(store).deliveryTimeWindow("Trước 9h").isDeliveryTimeOverridden(true).build();CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of(order));assertEquals(1,r.getEligibleVehicles().size());}
+    @Test @DisplayName("[L1-CV-12] vehicle missing capacity data is silently skipped") void missingCapacityVehicleIsSkipped(){when(recommendationService.isTwoVehicleFeasible(1L)).thenReturn(false);CapacityValidationResultResponse r=run(List.of(vehicle(1,null,"2000")),List.of());assertAll(()->assertTrue(r.getEligibleVehicles().isEmpty()),()->assertTrue(r.getIneligibleVehicles().isEmpty()));}
+    @Test @DisplayName("[L1-CV-13] already validated draft is rejected with conflict") void validatedDraftIsRejected(){draft.setStatus("VALIDATED");when(draftRepo.findById(1L)).thenReturn(Optional.of(draft));assertEquals(ErrorCode.ALREADY_VALIDATED,error().getErrorCode());}
+    @Test @DisplayName("[L1-CV-14] dispatched draft is rejected as not confirmed") void dispatchedDraftIsRejected(){draft.setStatus("DISPATCHED");when(draftRepo.findById(1L)).thenReturn(Optional.of(draft));assertEquals(ErrorCode.TRIP_DRAFT_NOT_CONFIRMED,error().getErrorCode());}
+    @Test @DisplayName("[L1-CV-15] missing trip draft returns TRIP_DRAFT_NOT_FOUND") void missingDraftIsRejected(){when(draftRepo.findById(1L)).thenReturn(Optional.empty());assertEquals(ErrorCode.TRIP_DRAFT_NOT_FOUND,error().getErrorCode());}
+    @Test @DisplayName("[L1-CV-16] zero volume and weight is rejected as no items") void zeroLoadIsRejected(){draft.setTotalVolumeM3(BigDecimal.ZERO);draft.setTotalWeightKg(BigDecimal.ZERO);when(draftRepo.findById(1L)).thenReturn(Optional.of(draft));assertEquals(ErrorCode.NO_ITEMS_TO_VALIDATE,error().getErrorCode());}
+    @Test @DisplayName("[L1-CV-17] empty active fleet returns service-unavailable business error") void emptyFleetIsRejected(){when(draftRepo.findById(1L)).thenReturn(Optional.of(draft));when(vehicleRepo.findByIsActiveTrue()).thenReturn(List.of());BusinessException e=error();assertAll(()->assertEquals(ErrorCode.NO_ACTIVE_VEHICLE,e.getErrorCode()),()->assertEquals(503,e.getHttpStatus().value()));}
+    @Test @DisplayName("[L1-CV-18] unknown validator username returns RESOURCE_NOT_FOUND") void unknownValidatorIsRejected(){when(draftRepo.findById(1L)).thenReturn(Optional.of(draft));when(vehicleRepo.findByIsActiveTrue()).thenReturn(List.of(vehicle(1,"10","2000")));when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.empty());assertEquals(ErrorCode.RESOURCE_NOT_FOUND,error().getErrorCode());}
+    @Test @DisplayName("[L1-CV-21] weight-only fleet failure reports WEIGHT binding constraint") void weightBindingIsReported(){draft.setTotalWeightKg(new BigDecimal("2000"));when(recommendationService.isTwoVehicleFeasible(1L)).thenReturn(false);CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of());assertEquals("WEIGHT",r.getBindingConstraint());}
+    @Test @DisplayName("[L1-CV-22] volume-and-weight fleet failure reports BOTH binding constraint") void bothBindingIsReported(){draft.setTotalVolumeM3(new BigDecimal("10"));draft.setTotalWeightKg(new BigDecimal("2000"));when(recommendationService.isTwoVehicleFeasible(1L)).thenReturn(false);CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of());assertEquals("BOTH",r.getBindingConstraint());}
+    @Test @DisplayName("[L1-CV-23] volume-only fleet failure reports VOLUME binding constraint") void volumeBindingIsReported(){draft.setTotalVolumeM3(new BigDecimal("10"));when(recommendationService.isTwoVehicleFeasible(1L)).thenReturn(false);CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of());assertEquals("VOLUME",r.getBindingConstraint());}
+    @Test @DisplayName("[L1-CV-24] time-window fleet failure reports TIME_WINDOW binding constraint") void timeWindowBindingIsReported(){stop.setPlannedEta(LocalDateTime.of(2026,8,14,20,0));when(recommendationService.isTwoVehicleFeasible(1L)).thenReturn(false);CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of());assertEquals("TIME_WINDOW",r.getBindingConstraint());}
+    @Test @DisplayName("[L1-CV-25] route-weight fleet failure reports ROUTE_CONSTRAINT binding constraint") void routeConstraintBindingIsReported(){store.setMaxAllowedVehicleWeight(new BigDecimal("1000"));when(recommendationService.isTwoVehicleFeasible(1L)).thenReturn(false);CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of());assertEquals("ROUTE_CONSTRAINT",r.getBindingConstraint());}
+    @Test @DisplayName("[L1-CV-26] two-vehicle split feasible sets VALIDATED status with suggestion") void twoVehicleSplitFeasiblePasses(){draft.setTotalVolumeM3(new BigDecimal("15"));when(recommendationService.isTwoVehicleFeasible(1L)).thenReturn(true);CapacityValidationResultResponse r=run(List.of(vehicle(1,"10","2000")),List.of());assertAll(()->assertTrue(r.isValidationPassed()),()->assertEquals("VALIDATED",r.getNewStatus()),()->assertTrue(r.getSuggestion().contains("two-vehicle split is feasible")));}
+    @Test @DisplayName("[L1-CV-27] getValidationResult returns persisted validation outcome") void getValidationResultReturnsPersistedState(){draft.setStatus("VALIDATED");draft.setVolumeCheckResult(ConstraintResult.PASS);draft.setWeightCheckResult(ConstraintResult.PASS);draft.setValidatedBy(user);draft.setValidatedAt(LocalDateTime.now());when(draftRepo.findById(1L)).thenReturn(Optional.of(draft));when(vehicleRepo.findByIsActiveTrue()).thenReturn(List.of(vehicle(1,"10","2000")));when(orderRepo.findByTripDraftId(1L)).thenReturn(List.of());CapacityValidationResultResponse r=service.getValidationResult(1L);assertAll(()->assertTrue(r.isValidationPassed()),()->assertEquals("VALIDATED",r.getNewStatus()),()->assertEquals(1,r.getEligibleVehicles().size()),()->assertNotNull(r.getValidatedBy()));}
+    @Test @DisplayName("[L1-CV-28] getValidationResult with unvalidated draft returns NOT_CHECKED message") void getValidationResultUnvalidatedDraft(){draft.setVolumeCheckResult(ConstraintResult.NOT_CHECKED);when(draftRepo.findById(1L)).thenReturn(Optional.of(draft));when(vehicleRepo.findByIsActiveTrue()).thenReturn(List.of());CapacityValidationResultResponse r=service.getValidationResult(1L);assertAll(()->assertFalse(r.isValidationPassed()),()->assertTrue(r.getMessage().contains("Chưa có kết quả kiểm tra")));}
 }
+

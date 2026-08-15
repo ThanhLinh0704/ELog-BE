@@ -1,0 +1,362 @@
+{
+  "projectRoot": "D:\\FULearning\\semester 9\\Elog\\ELog-BE",
+  "batchFiles": [
+    {
+      "path": "docs/api-conventions.md",
+      "language": "markdown",
+      "sizeLines": 158,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/business-rules.md",
+      "language": "markdown",
+      "sizeLines": 104,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/commit-helper-skill.md",
+      "language": "markdown",
+      "sizeLines": 115,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/data-model.md",
+      "language": "markdown",
+      "sizeLines": 172,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/tech-stack.md",
+      "language": "markdown",
+      "sizeLines": 190,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "docs/us01-checklist.md",
+      "language": "markdown",
+      "sizeLines": 177,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "ELog_kehoachphattrien.md",
+      "language": "markdown",
+      "sizeLines": 400,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "ELog_Project_Context.md",
+      "language": "markdown",
+      "sizeLines": 162,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "sizeLines": 76,
+      "fileCategory": "docs"
+    },
+    {
+      "path": "pom.xml",
+      "language": "xml",
+      "sizeLines": 164,
+      "fileCategory": "config"
+    },
+    {
+      "path": "src/main/resources/application-dev.yml",
+      "language": "yaml",
+      "sizeLines": 19,
+      "fileCategory": "config"
+    },
+    {
+      "path": "src/main/resources/application.yml",
+      "language": "yaml",
+      "sizeLines": 51,
+      "fileCategory": "config"
+    },
+    {
+      "path": "src/main/java/com/elog/config/CorsConfig.java",
+      "language": "java",
+      "sizeLines": 35,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/config/DataInitializer.java",
+      "language": "java",
+      "sizeLines": 68,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/config/FlywayConfig.java",
+      "language": "java",
+      "sizeLines": 18,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/config/SecurityConfig.java",
+      "language": "java",
+      "sizeLines": 77,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/config/SwaggerConfig.java",
+      "language": "java",
+      "sizeLines": 40,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/controller/AddressController.java",
+      "language": "java",
+      "sizeLines": 47,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/controller/AuthController.java",
+      "language": "java",
+      "sizeLines": 48,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/controller/DashboardController.java",
+      "language": "java",
+      "sizeLines": 47,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/controller/DriverStatusController.java",
+      "language": "java",
+      "sizeLines": 66,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/controller/DriverTripController.java",
+      "language": "java",
+      "sizeLines": 84,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/controller/ExceptionController.java",
+      "language": "java",
+      "sizeLines": 81,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/controller/HealthController.java",
+      "language": "java",
+      "sizeLines": 32,
+      "fileCategory": "code"
+    },
+    {
+      "path": "src/main/java/com/elog/controller/ImportController.java",
+      "language": "java",
+      "sizeLines": 108,
+      "fileCategory": "code"
+    }
+  ],
+  "batchImportData": {
+    "docs/api-conventions.md": [],
+    "docs/business-rules.md": [],
+    "docs/commit-helper-skill.md": [],
+    "docs/data-model.md": [],
+    "docs/tech-stack.md": [],
+    "docs/us01-checklist.md": [],
+    "ELog_kehoachphattrien.md": [],
+    "ELog_Project_Context.md": [],
+    "README.md": [],
+    "pom.xml": [],
+    "src/main/resources/application-dev.yml": [],
+    "src/main/resources/application.yml": [],
+    "src/main/java/com/elog/config/CorsConfig.java": [],
+    "src/main/java/com/elog/config/DataInitializer.java": [
+      "src/main/java/com/elog/entity/Role.java",
+      "src/main/java/com/elog/entity/User.java",
+      "src/main/java/com/elog/repository/RoleRepository.java",
+      "src/main/java/com/elog/repository/UserRepository.java"
+    ],
+    "src/main/java/com/elog/config/FlywayConfig.java": [],
+    "src/main/java/com/elog/config/SecurityConfig.java": [
+      "src/main/java/com/elog/security/CustomAccessDeniedHandler.java",
+      "src/main/java/com/elog/security/JwtAuthenticationEntryPoint.java",
+      "src/main/java/com/elog/security/JwtAuthFilter.java"
+    ],
+    "src/main/java/com/elog/config/SwaggerConfig.java": [],
+    "src/main/java/com/elog/controller/AddressController.java": [
+      "src/main/java/com/elog/dto/response/ActiveTripsResponse.java",
+      "src/main/java/com/elog/dto/response/ActiveTripWarningResponse.java",
+      "src/main/java/com/elog/dto/response/ApiResponse.java",
+      "src/main/java/com/elog/dto/response/AssignedRouteDto.java",
+      "src/main/java/com/elog/dto/response/AvailableDriverResponse.java",
+      "src/main/java/com/elog/dto/response/CapacityValidationResultResponse.java",
+      "src/main/java/com/elog/dto/response/ConfirmedByDto.java",
+      "src/main/java/com/elog/dto/response/ConfirmResponse.java",
+      "src/main/java/com/elog/dto/response/ConsolidateResponse.java",
+      "src/main/java/com/elog/dto/response/DeliveryExceptionResponse.java",
+      "src/main/java/com/elog/dto/response/DistrictResponse.java",
+      "src/main/java/com/elog/dto/response/DriverResponse.java",
+      "src/main/java/com/elog/dto/response/DriverStatusHistoryResponse.java",
+      "src/main/java/com/elog/dto/response/DriverTripCalendarDayResponse.java",
+      "src/main/java/com/elog/dto/response/DriverTripResponse.java",
+      "src/main/java/com/elog/dto/response/DuplicateBatchResponse.java",
+      "src/main/java/com/elog/dto/response/EligibleVehicleDto.java",
+      "src/main/java/com/elog/dto/response/EligibleVehiclesResponse.java",
+      "src/main/java/com/elog/dto/response/ExceptionListResponse.java",
+      "src/main/java/com/elog/dto/response/FleetCapacityCheckResponse.java",
+      "src/main/java/com/elog/dto/response/ImportBatchResponse.java",
+      "src/main/java/com/elog/dto/response/ImportedOrderDetailResponse.java",
+      "src/main/java/com/elog/dto/response/ImportErrorResponse.java",
+      "src/main/java/com/elog/dto/response/IneligibleVehicleDto.java",
+      "src/main/java/com/elog/dto/response/KpiByRouteResponse.java",
+      "src/main/java/com/elog/dto/response/KpiDailyTrendResponse.java",
+      "src/main/java/com/elog/dto/response/KpiSummaryResponse.java",
+      "src/main/java/com/elog/dto/response/ManifestByStopResponse.java",
+      "src/main/java/com/elog/dto/response/ManifestLineDto.java",
+      "src/main/java/com/elog/dto/response/ManifestResponse.java",
+      "src/main/java/com/elog/dto/response/PermissionResponse.java",
+      "src/main/java/com/elog/dto/response/PlanningEventResponse.java",
+      "src/main/java/com/elog/dto/response/ProductListItemResponse.java",
+      "src/main/java/com/elog/dto/response/ProductResponse.java",
+      "src/main/java/com/elog/dto/response/ProvinceResponse.java",
+      "src/main/java/com/elog/dto/response/RecalculateEtaResponse.java",
+      "src/main/java/com/elog/dto/response/RecommendationResultResponse.java",
+      "src/main/java/com/elog/dto/response/RoleResponse.java",
+      "src/main/java/com/elog/dto/response/RouteDetailResponse.java",
+      "src/main/java/com/elog/dto/response/RouteDirectionsResponse.java",
+      "src/main/java/com/elog/dto/response/RouteResponse.java",
+      "src/main/java/com/elog/dto/response/RouteStopResponse.java",
+      "src/main/java/com/elog/dto/response/RouteStopStoreDto.java",
+      "src/main/java/com/elog/dto/response/StopArriveResponse.java",
+      "src/main/java/com/elog/dto/response/StopCompleteResponse.java",
+      "src/main/java/com/elog/dto/response/StopEtaResponse.java",
+      "src/main/java/com/elog/dto/response/StopOrderItemResponse.java",
+      "src/main/java/com/elog/dto/response/StoreListItemResponse.java",
+      "src/main/java/com/elog/dto/response/StoreResponse.java",
+      "src/main/java/com/elog/dto/response/TokenRefreshResponse.java",
+      "src/main/java/com/elog/dto/response/TokenResponse.java",
+      "src/main/java/com/elog/dto/response/TripDraftResponse.java",
+      "src/main/java/com/elog/dto/response/TripDraftStopResponse.java",
+      "src/main/java/com/elog/dto/response/TripOutcomeEventResponse.java",
+      "src/main/java/com/elog/dto/response/TripOutcomeResponse.java",
+      "src/main/java/com/elog/dto/response/TripProgressResponse.java",
+      "src/main/java/com/elog/dto/response/TripResponse.java",
+      "src/main/java/com/elog/dto/response/TripSplitResponse.java",
+      "src/main/java/com/elog/dto/response/TripStartResponse.java",
+      "src/main/java/com/elog/dto/response/TripStopResponse.java",
+      "src/main/java/com/elog/dto/response/UserResponse.java",
+      "src/main/java/com/elog/dto/response/VehicleFleetCapacityResponse.java",
+      "src/main/java/com/elog/dto/response/VehicleListItemResponse.java",
+      "src/main/java/com/elog/dto/response/VehicleRecommendationResponse.java",
+      "src/main/java/com/elog/dto/response/VehicleResponse.java",
+      "src/main/java/com/elog/dto/response/WardResponse.java",
+      "src/main/java/com/elog/service/AddressService.java"
+    ],
+    "src/main/java/com/elog/controller/AuthController.java": [
+      "src/main/java/com/elog/dto/request/LoginRequest.java",
+      "src/main/java/com/elog/dto/request/TokenRefreshRequest.java",
+      "src/main/java/com/elog/dto/response/ApiResponse.java",
+      "src/main/java/com/elog/dto/response/TokenRefreshResponse.java",
+      "src/main/java/com/elog/dto/response/TokenResponse.java",
+      "src/main/java/com/elog/service/AuthService.java"
+    ],
+    "src/main/java/com/elog/controller/DashboardController.java": [
+      "src/main/java/com/elog/dto/response/ActiveTripsResponse.java",
+      "src/main/java/com/elog/dto/response/ActiveTripWarningResponse.java",
+      "src/main/java/com/elog/dto/response/ApiResponse.java",
+      "src/main/java/com/elog/dto/response/AssignedRouteDto.java",
+      "src/main/java/com/elog/dto/response/AvailableDriverResponse.java",
+      "src/main/java/com/elog/dto/response/CapacityValidationResultResponse.java",
+      "src/main/java/com/elog/dto/response/ConfirmedByDto.java",
+      "src/main/java/com/elog/dto/response/ConfirmResponse.java",
+      "src/main/java/com/elog/dto/response/ConsolidateResponse.java",
+      "src/main/java/com/elog/dto/response/DeliveryExceptionResponse.java",
+      "src/main/java/com/elog/dto/response/DistrictResponse.java",
+      "src/main/java/com/elog/dto/response/DriverResponse.java",
+      "src/main/java/com/elog/dto/response/DriverStatusHistoryResponse.java",
+      "src/main/java/com/elog/dto/response/DriverTripCalendarDayResponse.java",
+      "src/main/java/com/elog/dto/response/DriverTripResponse.java",
+      "src/main/java/com/elog/dto/response/DuplicateBatchResponse.java",
+      "src/main/java/com/elog/dto/response/EligibleVehicleDto.java",
+      "src/main/java/com/elog/dto/response/EligibleVehiclesResponse.java",
+      "src/main/java/com/elog/dto/response/ExceptionListResponse.java",
+      "src/main/java/com/elog/dto/response/FleetCapacityCheckResponse.java",
+      "src/main/java/com/elog/dto/response/ImportBatchResponse.java",
+      "src/main/java/com/elog/dto/response/ImportedOrderDetailResponse.java",
+      "src/main/java/com/elog/dto/response/ImportErrorResponse.java",
+      "src/main/java/com/elog/dto/response/IneligibleVehicleDto.java",
+      "src/main/java/com/elog/dto/response/KpiByRouteResponse.java",
+      "src/main/java/com/elog/dto/response/KpiDailyTrendResponse.java",
+      "src/main/java/com/elog/dto/response/KpiSummaryResponse.java",
+      "src/main/java/com/elog/dto/response/ManifestByStopResponse.java",
+      "src/main/java/com/elog/dto/response/ManifestLineDto.java",
+      "src/main/java/com/elog/dto/response/ManifestResponse.java",
+      "src/main/java/com/elog/dto/response/PermissionResponse.java",
+      "src/main/java/com/elog/dto/response/PlanningEventResponse.java",
+      "src/main/java/com/elog/dto/response/ProductListItemResponse.java",
+      "src/main/java/com/elog/dto/response/ProductResponse.java",
+      "src/main/java/com/elog/dto/response/ProvinceResponse.java",
+      "src/main/java/com/elog/dto/response/RecalculateEtaResponse.java",
+      "src/main/java/com/elog/dto/response/RecommendationResultResponse.java",
+      "src/main/java/com/elog/dto/response/RoleResponse.java",
+      "src/main/java/com/elog/dto/response/RouteDetailResponse.java",
+      "src/main/java/com/elog/dto/response/RouteDirectionsResponse.java",
+      "src/main/java/com/elog/dto/response/RouteResponse.java",
+      "src/main/java/com/elog/dto/response/RouteStopResponse.java",
+      "src/main/java/com/elog/dto/response/RouteStopStoreDto.java",
+      "src/main/java/com/elog/dto/response/StopArriveResponse.java",
+      "src/main/java/com/elog/dto/response/StopCompleteResponse.java",
+      "src/main/java/com/elog/dto/response/StopEtaResponse.java",
+      "src/main/java/com/elog/dto/response/StopOrderItemResponse.java",
+      "src/main/java/com/elog/dto/response/StoreListItemResponse.java",
+      "src/main/java/com/elog/dto/response/StoreResponse.java",
+      "src/main/java/com/elog/dto/response/TokenRefreshResponse.java",
+      "src/main/java/com/elog/dto/response/TokenResponse.java",
+      "src/main/java/com/elog/dto/response/TripDraftResponse.java",
+      "src/main/java/com/elog/dto/response/TripDraftStopResponse.java",
+      "src/main/java/com/elog/dto/response/TripOutcomeEventResponse.java",
+      "src/main/java/com/elog/dto/response/TripOutcomeResponse.java",
+      "src/main/java/com/elog/dto/response/TripProgressResponse.java",
+      "src/main/java/com/elog/dto/response/TripResponse.java",
+      "src/main/java/com/elog/dto/response/TripSplitResponse.java",
+      "src/main/java/com/elog/dto/response/TripStartResponse.java",
+      "src/main/java/com/elog/dto/response/TripStopResponse.java",
+      "src/main/java/com/elog/dto/response/UserResponse.java",
+      "src/main/java/com/elog/dto/response/VehicleFleetCapacityResponse.java",
+      "src/main/java/com/elog/dto/response/VehicleListItemResponse.java",
+      "src/main/java/com/elog/dto/response/VehicleRecommendationResponse.java",
+      "src/main/java/com/elog/dto/response/VehicleResponse.java",
+      "src/main/java/com/elog/dto/response/WardResponse.java",
+      "src/main/java/com/elog/service/TripMonitoringService.java"
+    ],
+    "src/main/java/com/elog/controller/DriverStatusController.java": [
+      "src/main/java/com/elog/dto/request/DriverStatusUpdateRequest.java",
+      "src/main/java/com/elog/dto/response/ApiResponse.java",
+      "src/main/java/com/elog/dto/response/DriverResponse.java",
+      "src/main/java/com/elog/dto/response/DriverStatusHistoryResponse.java",
+      "src/main/java/com/elog/service/DriverStatusService.java"
+    ],
+    "src/main/java/com/elog/controller/DriverTripController.java": [
+      "src/main/java/com/elog/dto/request/UpdateOrderResultRequest.java",
+      "src/main/java/com/elog/dto/response/ApiResponse.java",
+      "src/main/java/com/elog/dto/response/DriverTripResponse.java",
+      "src/main/java/com/elog/dto/response/TripOutcomeResponse.java",
+      "src/main/java/com/elog/service/DriverTripService.java"
+    ],
+    "src/main/java/com/elog/controller/ExceptionController.java": [
+      "src/main/java/com/elog/dto/request/RejectStopRequest.java",
+      "src/main/java/com/elog/dto/request/ResolveExceptionRequest.java",
+      "src/main/java/com/elog/dto/response/ApiResponse.java",
+      "src/main/java/com/elog/dto/response/DeliveryExceptionResponse.java",
+      "src/main/java/com/elog/dto/response/ExceptionListResponse.java",
+      "src/main/java/com/elog/service/ExceptionService.java"
+    ],
+    "src/main/java/com/elog/controller/HealthController.java": [],
+    "src/main/java/com/elog/controller/ImportController.java": [
+      "src/main/java/com/elog/dto/response/ApiResponse.java",
+      "src/main/java/com/elog/dto/response/ImportBatchResponse.java",
+      "src/main/java/com/elog/dto/response/ImportedOrderDetailResponse.java",
+      "src/main/java/com/elog/dto/response/ImportErrorResponse.java",
+      "src/main/java/com/elog/entity/User.java",
+      "src/main/java/com/elog/repository/UserRepository.java",
+      "src/main/java/com/elog/service/impl/ImportServiceImpl.java",
+      "src/main/java/com/elog/service/ImportService.java"
+    ]
+  }
+}

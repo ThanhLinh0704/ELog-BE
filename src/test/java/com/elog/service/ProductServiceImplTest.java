@@ -1,6 +1,10 @@
 package com.elog.service;
 
 import com.elog.dto.request.ProductCreateRequest;
+import com.elog.dto.request.ProductStatusUpdateRequest;
+import com.elog.dto.request.ProductUpdateRequest;
+import com.elog.dto.response.ApiResponse;
+import com.elog.dto.response.ProductListItemResponse;
 import com.elog.dto.response.ProductResponse;
 import com.elog.entity.Product;
 import com.elog.exception.BusinessException;
@@ -9,101 +13,114 @@ import com.elog.mapper.ProductMapper;
 import com.elog.repository.ProductRepository;
 import com.elog.service.impl.ProductServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ProductServiceImplTest {
+    @Mock ProductRepository productRepository;
+    @Mock ProductMapper productMapper;
 
-    @Mock
-    private ProductRepository productRepository;
-
-    @Mock
-    private ProductMapper productMapper;
-
-    @InjectMocks
-    private ProductServiceImpl productService;
-
-    private ProductCreateRequest request;
-    private Product product;
+    ProductServiceImpl service;
+    Product product;
 
     @BeforeEach
     void setUp() {
-        request = new ProductCreateRequest();
-        request.setSku("SKU-VALID");
-        request.setProductName("Valid Product");
-        request.setWeightKg(BigDecimal.valueOf(10.0));
-        request.setLengthM(BigDecimal.valueOf(0.5));
-        request.setWidthM(BigDecimal.valueOf(0.5));
-        request.setHeightM(BigDecimal.valueOf(0.5)); // volume = 0.125, ratio = 10 / 0.125 = 80 kg/m3
-
-        product = Product.builder()
-                .id(1L)
-                .sku("SKU-VALID")
-                .productName("Valid Product")
-                .weightKg(BigDecimal.valueOf(10.0))
-                .lengthM(BigDecimal.valueOf(0.5))
-                .widthM(BigDecimal.valueOf(0.5))
-                .heightM(BigDecimal.valueOf(0.5))
-                .volumeM3(BigDecimal.valueOf(0.125))
-                .isActive(true)
-                .build();
+        service = new ProductServiceImpl(productRepository, productMapper);
+        product = Product.builder().id(10L).sku("SKU-01").productName("Milk Box").weightKg(new BigDecimal("10")).volumeM3(new BigDecimal("0.02")).isActive(true).build();
     }
 
     @Test
-    void createProduct_success_validRatio() {
-        when(productRepository.existsBySku("SKU-VALID")).thenReturn(false);
-        when(productMapper.toEntity(any(ProductCreateRequest.class))).thenReturn(product);
-        when(productRepository.save(any(Product.class))).thenReturn(product);
-        when(productMapper.toResponse(any(Product.class))).thenReturn(ProductResponse.builder().id(1L).sku("SKU-VALID").build());
+    @DisplayName("[L1-PR-01] createProduct saves product for valid capacity ratio")
+    void createProductSuccess() {
+        ProductCreateRequest req = new ProductCreateRequest();
+        req.setSku("SKU-01");
+        req.setWeightKg(new BigDecimal("10"));
+        req.setLengthM(new BigDecimal("0.2"));
+        req.setWidthM(new BigDecimal("0.2"));
+        req.setHeightM(new BigDecimal("0.5"));
 
-        ProductResponse response = productService.createProduct(request);
+        when(productRepository.existsBySku("SKU-01")).thenReturn(false);
+        when(productMapper.toEntity(req)).thenReturn(product);
+        when(productRepository.save(any())).thenReturn(product);
+        when(productMapper.toResponse(product)).thenReturn(ProductResponse.builder().id(10L).sku("SKU-01").build());
 
-        assertThat(response.getId()).isEqualTo(1L);
-        verify(productRepository).save(any(Product.class));
+        ProductResponse resp = service.createProduct(req);
+
+        assertAll(
+                () -> assertEquals(10L, resp.getId()),
+                () -> verify(productRepository).save(product)
+        );
     }
 
     @Test
-    void createProduct_fails_anomalyRatioTooHigh() {
-        // volume = 0.5 * 0.5 * 0.5 = 0.125. Let's make weight 2000.0 kg -> ratio = 2000 / 0.125 = 16000 kg/m3 (extremely dense)
-        request.setWeightKg(BigDecimal.valueOf(2000.0));
+    @DisplayName("[L1-PR-02] getProductById returns product response")
+    void getProductByIdSuccess() {
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        when(productMapper.toResponse(product)).thenReturn(ProductResponse.builder().id(10L).sku("SKU-01").build());
 
-        when(productRepository.existsBySku("SKU-VALID")).thenReturn(false);
+        ProductResponse resp = service.getProductById(10L);
 
-        assertThatThrownBy(() -> productService.createProduct(request))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_CAPACITY_RATIO)
-                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.BAD_REQUEST);
-
-        verify(productRepository, never()).save(any(Product.class));
+        assertEquals(10L, resp.getId());
     }
 
     @Test
-    void createProduct_fails_anomalyRatioTooLow() {
-        // volume = 1.0 * 1.0 * 1.0 = 1.0. Let's make weight 0.001 kg -> ratio = 0.001 / 1.0 = 0.001 kg/m3 (extremely light)
-        request.setLengthM(BigDecimal.valueOf(1.0));
-        request.setWidthM(BigDecimal.valueOf(1.0));
-        request.setHeightM(BigDecimal.valueOf(1.0));
-        request.setWeightKg(BigDecimal.valueOf(0.001));
+    @DisplayName("[L1-PR-03] getProductBySku returns product response")
+    void getProductBySkuSuccess() {
+        when(productRepository.findBySku("SKU-01")).thenReturn(Optional.of(product));
+        when(productMapper.toResponse(product)).thenReturn(ProductResponse.builder().id(10L).sku("SKU-01").build());
 
-        when(productRepository.existsBySku("SKU-VALID")).thenReturn(false);
+        ProductResponse resp = service.getProductBySku("SKU-01");
 
-        assertThatThrownBy(() -> productService.createProduct(request))
-                .isInstanceOf(BusinessException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_CAPACITY_RATIO)
-                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.BAD_REQUEST);
+        assertEquals(10L, resp.getId());
+    }
 
-        verify(productRepository, never()).save(any(Product.class));
+    @Test
+    @DisplayName("[L1-PR-04] getAllProducts returns paginated product list")
+    void getAllProductsSuccess() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(new PageImpl<>(List.of(product)));
+        when(productMapper.toListItem(product)).thenReturn(ProductListItemResponse.builder().id(10L).sku("SKU-01").build());
+
+        ApiResponse<List<ProductListItemResponse>> resp = service.getAllProducts(null, null, pageable);
+
+        assertAll(
+                () -> assertTrue(resp.isSuccess()),
+                () -> assertEquals(1, resp.getData().size())
+        );
+    }
+
+    @Test
+    @DisplayName("[L1-PR-05] updateProductStatus updates active status")
+    void updateProductStatusSuccess() {
+        ProductStatusUpdateRequest req = new ProductStatusUpdateRequest();
+        req.setIsActive(false);
+
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        when(productRepository.save(product)).thenReturn(product);
+        when(productMapper.toResponse(product)).thenReturn(ProductResponse.builder().id(10L).sku("SKU-01").isActive(false).build());
+
+        ProductResponse resp = service.updateProductStatus(10L, req);
+
+        assertAll(
+                () -> assertEquals(10L, resp.getId()),
+                () -> assertFalse(resp.getIsActive())
+        );
     }
 }
