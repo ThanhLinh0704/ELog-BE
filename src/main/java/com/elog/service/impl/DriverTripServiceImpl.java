@@ -287,7 +287,7 @@ public class DriverTripServiceImpl implements DriverTripService {
 
                     if ("DELIVERED".equals(stopStatusAfter)) {
                         ts.setStatus(TripStopStatus.COMPLETED);
-                    } else if ("FAILED".equals(stopStatusAfter) || "PARTIALLY_DELIVERED".equals(stopStatusAfter)) {
+                    } else if ("FAILED".equals(stopStatusAfter) || "PARTIAL".equals(stopStatusAfter) || "PARTIALLY_DELIVERED".equals(stopStatusAfter)) {
                         ts.setStatus(TripStopStatus.EXCEPTION);
                     }
                     tripStopRepo.save(ts);
@@ -665,7 +665,7 @@ public class DriverTripServiceImpl implements DriverTripService {
         boolean anyFailed = orders.stream().anyMatch(o -> "FAILED".equals(o.getDeliveryStatus()));
         if (anyFailed)
             return "FAILED";
-        return "PARTIALLY_DELIVERED";
+        return "PARTIAL";
     }
 
     private String aggregateStopStatusFromResults(List<DeliveryOrderResult> results) {
@@ -680,7 +680,7 @@ public class DriverTripServiceImpl implements DriverTripService {
         boolean anyFailed = results.stream().anyMatch(o -> "FAILED".equals(o.getStatus()));
         if (anyFailed)
             return "FAILED";
-        return "PARTIALLY_DELIVERED";
+        return "PARTIAL";
     }
 
     @Override
