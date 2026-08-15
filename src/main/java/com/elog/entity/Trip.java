@@ -2,6 +2,7 @@ package com.elog.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -81,6 +82,7 @@ public class Trip {
 
     @OneToMany(mappedBy = "trip", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequenceOrder ASC")
+    @BatchSize(size = 100)
     @Builder.Default
     private List<TripStop> stops = new ArrayList<>();
 

@@ -2,6 +2,7 @@ package com.elog.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -37,6 +38,7 @@ public class Route {
 
     @OneToMany(mappedBy = "route", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequenceOrder ASC")
+    @BatchSize(size = 100)
     @Builder.Default
     private List<RouteStop> stops = new ArrayList<>();
 

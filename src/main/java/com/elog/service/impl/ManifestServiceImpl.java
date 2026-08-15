@@ -91,13 +91,24 @@ public class ManifestServiceImpl implements ManifestService {
                 .build();
         manifestRepo.save(manifest);
 
-        // 8. Build ManifestLines
+        // 8. Build ManifestLines (batch fetch items for all stops in one query)
+        List<Long> storeIds = lifoStops.stream()
+                .map(s -> s.getStore() != null ? s.getStore().getId() : null)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<Long, List<OrderItem>> itemsByStoreId = storeIds.isEmpty()
+                ? Collections.emptyMap()
+                : orderItemRepo.findByStoreIdInAndTripDraftId(storeIds, tripDraftId).stream()
+                        .collect(Collectors.groupingBy(item -> item.getOrder().getStore().getId()));
+
         List<ManifestLine> lines = new ArrayList<>();
         int counter = 1;
 
         for (TripDraftStop stop : lifoStops) {
-            List<OrderItem> items = orderItemRepo
-                    .findByStopForManifest(stop.getStore().getId(), tripDraftId);
+            List<OrderItem> items = itemsByStoreId.getOrDefault(
+                    stop.getStore() != null ? stop.getStore().getId() : null, Collections.emptyList());
 
             if (items.isEmpty()) {
                 log.warn("Active stop {} (store={}) has no order items — skipped in manifest",

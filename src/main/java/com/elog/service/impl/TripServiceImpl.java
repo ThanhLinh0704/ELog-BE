@@ -527,24 +527,31 @@ public class TripServiceImpl implements TripService {
             validateVehicleAndDriverAvailability(vehicle, driver, td.getDeliveryDate(), td.getPlannedDepartureTime(), null);
 
             // Get the specific stops for this split group and recalculate group ETAs from warehouse
-            List<TripDraftStop> rawGroupStops = assignment.getStopIds().stream()
-                    .map(stopId -> tripDraftStopRepository.findById(stopId)
-                            .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
-                                    "TripDraftStop " + stopId + " not found.", HttpStatus.NOT_FOUND)))
+            List<TripDraftStop> fetchedStops = tripDraftStopRepository.findAllById(assignment.getStopIds());
+            if (fetchedStops.size() != assignment.getStopIds().size()) {
+                throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
+                        "One or more TripDraftStops not found.", HttpStatus.NOT_FOUND);
+            }
+            List<TripDraftStop> rawGroupStops = fetchedStops.stream()
                     .sorted(Comparator.comparing(TripDraftStop::getSequenceNo))
                     .toList();
 
             List<TripDraftStop> groupStops = calculateGroupEtas(td, rawGroupStops, td.getPlannedDepartureTime());
 
-            // Calculate group totals
+            // Calculate group totals via batch query
+            List<Long> groupStoreIds = groupStops.stream()
+                    .map(stop -> stop.getStore() != null ? stop.getStore().getId() : null)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .toList();
+
             BigDecimal groupWeight = BigDecimal.ZERO;
             BigDecimal groupVolume = BigDecimal.ZERO;
-            for (TripDraftStop stop : groupStops) {
-                List<OrderItem> items = orderItemRepository.findByStopForManifest(
-                        stop.getStore().getId(), tripDraftId);
+            if (!groupStoreIds.isEmpty()) {
+                List<OrderItem> items = orderItemRepository.findByStoreIdInAndTripDraftId(groupStoreIds, tripDraftId);
                 for (OrderItem item : items) {
-                    groupWeight = groupWeight.add(item.getLineWeightKg());
-                    groupVolume = groupVolume.add(item.getLineVolumeM3());
+                    if (item.getLineWeightKg() != null) groupWeight = groupWeight.add(item.getLineWeightKg());
+                    if (item.getLineVolumeM3() != null) groupVolume = groupVolume.add(item.getLineVolumeM3());
                 }
             }
 
