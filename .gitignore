@@ -61,3 +61,20 @@ ehthumbs.db
 # ─── Misc ───────────────────────────────────────────────────
 *.log
 logs/
+test-execution/
+*.ndjson
+*.dump
+*.dumpstream
+surefire-reports/
+jacoco.exec
+
+# ─── Office & Documentation Artifacts ────────────────────────
+SRS - for System/
+*.doc
+*.docx
+*.pdf
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+~$*
