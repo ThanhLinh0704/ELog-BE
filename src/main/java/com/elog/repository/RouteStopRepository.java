@@ -1,6 +1,7 @@
 package com.elog.repository;
 
 import com.elog.entity.RouteStop;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -12,6 +13,7 @@ public interface RouteStopRepository extends JpaRepository<RouteStop, Long> {
     List<RouteStop> findAllByStoreId(Long storeId);
     boolean existsByStoreIdAndRouteIsActiveTrue(Long storeId);
 
+    @EntityGraph(attributePaths = {"store", "store.ward", "store.district", "store.province", "route"})
     List<RouteStop> findByRouteIdOrderBySequenceOrderAsc(Long routeId);
     int countByRouteId(Long routeId);
     boolean existsByRouteIdAndStoreId(Long routeId, Long storeId);

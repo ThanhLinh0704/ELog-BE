@@ -15,6 +15,8 @@ public interface TripExecutionRepository extends JpaRepository<TripExecution, Lo
     @Query("SELECT te FROM TripExecution te WHERE te.trip.tripId = :tripId")
     Optional<TripExecution> findByTripId(@Param("tripId") Long tripId);
 
+    List<TripExecution> findByTripTripIdIn(java.util.Collection<Long> tripIds);
+
     List<TripExecution> findByDriverId(Long driverId);
 
     @Query("SELECT te FROM TripExecution te WHERE te.trip.vehicle.id = :vehicleId")

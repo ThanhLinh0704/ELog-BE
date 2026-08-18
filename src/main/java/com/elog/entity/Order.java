@@ -2,6 +2,7 @@ package com.elog.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDate;
@@ -44,6 +45,7 @@ public class Order {
     private String status = "IMPORTED";
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 100)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
 

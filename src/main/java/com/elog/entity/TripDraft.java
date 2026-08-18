@@ -2,6 +2,7 @@ package com.elog.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -95,6 +96,7 @@ public class TripDraft {
 
     @OneToMany(mappedBy = "tripDraft", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sequenceNo ASC")
+    @BatchSize(size = 100)
     @Builder.Default
     private List<TripDraftStop> stops = new ArrayList<>();
 

@@ -49,4 +49,15 @@ public class StoreSpecification {
             return root.get("id").in(sub);
         };
     }
+
+    public static Specification<Store> fetchLocations() {
+        return (root, query, cb) -> {
+            if (query.getResultType() != null && !Long.class.isAssignableFrom(query.getResultType()) && !long.class.isAssignableFrom(query.getResultType())) {
+                root.fetch("province", jakarta.persistence.criteria.JoinType.LEFT);
+                root.fetch("district", jakarta.persistence.criteria.JoinType.LEFT);
+                root.fetch("ward", jakarta.persistence.criteria.JoinType.LEFT);
+            }
+            return null;
+        };
+    }
 }
