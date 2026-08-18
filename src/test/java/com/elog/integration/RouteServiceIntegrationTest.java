@@ -1,9 +1,9 @@
 package com.elog.integration;
 
-import com.elog.dto.request.RouteCreateRequest;
-import com.elog.dto.request.RouteStopAddRequest;
-import com.elog.dto.request.RouteStopReorderRequest;
-import com.elog.dto.response.RouteResponse;
+import com.elog.dto.request.route.RouteCreateRequest;
+import com.elog.dto.request.route.RouteStopAddRequest;
+import com.elog.dto.request.route.RouteStopReorderRequest;
+import com.elog.dto.response.route.RouteResponse;
 import com.elog.entity.District;
 import com.elog.entity.Province;
 import com.elog.entity.Route;

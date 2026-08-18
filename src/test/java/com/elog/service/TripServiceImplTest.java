@@ -634,10 +634,10 @@ class TripServiceImplTest {
         TripDraftStop s1 = TripDraftStop.builder().id(10L).isActive(true).sequenceNo(1).build();
         when(tripDraftStopRepository.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(1L)).thenReturn(List.of(s1));
 
-        com.elog.dto.request.TripSplitAssignRequest req = new com.elog.dto.request.TripSplitAssignRequest();
-        com.elog.dto.request.TripSplitAssignRequest.SplitAssignment a1 = new com.elog.dto.request.TripSplitAssignRequest.SplitAssignment();
+        com.elog.dto.request.trip.TripSplitAssignRequest req = new com.elog.dto.request.trip.TripSplitAssignRequest();
+        com.elog.dto.request.trip.TripSplitAssignRequest.SplitAssignment a1 = new com.elog.dto.request.trip.TripSplitAssignRequest.SplitAssignment();
         a1.setVehicleId(1L); a1.setStopIds(List.of(10L));
-        com.elog.dto.request.TripSplitAssignRequest.SplitAssignment a2 = new com.elog.dto.request.TripSplitAssignRequest.SplitAssignment();
+        com.elog.dto.request.trip.TripSplitAssignRequest.SplitAssignment a2 = new com.elog.dto.request.trip.TripSplitAssignRequest.SplitAssignment();
         a2.setVehicleId(2L); a2.setStopIds(List.of(10L));
         req.setAssignments(List.of(a1, a2));
 
@@ -656,13 +656,68 @@ class TripServiceImplTest {
         TripDraftStop s2 = TripDraftStop.builder().id(20L).isActive(true).sequenceNo(2).build();
         when(tripDraftStopRepository.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(1L)).thenReturn(List.of(s1, s2));
 
-        com.elog.dto.request.TripSplitAssignRequest req = new com.elog.dto.request.TripSplitAssignRequest();
-        com.elog.dto.request.TripSplitAssignRequest.SplitAssignment a1 = new com.elog.dto.request.TripSplitAssignRequest.SplitAssignment();
+        com.elog.dto.request.trip.TripSplitAssignRequest req = new com.elog.dto.request.trip.TripSplitAssignRequest();
+        com.elog.dto.request.trip.TripSplitAssignRequest.SplitAssignment a1 = new com.elog.dto.request.trip.TripSplitAssignRequest.SplitAssignment();
         a1.setVehicleId(1L); a1.setStopIds(List.of(10L));
         req.setAssignments(List.of(a1));
 
         assertThatThrownBy(() -> tripService.assignSplit(1L, req, "dispatcher01"))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SPLIT_PLAN_STOP_INCOMPLETE);
+    }
+
+    // ── Additional Unit Tests ──────────────────────────────────────────────────
+
+    @Test
+    void getTripById_success() {
+        Trip trip = Trip.builder()
+                .tripId(100L)
+                .tripDraft(testDraft)
+                .route(Route.builder().id(10L).code("RT-010").build())
+                .vehicle(testVehicle)
+                .driver(testDriver)
+                .status(TripStatus.DISPATCHED)
+                .deliveryDate(LocalDate.now())
+                .stops(new ArrayList<>())
+                .build();
+
+        when(tripRepository.findById(100L)).thenReturn(Optional.of(trip));
+        when(tripStopRepository.findByTripTripIdOrderBySequenceOrderAsc(100L)).thenReturn(Collections.emptyList());
+
+        TripResponse resp = tripService.getTripById(100L);
+        assertThat(resp).isNotNull();
+        assertThat(resp.getTripId()).isEqualTo(100L);
+        assertThat(resp.getStatus()).isEqualTo("DISPATCHED");
+    }
+
+    @Test
+    void getTripById_notFound_throwsException() {
+        when(tripRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> tripService.getTripById(999L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.TRIP_NOT_FOUND);
+    }
+
+    @Test
+    void getDriverTrips_success() {
+        Trip trip = Trip.builder()
+                .tripId(100L)
+                .tripDraft(testDraft)
+                .route(Route.builder().id(10L).code("RT-010").build())
+                .vehicle(testVehicle)
+                .driver(testDriver)
+                .status(TripStatus.DISPATCHED)
+                .deliveryDate(LocalDate.now())
+                .stops(new ArrayList<>())
+                .build();
+
+        when(userRepository.findByUsername("driver01")).thenReturn(Optional.of(testDriver));
+        when(tripRepository.findByDriverIdAndDeliveryDateAndStatus(eq(2L), any(), eq(TripStatus.DISPATCHED))).thenReturn(List.of(trip));
+        when(tripStopRepository.findByTripTripIdOrderBySequenceOrderAsc(100L)).thenReturn(Collections.emptyList());
+
+        List<TripResponse> list = tripService.getDriverTrips("driver01", LocalDate.now(), "DISPATCHED");
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).getTripId()).isEqualTo(100L);
     }
 }

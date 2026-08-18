@@ -1,7 +1,10 @@
 package com.elog.service;
 
-import com.elog.dto.request.StopUpdateRequest;
-import com.elog.dto.response.*;
+import com.elog.dto.request.trip.StopUpdateRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.common.ConfirmResponse;
+import com.elog.dto.response.common.ConfirmedByDto;
+import com.elog.dto.response.trip.*;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.repository.*;
@@ -39,6 +42,14 @@ class TripDraftServiceImplTest {
     private OrderItemRepository orderItemRepository;
     @Mock
     private PlanningHistoryService planningHistoryService;
+    @Mock
+    private UserRepository userRepository;
+    @Mock
+    private EtaCalculationService etaCalculationService;
+    @Mock
+    private TripRepository tripRepository;
+    @Mock
+    private ManifestRepository manifestRepository;
 
     @InjectMocks
     private TripDraftServiceImpl tripDraftService;
@@ -467,5 +478,260 @@ class TripDraftServiceImplTest {
         assertThatThrownBy(() -> tripDraftService.updateStop(50L, 100L, req))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.BAD_REQUEST);
+    }
+
+    // ── US-11: confirmTripDraft tests ──────────────────────────────────────────
+
+    @Test
+    void confirmTripDraft_success() {
+        Route route = Route.builder().id(10L).code("RT-01").build();
+        TripDraft draft = TripDraft.builder()
+                .id(50L)
+                .status("DRAFT")
+                .route(route)
+                .deliveryDate(deliveryDate)
+                .build();
+        User user = User.builder().id(1L).username("dispatcher01").fullName("Nguyen Van A").build();
+
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+        when(tripDraftStopRepository.countByTripDraftIdAndIsActiveTrue(50L)).thenReturn(3);
+        when(tripDraftStopRepository.countByTripDraftIdAndIsActiveTrueAndPlannedEtaIsNull(50L)).thenReturn(0);
+        when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(user));
+
+        ConfirmResponse response = tripDraftService.confirmTripDraft(50L, "dispatcher01");
+
+        assertThat(response).isNotNull();
+        assertThat(response.getTripDraftId()).isEqualTo(50L);
+        assertThat(response.getStatus()).isEqualTo("PLANNED");
+        assertThat(response.getFixedRouteCode()).isEqualTo("RT-01");
+        assertThat(response.getConfirmedBy().getFullName()).isEqualTo("Nguyen Van A");
+        assertThat(draft.getStatus()).isEqualTo("PLANNED");
+        verify(tripDraftRepository).save(draft);
+    }
+
+    @Test
+    void confirmTripDraft_notDraft_throwsConflict() {
+        TripDraft draft = TripDraft.builder().id(50L).status("PLANNED").build();
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+
+        assertThatThrownBy(() -> tripDraftService.confirmTripDraft(50L, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void confirmTripDraft_noActiveStops_throwsBadRequest() {
+        TripDraft draft = TripDraft.builder().id(50L).status("DRAFT").build();
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+        when(tripDraftStopRepository.countByTripDraftIdAndIsActiveTrue(50L)).thenReturn(0);
+
+        assertThatThrownBy(() -> tripDraftService.confirmTripDraft(50L, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void confirmTripDraft_missingEta_throwsBadRequest() {
+        TripDraft draft = TripDraft.builder().id(50L).status("DRAFT").build();
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+        when(tripDraftStopRepository.countByTripDraftIdAndIsActiveTrue(50L)).thenReturn(2);
+        when(tripDraftStopRepository.countByTripDraftIdAndIsActiveTrueAndPlannedEtaIsNull(50L)).thenReturn(1);
+
+        assertThatThrownBy(() -> tripDraftService.confirmTripDraft(50L, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.BAD_REQUEST);
+    }
+
+    // ── US-11: revertToDraft tests ─────────────────────────────────────────────
+
+    @Test
+    void revertToDraft_alreadyAssignedToTrip_throwsConflict() {
+        TripDraft draft = TripDraft.builder().id(50L).status("PLANNED").build();
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+        when(tripRepository.existsByTripDraftId(50L)).thenReturn(true);
+
+        assertThatThrownBy(() -> tripDraftService.revertToDraft(50L, "admin"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void revertToDraft_success() {
+        TripDraft draft = TripDraft.builder().id(50L).status("PLANNED").deliveryDate(deliveryDate).stops(new ArrayList<>()).build();
+        TripDraftStop stop = TripDraftStop.builder().id(100L).tripDraft(draft).violationCode("DELAY_VIOLATION").overrideNote("note").build();
+        draft.getStops().add(stop);
+        Manifest manifest = Manifest.builder().manifestId(200L).tripDraft(draft).build();
+
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+        when(tripRepository.existsByTripDraftId(50L)).thenReturn(false);
+        when(manifestRepository.findByTripDraftId(50L)).thenReturn(Optional.of(manifest));
+
+        tripDraftService.revertToDraft(50L, "admin");
+
+        assertThat(draft.getStatus()).isEqualTo("DRAFT");
+        assertThat(stop.getPlannedEta()).isNull();
+        verify(manifestRepository).delete(manifest);
+        verify(tripDraftRepository).save(draft);
+    }
+
+    // ── adjustDepartureTime tests ──────────────────────────────────────────────
+
+    @Test
+    void adjustDepartureTime_locked_throwsConflict() {
+        TripDraft draft = TripDraft.builder().id(50L).status("CONFIRMED").build();
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+
+        com.elog.dto.request.trip.AdjustDepartureTimeRequest req = new com.elog.dto.request.trip.AdjustDepartureTimeRequest();
+        req.setNewDepartureTime(java.time.LocalTime.of(8, 30));
+
+        assertThatThrownBy(() -> tripDraftService.adjustDepartureTime(50L, req))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void adjustDepartureTime_success() {
+        Route route = Route.builder().id(10L).code("RT-01").build();
+        TripDraft draft = TripDraft.builder().id(50L).status("DRAFT").route(route).deliveryDate(deliveryDate).stops(new ArrayList<>()).build();
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+        when(etaCalculationService.calculateAndPersist(eq(50L), any())).thenReturn(Collections.emptyList());
+
+        com.elog.dto.request.trip.AdjustDepartureTimeRequest req = new com.elog.dto.request.trip.AdjustDepartureTimeRequest();
+        req.setNewDepartureTime(java.time.LocalTime.of(8, 30));
+
+        TripDraftResponse response = tripDraftService.adjustDepartureTime(50L, req);
+
+        assertThat(response).isNotNull();
+        assertThat(draft.getPlannedDepartureTime()).isEqualTo(java.time.LocalTime.of(8, 30));
+        verify(tripDraftRepository, atLeastOnce()).save(draft);
+    }
+
+    // ── settleDelay tests ──────────────────────────────────────────────────────
+
+    @Test
+    void settleDelay_orderNotFound_throwsNotFound() {
+        when(orderRepository.findById(200L)).thenReturn(Optional.empty());
+
+        com.elog.dto.request.trip.SettleDelayRequest req = new com.elog.dto.request.trip.SettleDelayRequest();
+        req.setReason("Khach dong y nhan muon");
+
+        assertThatThrownBy(() -> tripDraftService.settleDelay(50L, 200L, req, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void settleDelay_wrongDraft_throwsBadRequest() {
+        TripDraft otherDraft = TripDraft.builder().id(99L).build();
+        Order order = Order.builder().id(200L).tripDraft(otherDraft).build();
+        when(orderRepository.findById(200L)).thenReturn(Optional.of(order));
+
+        com.elog.dto.request.trip.SettleDelayRequest req = new com.elog.dto.request.trip.SettleDelayRequest();
+        req.setReason("Khach dong y nhan muon");
+
+        assertThatThrownBy(() -> tripDraftService.settleDelay(50L, 200L, req, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void settleDelay_draftLocked_throwsConflict() {
+        TripDraft draft = TripDraft.builder().id(50L).status("CONFIRMED").build();
+        Order order = Order.builder().id(200L).tripDraft(draft).build();
+        when(orderRepository.findById(200L)).thenReturn(Optional.of(order));
+
+        com.elog.dto.request.trip.SettleDelayRequest req = new com.elog.dto.request.trip.SettleDelayRequest();
+        req.setReason("Khach dong y nhan muon");
+
+        assertThatThrownBy(() -> tripDraftService.settleDelay(50L, 200L, req, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void settleDelay_success() {
+        Route route = Route.builder().id(10L).code("RT-01").build();
+        Store store = Store.builder().id(1L).code("ST-01").build();
+        TripDraft draft = TripDraft.builder().id(50L).status("DRAFT").route(route).deliveryDate(deliveryDate).plannedDepartureTime(java.time.LocalTime.of(8, 0)).build();
+        Order order = Order.builder().id(200L).orderRef("ORD-200").store(store).tripDraft(draft).build();
+        User user = User.builder().id(5L).username("dispatcher01").build();
+
+        when(orderRepository.findById(200L)).thenReturn(Optional.of(order));
+        when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(user));
+        when(etaCalculationService.calculateAndPersist(eq(50L), any())).thenReturn(Collections.emptyList());
+
+        com.elog.dto.request.trip.SettleDelayRequest req = new com.elog.dto.request.trip.SettleDelayRequest();
+        req.setReason("Khach dong y nhan muon");
+
+        tripDraftService.settleDelay(50L, 200L, req, "dispatcher01");
+
+        assertThat(order.getIsDeliveryTimeOverridden()).isTrue();
+        assertThat(order.getTimeOverrideReason()).isEqualTo("Khach dong y nhan muon");
+        assertThat(order.getTimeOverrideBy()).isEqualTo(5L);
+        verify(orderRepository).save(order);
+    }
+
+    // ── excludeOrder & reIncludeOrder tests ───────────────────────────────────
+
+    @Test
+    void excludeOrder_success() {
+        Route route = Route.builder().id(10L).code("RT-01").build();
+        Store store = Store.builder().id(1L).code("ST-01").build();
+        TripDraft draft = TripDraft.builder().id(50L).status("DRAFT").route(route).deliveryDate(deliveryDate).plannedDepartureTime(java.time.LocalTime.of(8, 0)).build();
+        Order order = Order.builder().id(200L).orderRef("ORD-200").store(store).tripDraft(draft).build();
+
+        TripDraftStop stop = TripDraftStop.builder().id(100L).store(store).tripDraft(draft).orderCount(1).build();
+
+        when(orderRepository.findById(200L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByTripDraftId(50L)).thenReturn(Collections.emptyList());
+        when(tripDraftStopRepository.findByTripDraftIdOrderBySequenceNoAsc(50L)).thenReturn(List.of(stop));
+        when(tripDraftRepository.save(draft)).thenReturn(draft);
+
+        tripDraftService.excludeOrder(50L, 200L);
+
+        assertThat(order.getTripDraft()).isNull();
+        assertThat(order.getStatus()).isEqualTo("UNASSIGNED");
+        verify(orderRepository).save(order);
+        verify(tripDraftRepository, atLeastOnce()).save(draft);
+    }
+
+    @Test
+    void reIncludeOrder_success() {
+        Route route = Route.builder().id(10L).code("RT-01").build();
+        Store store = Store.builder().id(1L).code("ST-01").build();
+        TripDraft draft = TripDraft.builder().id(50L).status("DRAFT").route(route).deliveryDate(deliveryDate).plannedDepartureTime(java.time.LocalTime.of(8, 0)).build();
+        Order order = Order.builder().id(200L).orderRef("ORD-200").store(store).status("UNASSIGNED").build();
+
+        TripDraftStop stop = TripDraftStop.builder().id(100L).store(store).tripDraft(draft).orderCount(0).build();
+
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+        when(orderRepository.findById(200L)).thenReturn(Optional.of(order));
+        when(orderRepository.findByTripDraftId(50L)).thenReturn(List.of(order));
+        when(orderItemRepository.findByOrderIdIn(List.of(200L))).thenReturn(Collections.emptyList());
+        when(tripDraftStopRepository.findByTripDraftIdOrderBySequenceNoAsc(50L)).thenReturn(List.of(stop));
+
+        tripDraftService.reIncludeOrder(50L, 200L);
+
+        assertThat(order.getTripDraft()).isEqualTo(draft);
+        assertThat(order.getStatus()).isEqualTo("IMPORTED");
+        verify(orderRepository).save(order);
+        verify(tripDraftRepository, atLeastOnce()).save(draft);
+    }
+
+    @Test
+    void getStopsForReview_success() {
+        Route route = Route.builder().id(10L).code("RT-01").build();
+        TripDraft draft = TripDraft.builder().id(50L).status("DRAFT").route(route).deliveryDate(deliveryDate).stops(new ArrayList<>()).build();
+        Store store = Store.builder().id(1L).code("ST-01").build();
+        TripDraftStop stop = TripDraftStop.builder().id(100L).store(store).tripDraft(draft).orderCount(1).build();
+        draft.getStops().add(stop);
+
+        when(tripDraftRepository.findById(50L)).thenReturn(Optional.of(draft));
+
+        TripDraftResponse response = tripDraftService.getStopsForReview(50L);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getStops()).hasSize(1);
+        assertThat(response.getStops().get(0).getTripDraftStopId()).isEqualTo(100L);
     }
 }

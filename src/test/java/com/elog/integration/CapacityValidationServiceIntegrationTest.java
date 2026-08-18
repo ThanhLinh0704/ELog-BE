@@ -1,6 +1,6 @@
 package com.elog.integration;
 
-import com.elog.dto.response.CapacityValidationResultResponse;
+import com.elog.dto.response.vehicle.CapacityValidationResultResponse;
 import com.elog.entity.ConstraintResult;
 import com.elog.service.CapacityValidationService;
 import com.elog.service.RecommendationService;

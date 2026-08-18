@@ -39,11 +39,16 @@ public class SecurityConfig {
         /** Endpoints that do NOT require authentication. */
         private static final String[] PUBLIC_URLS = {
                         "/api/v1/auth/**",
+                        "/api/auth/**",
                         "/api/v1/health",
                         "/swagger-ui/**",
+                        "/swagger-ui.html",
                         "/swagger-ui/index.html",
                         "/api-docs/**",
-                        "/v3/api-docs/**"
+                        "/v3/api-docs",
+                        "/v3/api-docs/**",
+                        "/swagger-resources/**",
+                        "/webjars/**"
         };
 
         @Bean

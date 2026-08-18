@@ -1,6 +1,7 @@
 package com.elog.service;
 
-import com.elog.dto.response.*;
+import com.elog.dto.response.trip.RecommendationResultResponse;
+import com.elog.dto.response.vehicle.VehicleRecommendationResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -36,5 +37,5 @@ class RecommendationServiceImplTest{
  @Test @DisplayName("[L1-RC-11] two-vehicle split keeps each store wholly in one sub-trip") void splitPreservesStoreIntegrity(){RecommendationResultResponse r=twoVehicle();List<VehicleRecommendationResponse.SubTripDto> sub=r.getRecommendations().getFirst().getSubTrips();assertEquals(List.of(List.of(1),List.of(2)),sub.stream().map(VehicleRecommendationResponse.SubTripDto::getStopSequenceNos).toList());}
  @Test @DisplayName("[L1-RC-12] two-vehicle split preserves relative stop order") void splitPreservesStopOrder(){RecommendationResultResponse r=twoVehicle();r.getRecommendations().getFirst().getSubTrips().forEach(s->assertEquals(s.getStopSequenceNos().stream().sorted().toList(),s.getStopSequenceNos()));}
  @Test @DisplayName("[L1-RC-13] pair score applies fifteen-point multi-vehicle penalty") void splitAppliesPenalty(){VehicleRecommendationResponse p=twoVehicle().getRecommendations().getFirst();BigDecimal average=p.getSubTrips().get(0).getSubScore().add(p.getSubTrips().get(1).getSubScore()).divide(new BigDecimal("2"));assertEquals(new BigDecimal("15.00"),average.subtract(p.getTotalScore()));}
+ @Test @DisplayName("[L1-RC-14] isTwoVehicleFeasible returns true for valid split") void isTwoVehicleFeasibleSuccess() { Store a = Store.builder().id(1L).code("A").allowedDeliveryHours("All").build(); Store b = Store.builder().id(2L).code("B").allowedDeliveryHours("All").build(); TripDraftStop sa = TripDraftStop.builder().id(1L).store(a).sequenceNo(1).isActive(true).plannedEta(LocalDateTime.of(2026, 8, 14, 9, 0)).build(); TripDraftStop sb = TripDraftStop.builder().id(2L).store(b).sequenceNo(2).isActive(true).plannedEta(LocalDateTime.of(2026, 8, 14, 10, 0)).build(); draft.setTotalVolumeM3(new BigDecimal("8")); draft.setTotalWeightKg(new BigDecimal("1600")); Order oa = Order.builder().id(1L).store(a).items(List.of(OrderItem.builder().lineVolumeM3(new BigDecimal("4")).lineWeightKg(new BigDecimal("800")).build())).build(); Order ob = Order.builder().id(2L).store(b).items(List.of(OrderItem.builder().lineVolumeM3(new BigDecimal("4")).lineWeightKg(new BigDecimal("800")).build())).build(); when(drafts.findById(1L)).thenReturn(Optional.of(draft)); when(stops.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(1L)).thenReturn(List.of(sa, sb)); when(vehicles.findByIsActiveTrue()).thenReturn(List.of(vehicle(1, "5", "1000", "10"), vehicle(2, "5", "1000", "10"))); when(orders.findByTripDraftId(1L)).thenReturn(List.of(oa, ob)); boolean feasible = service.isTwoVehicleFeasible(1L); assertTrue(feasible); }
 }
-

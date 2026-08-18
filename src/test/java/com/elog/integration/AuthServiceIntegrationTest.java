@@ -1,8 +1,8 @@
 package com.elog.integration;
 
-import com.elog.dto.request.LoginRequest;
-import com.elog.dto.request.TokenRefreshRequest;
-import com.elog.dto.response.TokenResponse;
+import com.elog.dto.request.auth.LoginRequest;
+import com.elog.dto.request.auth.TokenRefreshRequest;
+import com.elog.dto.response.auth.TokenResponse;
 import com.elog.entity.RefreshToken;
 import com.elog.entity.User;
 import com.elog.exception.BusinessException;
@@ -99,6 +99,18 @@ class AuthServiceIntegrationTest {
         entityManager.flush();
         assertThat(refreshTokenRepository.count()).isEqualTo(before);
         assertThat(refreshTokenRepository.findByToken(token.getToken())).isPresent();
+    }
+
+    @Test
+    void l2Atk06SqlInjectionGuardPayloadDoesNotBypassAuthentication() {
+        User user = user(true);
+        String sqliUsername = "admin' OR '1'='1' --";
+        String sqliPassword = "' OR '1'='1";
+
+        assertThatThrownBy(() -> authService.login(login(sqliUsername, sqliPassword)))
+                .isInstanceOfSatisfying(BusinessException.class,
+                        error -> assertThat(error.getErrorCode()).isEqualTo(ErrorCode.INVALID_CREDENTIALS));
+        assertThat(tokensFor(user)).isEmpty();
     }
 
     private User user(boolean active) {

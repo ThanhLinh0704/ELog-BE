@@ -64,5 +64,39 @@ public class DataInitializer implements CommandLineRunner {
         } else {
             log.debug("Default admin account already exists. Skipping database seeding.");
         }
+
+        // 3. Ensure DISPATCHER role & default dispatcher1 account exist
+        Role dispatcherRole = roleRepository.findByName("DISPATCHER")
+                .orElseGet(() -> roleRepository.save(Role.builder().name("DISPATCHER").build()));
+
+        if (!userRepository.existsByUsername("dispatcher1")) {
+            User dispatcherUser = User.builder()
+                    .username("dispatcher1")
+                    .passwordHash(passwordEncoder.encode("Admin@2025"))
+                    .fullName("Default Dispatcher")
+                    .email("dispatcher1@elog.vn")
+                    .isActive(true)
+                    .roles(new HashSet<>(Collections.singletonList(dispatcherRole)))
+                    .build();
+            userRepository.save(dispatcherUser);
+            log.info("Successfully seeded default dispatcher account 'dispatcher1'");
+        }
+
+        // 4. Ensure DRIVER role & default driver1 account exist
+        Role driverRole = roleRepository.findByName("DRIVER")
+                .orElseGet(() -> roleRepository.save(Role.builder().name("DRIVER").build()));
+
+        if (!userRepository.existsByUsername("driver1")) {
+            User driverUser = User.builder()
+                    .username("driver1")
+                    .passwordHash(passwordEncoder.encode("Admin@2025"))
+                    .fullName("Default Driver")
+                    .email("driver1@elog.vn")
+                    .isActive(true)
+                    .roles(new HashSet<>(Collections.singletonList(driverRole)))
+                    .build();
+            userRepository.save(driverUser);
+            log.info("Successfully seeded default driver account 'driver1'");
+        }
     }
 }

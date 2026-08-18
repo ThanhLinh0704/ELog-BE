@@ -1,8 +1,9 @@
 package com.elog.service;
 
-import com.elog.dto.request.UpdateOrderResultRequest;
-import com.elog.dto.response.DriverTripResponse;
-import com.elog.dto.response.TripOutcomeResponse;
+import com.elog.dto.request.trip.UpdateOrderResultRequest;
+import com.elog.dto.request.trip.AdminTripOverrideRequest;
+import com.elog.dto.response.user.DriverTripResponse;
+import com.elog.dto.response.trip.TripOutcomeResponse;
 import com.elog.entity.DeliveryOrderResult;
 import java.util.List;
 import static org.mockito.ArgumentMatchers.eq;
@@ -49,7 +50,6 @@ import static org.mockito.Mockito.when;
 
 import com.elog.entity.TripStop;
 import com.elog.entity.TripStopStatus;
-import com.elog.dto.request.AdminTripOverrideRequest;
 
 class DriverTripServiceImplTest {
     private TripExecutionRepository executions;
@@ -422,7 +422,7 @@ class DriverTripServiceImplTest {
         trip.setVehicle(v);
         when(executions.findById(10L)).thenReturn(Optional.of(execution));
 
-        com.elog.dto.request.AdminTripOverrideRequest req = new com.elog.dto.request.AdminTripOverrideRequest();
+        AdminTripOverrideRequest req = new AdminTripOverrideRequest();
         req.setAction("FORCE_RETURN");
         req.setReason("Driver vehicle returned late");
 
@@ -443,7 +443,7 @@ class DriverTripServiceImplTest {
         when(executions.findById(10L)).thenReturn(Optional.of(execution));
         when(results.findByTripExecutionId(10L)).thenReturn(List.of());
 
-        com.elog.dto.request.AdminTripOverrideRequest req = new com.elog.dto.request.AdminTripOverrideRequest();
+        AdminTripOverrideRequest req = new AdminTripOverrideRequest();
         req.setAction("FORCE_COMPLETE_AND_RETURN");
         req.setReason("Emergency complete by admin");
 

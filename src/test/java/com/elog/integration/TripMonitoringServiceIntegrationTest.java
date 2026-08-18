@@ -1,7 +1,7 @@
 package com.elog.integration;
 
-import com.elog.dto.response.StopArriveResponse;
-import com.elog.dto.response.TripStartResponse;
+import com.elog.dto.response.trip.StopArriveResponse;
+import com.elog.dto.response.trip.TripStartResponse;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
 import com.elog.service.TripMonitoringService;

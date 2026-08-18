@@ -1,7 +1,7 @@
 package com.elog.integration;
 
-import com.elog.dto.request.StoreCreateRequest;
-import com.elog.dto.response.StoreResponse;
+import com.elog.dto.request.store.StoreCreateRequest;
+import com.elog.dto.response.store.StoreResponse;
 import com.elog.entity.District;
 import com.elog.entity.Province;
 import com.elog.entity.Store;
@@ -51,7 +51,7 @@ class StoreServiceIntegrationTest {
         Store persisted = storeRepository.findById(response.getId()).orElseThrow();
         assertThat(persisted.getProvince().getCode()).isEqualTo(address.province().getCode());
         assertThat(persisted.getDistrict().getCode()).isEqualTo(address.district().getCode());
-        assertThat(persisted.getWard().getCode()).isEqualTo(address.ward().getCode());
+        assertThat(persisted.getWard().getCode()).isEqualTo(address.ward        ().getCode());
     }
 
     @Test

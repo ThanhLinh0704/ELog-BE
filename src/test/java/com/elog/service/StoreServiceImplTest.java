@@ -1,10 +1,11 @@
 package com.elog.service;
 
-import com.elog.dto.request.StoreCreateRequest;
-import com.elog.dto.request.StoreStatusUpdateRequest;
-import com.elog.dto.response.ApiResponse;
-import com.elog.dto.response.StoreListItemResponse;
-import com.elog.dto.response.StoreResponse;
+import com.elog.dto.request.store.StoreCreateRequest;
+import com.elog.dto.request.store.StoreStatusUpdateRequest;
+import com.elog.dto.request.store.StoreUpdateRequest;
+import com.elog.dto.response.common.ApiResponse;
+import com.elog.dto.response.store.StoreListItemResponse;
+import com.elog.dto.response.store.StoreResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -123,7 +124,7 @@ class StoreServiceImplTest {
     @Test
     @DisplayName("[L1-ST-05] updateStore updates store details when address hierarchy is valid")
     void updateStoreSuccess() {
-        com.elog.dto.request.StoreUpdateRequest req = new com.elog.dto.request.StoreUpdateRequest();
+        StoreUpdateRequest req = new StoreUpdateRequest();
         req.setStoreName("Updated Store Name");
         req.setProvinceCode("01");
         req.setDistrictCode("001");

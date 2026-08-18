@@ -1,9 +1,9 @@
 package com.elog.integration;
 
-import com.elog.dto.request.TripAssignRequest;
-import com.elog.dto.request.TripSplitAssignRequest;
-import com.elog.dto.response.TripResponse;
-import com.elog.dto.response.TripSplitResponse;
+import com.elog.dto.request.trip.TripAssignRequest;
+import com.elog.dto.request.trip.TripSplitAssignRequest;
+import com.elog.dto.response.trip.TripResponse;
+import com.elog.dto.response.trip.TripSplitResponse;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
 import com.elog.service.TripService;
@@ -115,6 +115,7 @@ class TripServiceIntegrationTest {
     }
 
     private Draft seedDraft(LocalDate date, int stopCount) {
+        jdbc.update("UPDATE stores SET max_allowed_vehicle_weight = NULL");
         jdbc.update("""
                 INSERT INTO trip_drafts
                     (route_id, delivery_date, total_volume_m3, total_weight_kg,

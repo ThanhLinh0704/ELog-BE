@@ -1,8 +1,8 @@
 package com.elog.integration;
 
-import com.elog.dto.request.RecalculateEtaRequest;
-import com.elog.dto.response.ConsolidateResponse;
-import com.elog.dto.response.RecalculateEtaResponse;
+import com.elog.dto.request.trip.RecalculateEtaRequest;
+import com.elog.dto.response.trip.ConsolidateResponse;
+import com.elog.dto.response.goong.RecalculateEtaResponse;
 import com.elog.entity.TripDraft;
 import com.elog.repository.TripDraftRepository;
 import com.elog.service.TripDraftService;

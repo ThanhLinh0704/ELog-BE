@@ -1,7 +1,6 @@
 package com.elog.service;
 
-import com.elog.dto.response.KpiDailyTrendResponse;
-import com.elog.dto.response.KpiSummaryResponse;
+import com.elog.dto.response.kpi.*;
 import com.elog.entity.*;
 import com.elog.repository.*;
 import com.elog.service.impl.KpiServiceImpl;
@@ -92,7 +91,7 @@ class KpiServiceImplTest {
         when(tripStopRepo.findProcessedStopsInDateRange(start, end)).thenReturn(List.of(stop));
         when(deliveryExceptionRepo.findExceptionsInDateRange(start, end)).thenReturn(List.of());
 
-        com.elog.dto.response.KpiByRouteResponse resp = service.getByRoute(start, end);
+        KpiByRouteResponse resp = service.getByRoute(start, end);
 
         assertAll(
                 () -> assertNotNull(resp),
@@ -113,12 +112,33 @@ class KpiServiceImplTest {
         when(tripStopRepo.findProcessedStopsInDateRange(start, end)).thenReturn(List.of(stop));
         when(deliveryExceptionRepo.findExceptionsInDateRange(start, end)).thenReturn(List.of());
 
-        com.elog.dto.response.KpiByVehicleResponse resp = service.getByVehicle(start, end);
+        KpiByVehicleResponse resp = service.getByVehicle(start, end);
 
         assertAll(
                 () -> assertNotNull(resp),
                 () -> assertEquals(1, resp.getVehicles().size()),
                 () -> assertEquals("29A-12345", resp.getVehicles().getFirst().getLicensePlate())
+        );
+    }
+
+    @Test
+    @DisplayName("[L1-KPI-05] getByDriver returns KPI breakdown by driver")
+    void getByDriverReturnsData() {
+        User driver = User.builder().id(5L).username("driver01").fullName("Le Van Driver").build();
+        Vehicle vehicle = Vehicle.builder().id(1L).plateNumber("29A-12345").build();
+        Trip trip = Trip.builder().tripId(10L).deliveryDate(start).status(TripStatus.COMPLETED).driver(driver).vehicle(vehicle).totalDistanceKm(new BigDecimal("50")).build();
+        TripStop stop = TripStop.builder().tripStopId(100L).trip(trip).status(TripStopStatus.COMPLETED).plannedEta(LocalDateTime.of(2026, 8, 1, 9, 0)).actualArrivalTime(LocalDateTime.of(2026, 8, 1, 9, 5)).build();
+
+        when(tripRepo.findTripsWithVehicleAndRouteInDateRange(start, end)).thenReturn(List.of(trip));
+        when(tripStopRepo.findProcessedStopsInDateRange(start, end)).thenReturn(List.of(stop));
+        when(deliveryExceptionRepo.findExceptionsInDateRange(start, end)).thenReturn(List.of());
+
+        KpiByDriverResponse resp = service.getByDriver(start, end);
+
+        assertAll(
+                () -> assertNotNull(resp),
+                () -> assertEquals(1, resp.getDrivers().size()),
+                () -> assertEquals("Le Van Driver", resp.getDrivers().getFirst().getFullName())
         );
     }
 }

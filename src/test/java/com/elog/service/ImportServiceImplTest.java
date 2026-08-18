@@ -1,6 +1,6 @@
 package com.elog.service;
 
-import com.elog.dto.response.ImportBatchResponse;
+import com.elog.dto.response.importbatch.ImportBatchResponse;
 import com.elog.entity.ImportBatch;
 import com.elog.entity.ImportError;
 import com.elog.entity.Order;
@@ -48,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -64,7 +65,7 @@ class ImportServiceImplTest {
     private StoreRepository stores;
     private ProductRepository products;
     private ImportServiceImpl service;
-    private final LocalDate deliveryDate = LocalDate.of(2026, 8, 14);
+    private final LocalDate deliveryDate = LocalDate.now().plusDays(2);
     private Store store;
     private Product product;
 
@@ -304,6 +305,84 @@ class ImportServiceImplTest {
         MockMultipartFile emptyFile = new MockMultipartFile("file", "orders.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", new byte[0]);
         BusinessException e = assertThrows(BusinessException.class, () -> service.importExcel(emptyFile, LocalDate.now(), false, 1L));
         assertEquals(ErrorCode.EXCEL_PARSE_ERROR, e.getErrorCode());
+    }
+
+    // ── Additional Unit Tests ──────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("[L1-IMP-12] getBatches with date returns batches page")
+    void getBatchesWithDate() {
+        ImportBatch b = ImportBatch.builder().id(100L).deliveryDate(deliveryDate).status("SUCCESS").build();
+        org.springframework.data.domain.Page<ImportBatch> page = new org.springframework.data.domain.PageImpl<>(List.of(b));
+        when(batches.findByDeliveryDate(eq(deliveryDate), any())).thenReturn(page);
+        when(orders.countByBatchId(100L)).thenReturn(5L);
+
+        var resp = service.getBatches(deliveryDate, org.springframework.data.domain.PageRequest.of(0, 10));
+        assertNotNull(resp);
+        assertEquals(1, resp.getData().size());
+        assertEquals(100L, resp.getData().get(0).getBatchId());
+    }
+
+    @Test
+    @DisplayName("[L1-IMP-13] getBatchById returns batch detail or 404")
+    void getBatchByIdTests() {
+        ImportBatch b = ImportBatch.builder().id(100L).deliveryDate(deliveryDate).status("SUCCESS").build();
+        when(batches.findById(100L)).thenReturn(Optional.of(b));
+        when(batches.findById(999L)).thenReturn(Optional.empty());
+        when(orders.countByBatchId(100L)).thenReturn(5L);
+
+        var resp = service.getBatchById(100L);
+        assertNotNull(resp);
+        assertEquals(100L, resp.getBatchId());
+
+        assertThrows(BusinessException.class, () -> service.getBatchById(999L));
+    }
+
+    @Test
+    @DisplayName("[L1-IMP-14] getBatchErrors returns error list or 404")
+    void getBatchErrorsTests() {
+        when(batches.existsById(100L)).thenReturn(true);
+        when(batches.existsById(999L)).thenReturn(false);
+
+        ImportError err = ImportError.builder().id(1L).rowNumber(2).errorCode("SKU_NOT_FOUND").errorReason("Unknown sku").build();
+        org.springframework.data.domain.Page<ImportError> page = new org.springframework.data.domain.PageImpl<>(List.of(err));
+        when(errors.findByImportBatchIdAndErrorCode(eq(100L), any(), any())).thenReturn(page);
+
+        var resp = service.getBatchErrors(100L, "SKU_NOT_FOUND", org.springframework.data.domain.PageRequest.of(0, 10));
+        assertNotNull(resp);
+        assertEquals(1, resp.getData().size());
+
+        assertThrows(BusinessException.class, () -> service.getBatchErrors(999L, null, org.springframework.data.domain.PageRequest.of(0, 10)));
+    }
+
+    @Test
+    @DisplayName("[L1-IMP-15] exportBatchErrors exports excel byte array")
+    void exportBatchErrorsTests() {
+        when(batches.existsById(100L)).thenReturn(true);
+        when(batches.existsById(999L)).thenReturn(false);
+
+        ImportError err = ImportError.builder().id(1L).rowNumber(2).errorCode("SKU_NOT_FOUND").fieldName("SKU").rawData("SKU-999").errorReason("Unknown sku").build();
+        when(errors.findByImportBatchIdOrderByRowNumberAsc(100L)).thenReturn(List.of(err));
+
+        byte[] excelBytes = service.exportBatchErrors(100L);
+        assertNotNull(excelBytes);
+        assertTrue(excelBytes.length > 0);
+
+        assertThrows(BusinessException.class, () -> service.exportBatchErrors(999L));
+    }
+
+    @Test
+    @DisplayName("[L1-IMP-16] getImportedOrders returns orders for batch")
+    void getImportedOrdersTests() {
+        when(batches.existsById(100L)).thenReturn(true);
+        OrderItem item = OrderItem.builder().sku("SKU-A").product(product).quantity(5).lineWeightKg(BigDecimal.valueOf(5)).lineVolumeM3(BigDecimal.valueOf(0.5)).build();
+        Order ord = Order.builder().id(200L).orderRef("ORD-200").store(store).deliveryDate(deliveryDate).status("IMPORTED").items(List.of(item)).build();
+        when(orders.findByImportBatchId(100L)).thenReturn(List.of(ord));
+
+        var ordersList = service.getImportedOrders(100L);
+        assertNotNull(ordersList);
+        assertEquals(1, ordersList.size());
+        assertEquals("ORD-200", ordersList.get(0).getOrderRef());
     }
 }
 

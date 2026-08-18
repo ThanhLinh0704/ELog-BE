@@ -1,7 +1,7 @@
 package com.elog.integration;
 
-import com.elog.dto.request.RejectStopRequest;
-import com.elog.dto.response.DeliveryExceptionResponse;
+import com.elog.dto.request.exception.RejectStopRequest;
+import com.elog.dto.response.exception.DeliveryExceptionResponse;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
 import com.elog.service.ExceptionService;

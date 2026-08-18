@@ -1,6 +1,6 @@
 package com.elog.service;
 
-import com.elog.dto.response.CapacityValidationResultResponse;
+import com.elog.dto.response.vehicle.CapacityValidationResultResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
