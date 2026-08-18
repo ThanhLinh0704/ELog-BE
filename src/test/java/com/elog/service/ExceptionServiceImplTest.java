@@ -162,4 +162,31 @@ class ExceptionServiceImplTest {
         BusinessException ex = assertThrows(BusinessException.class, () -> service.resolveException(500L, req, "manager"));
         assertEquals(ErrorCode.EXCEPTION_ALREADY_RESOLVED, ex.getErrorCode());
     }
+
+    @Test
+    @DisplayName("[L1-EX-08] rejectStop rejects duplicate active rejection")
+    void rejectDuplicateRejection() {
+        when(tripStopRepo.findById(100L)).thenReturn(Optional.of(stop));
+        when(deliveryExceptionRepo.existsByTripStopIdAndExceptionTypeAndResolvedAtIsNull(100L, ExceptionType.DELIVERY_REJECTION)).thenReturn(true);
+
+        RejectStopRequest req = new RejectStopRequest();
+        req.setRejectionType("STORE_CLOSED");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.rejectStop(100L, req, "driver"));
+        assertEquals(ErrorCode.REJECTION_ALREADY_RECORDED, ex.getErrorCode());
+    }
+
+    @Test
+    @DisplayName("[L1-EX-09] listExceptions invalid type or resolved filter throws VALIDATION_FAILED")
+    void listExceptionsInvalidFilter() {
+        assertThrows(BusinessException.class, () -> service.listExceptions(LocalDate.now(), "INVALID_TYPE", "all"));
+        assertThrows(BusinessException.class, () -> service.listExceptions(LocalDate.now(), "ALL", "INVALID_RESOLVED"));
+    }
+
+    @Test
+    @DisplayName("[L1-EX-10] getException throws EXCEPTION_NOT_FOUND when ID missing")
+    void getExceptionNotFound() {
+        when(deliveryExceptionRepo.findById(999L)).thenReturn(Optional.empty());
+        assertThrows(BusinessException.class, () -> service.getException(999L));
+    }
 }

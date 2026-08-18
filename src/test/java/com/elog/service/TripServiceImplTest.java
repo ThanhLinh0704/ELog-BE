@@ -2,9 +2,11 @@ package com.elog.service;
 
 import com.elog.dto.request.trip.TripAssignmentPatchRequest;
 import com.elog.dto.request.trip.TripAssignRequest;
+import com.elog.dto.request.trip.TripSplitAssignRequest;
 import com.elog.dto.response.trip.TripResponse;
 import com.elog.dto.response.user.AvailableDriverResponse;
 import com.elog.dto.response.vehicle.EligibleVehiclesResponse;
+import com.elog.dto.response.vehicle.FleetCapacityCheckResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -719,5 +721,119 @@ class TripServiceImplTest {
         List<TripResponse> list = tripService.getDriverTrips("driver01", LocalDate.now(), "DISPATCHED");
         assertThat(list).hasSize(1);
         assertThat(list.get(0).getTripId()).isEqualTo(100L);
+    }
+
+    @Test
+    void getHandoverSlipHtml_success() {
+        Trip trip = Trip.builder()
+                .tripId(100L)
+                .tripDraft(testDraft)
+                .route(Route.builder().id(10L).code("RT-010").name("Route 10").build())
+                .vehicle(testVehicle)
+                .driver(testDriver)
+                .status(TripStatus.DISPATCHED)
+                .deliveryDate(LocalDate.now())
+                .stops(new ArrayList<>())
+                .build();
+
+        when(tripRepository.findById(100L)).thenReturn(Optional.of(trip));
+        when(tripStopRepository.findByTripTripIdOrderBySequenceOrderAsc(100L)).thenReturn(Collections.emptyList());
+
+        String html = tripService.getHandoverSlipHtml(100L);
+        assertThat(html).isNotNull();
+        assertThat(html).contains("HANDOVER SLIP");
+        assertThat(html).contains("29A-12345");
+    }
+
+    @Test
+    void checkFleetCapacity_success() {
+        when(vehicleRepository.sumActiveMaxVolumeM3()).thenReturn(new BigDecimal("50"));
+        when(vehicleRepository.sumActiveMaxWeightKg()).thenReturn(new BigDecimal("20000"));
+        when(tripDraftRepository.findByDeliveryDate(any(), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(testDraft)));
+
+        FleetCapacityCheckResponse resp = tripService.checkFleetCapacity(LocalDate.now());
+        assertThat(resp).isNotNull();
+        assertThat(resp.isCanDispatch()).isTrue();
+    }
+
+    @Test
+    void updateAssignment_notFound_throwsException() {
+        when(tripRepository.findById(999L)).thenReturn(Optional.empty());
+
+        TripAssignmentPatchRequest req = new TripAssignmentPatchRequest();
+        req.setVehicleId(1L);
+
+        assertThatThrownBy(() -> tripService.updateAssignment(999L, req, "admin"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.TRIP_NOT_FOUND);
+    }
+
+    @Test
+    void assignSplit_alreadyAssigned_throwsException() {
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(tripRepository.existsByTripDraftId(1L)).thenReturn(true);
+
+        TripSplitAssignRequest req = new TripSplitAssignRequest();
+        assertThatThrownBy(() -> tripService.assignSplit(1L, req, "admin"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED);
+    }
+
+    @Test
+    void assignSplit_duplicateStop_throwsException() {
+        testDraft.setStatus("VALIDATED");
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(testDispatcher));
+
+        TripDraftStop s1 = TripDraftStop.builder().id(101L).build();
+        when(tripDraftStopRepository.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(1L)).thenReturn(List.of(s1));
+
+        TripSplitAssignRequest.SplitAssignment a1 = new TripSplitAssignRequest.SplitAssignment();
+        a1.setVehicleId(1L);
+        a1.setStopIds(List.of(101L, 101L)); // duplicate stop
+        TripSplitAssignRequest req = new TripSplitAssignRequest();
+        req.setAssignments(List.of(a1));
+
+        assertThatThrownBy(() -> tripService.assignSplit(1L, req, "admin"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SPLIT_PLAN_STOP_DUPLICATED);
+    }
+
+    @Test
+    void assignSplit_incompleteStops_throwsException() {
+        testDraft.setStatus("VALIDATED");
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(testDispatcher));
+
+        TripDraftStop s1 = TripDraftStop.builder().id(101L).build();
+        TripDraftStop s2 = TripDraftStop.builder().id(102L).build();
+        when(tripDraftStopRepository.findByTripDraftIdAndIsActiveTrueOrderBySequenceNoAsc(1L)).thenReturn(List.of(s1, s2));
+
+        TripSplitAssignRequest.SplitAssignment a1 = new TripSplitAssignRequest.SplitAssignment();
+        a1.setVehicleId(1L);
+        a1.setStopIds(List.of(101L)); // missing 102L
+        TripSplitAssignRequest req = new TripSplitAssignRequest();
+        req.setAssignments(List.of(a1));
+
+        assertThatThrownBy(() -> tripService.assignSplit(1L, req, "admin"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.SPLIT_PLAN_STOP_INCOMPLETE);
+    }
+
+    @Test
+    void getEligibleVehiclesForStops_success() {
+        testDraft.setStatus("VALIDATED");
+        TripDraftStop s1 = TripDraftStop.builder().id(101L).build();
+        testDraft.setStops(List.of(s1));
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepository.findByIsActiveTrue()).thenReturn(List.of(testVehicle));
+        when(orderItemRepository.findByStoreIdInAndTripDraftId(any(), eq(1L))).thenReturn(Collections.emptyList());
+
+        EligibleVehiclesResponse resp = tripService.getEligibleVehiclesForStops(1L, List.of(101L));
+        assertThat(resp).isNotNull();
     }
 }
