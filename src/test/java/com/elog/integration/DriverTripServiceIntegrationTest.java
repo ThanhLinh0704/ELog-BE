@@ -115,7 +115,7 @@ class DriverTripServiceIntegrationTest {
     }
 
     private Fixture seedExecution(String executionStatus, String startedAt) {
-        LocalDate today = LocalDate.now().minusDays(DAY_SEQUENCE.getAndIncrement());
+        LocalDate today = LocalDate.now().minusDays(100 + DAY_SEQUENCE.getAndIncrement());
         jdbc.update("""
                 INSERT INTO trip_drafts
                     (route_id, delivery_date, total_volume_m3, total_weight_kg,

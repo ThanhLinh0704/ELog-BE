@@ -8,6 +8,7 @@ import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
 import com.elog.service.TripService;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +33,12 @@ class TripServiceIntegrationTest {
     @Autowired TripService tripService;
     @Autowired JdbcTemplate jdbc;
     @Autowired EntityManager entityManager;
+
+    @BeforeEach
+    void setUp() {
+        jdbc.update("UPDATE vehicles SET status = 'AVAILABLE'");
+        jdbc.update("UPDATE trip_executions SET returned_to_warehouse_at = NOW(), status = 'COMPLETED' WHERE returned_to_warehouse_at IS NULL");
+    }
 
     @Test
     void l2Dsp01AssignmentPersistsTripAndStops() {
