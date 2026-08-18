@@ -61,7 +61,9 @@ ehthumbs.db
 # ─── Misc ───────────────────────────────────────────────────
 *.log
 logs/
+src/test/legacy_archive/
 test-execution/
+
 *.ndjson
 *.dump
 *.dumpstream
