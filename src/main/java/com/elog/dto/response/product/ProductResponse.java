@@ -14,6 +14,10 @@ public class ProductResponse {
     private Long id;
     private String sku;
     private String productName;
+    private String brand;
+    private String productGroup;
+    private String productType;
+    private BigDecimal capacityValue;
     private BigDecimal weightKg;
     private BigDecimal lengthM;
     private BigDecimal widthM;

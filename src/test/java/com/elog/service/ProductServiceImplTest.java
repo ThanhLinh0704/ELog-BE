@@ -106,4 +106,31 @@ class ProductServiceImplTest {
 
         verify(productRepository, never()).save(any(Product.class));
     }
+
+    @Test
+    void updateProduct_success_withClassificationFields() {
+        com.elog.dto.request.product.ProductUpdateRequest updateReq = new com.elog.dto.request.product.ProductUpdateRequest();
+        updateReq.setProductName("Updated Name");
+        updateReq.setBrand("Brand A");
+        updateReq.setProductGroup("Tủ lạnh");
+        updateReq.setProductType("1.Tủ lạnh");
+        updateReq.setCapacityValue(BigDecimal.valueOf(500.0));
+        updateReq.setWeightKg(BigDecimal.valueOf(50.0));
+        updateReq.setLengthM(BigDecimal.valueOf(0.8));
+        updateReq.setWidthM(BigDecimal.valueOf(0.8));
+        updateReq.setHeightM(BigDecimal.valueOf(1.8));
+
+        when(productRepository.findById(1L)).thenReturn(java.util.Optional.of(product));
+        when(productRepository.save(any(Product.class))).thenReturn(product);
+        when(productMapper.toResponse(any(Product.class))).thenReturn(ProductResponse.builder().id(1L).brand("Brand A").build());
+
+        ProductResponse res = productService.updateProduct(1L, updateReq);
+
+        assertThat(res).isNotNull();
+        assertThat(product.getBrand()).isEqualTo("Brand A");
+        assertThat(product.getProductGroup()).isEqualTo("Tủ lạnh");
+        assertThat(product.getProductType()).isEqualTo("1.Tủ lạnh");
+        assertThat(product.getCapacityValue()).isEqualByComparingTo(BigDecimal.valueOf(500.0));
+        verify(productRepository).save(product);
+    }
 }

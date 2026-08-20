@@ -34,5 +34,17 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     List<OrderItem> findByOrderId(Long orderId);
 
     List<OrderItem> findByOrderIdIn(List<Long> orderIds);
+
+    // ── Confirmed Dispatch Export ────────────────────────────────────────
+
+    @Query("SELECT oi FROM OrderItem oi " +
+           "JOIN FETCH oi.order o " +
+           "JOIN FETCH o.store s " +
+           "LEFT JOIN FETCH s.province " +
+           "LEFT JOIN FETCH s.district " +
+           "JOIN FETCH oi.product p " +
+           "WHERE o.tripDraft.id IN :tripDraftIds")
+    List<OrderItem> findByTripDraftIdInWithOrderAndProduct(
+            @Param("tripDraftIds") java.util.Collection<Long> tripDraftIds);
 }
 

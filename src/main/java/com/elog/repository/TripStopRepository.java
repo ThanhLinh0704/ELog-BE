@@ -69,4 +69,16 @@ public interface TripStopRepository extends JpaRepository<TripStop, Long> {
     List<TripStop> findProcessedStopsInDateRange(
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+
+    // ── Confirmed Dispatch Export ────────────────────────────────────────
+
+    @Query("SELECT ts FROM TripStop ts " +
+           "JOIN FETCH ts.trip t " +
+           "LEFT JOIN FETCH ts.tripDraftStop tds " +
+           "LEFT JOIN FETCH tds.store s " +
+           "LEFT JOIN FETCH s.province " +
+           "LEFT JOIN FETCH s.district " +
+           "WHERE t.tripId IN :tripIds " +
+           "ORDER BY t.tripId ASC, ts.sequenceOrder ASC")
+    List<TripStop> findByTripIdInWithStoreForExport(@Param("tripIds") java.util.Collection<Long> tripIds);
 }
