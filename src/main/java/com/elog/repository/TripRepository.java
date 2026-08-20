@@ -112,4 +112,30 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         List<Trip> findTripsWithVehicleAndRouteInDateRange(
                         @Param("startDate") LocalDate startDate,
                         @Param("endDate") LocalDate endDate);
+
+        // ── Confirmed Dispatch Export ────────────────────────────────────────
+
+        @Query("SELECT t FROM Trip t " +
+                        "JOIN FETCH t.vehicle " +
+                        "JOIN FETCH t.driver " +
+                        "LEFT JOIN FETCH t.route " +
+                        "JOIN FETCH t.tripDraft " +
+                        "WHERE t.tripDraft.id = :tripDraftId " +
+                        "AND t.status IN :statuses")
+        List<Trip> findByTripDraftIdAndStatusInWithDetails(
+                        @Param("tripDraftId") Long tripDraftId,
+                        @Param("statuses") java.util.Collection<TripStatus> statuses);
+
+        @Query("SELECT t FROM Trip t " +
+                        "JOIN FETCH t.vehicle " +
+                        "JOIN FETCH t.driver " +
+                        "LEFT JOIN FETCH t.route " +
+                        "JOIN FETCH t.tripDraft " +
+                        "WHERE t.deliveryDate BETWEEN :fromDate AND :toDate " +
+                        "AND t.status IN :statuses " +
+                        "ORDER BY t.deliveryDate ASC, t.tripId ASC")
+        List<Trip> findByDeliveryDateBetweenAndStatusInWithDetails(
+                        @Param("fromDate") LocalDate fromDate,
+                        @Param("toDate") LocalDate toDate,
+                        @Param("statuses") java.util.Collection<TripStatus> statuses);
 }

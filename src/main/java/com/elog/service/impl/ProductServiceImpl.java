@@ -112,6 +112,10 @@ public class ProductServiceImpl implements ProductService {
         validateProductCapacityRatio(request.getWeightKg(), request.getLengthM(), request.getWidthM(), request.getHeightM());
 
         product.setProductName(request.getProductName());
+        product.setBrand(request.getBrand());
+        product.setProductGroup(request.getProductGroup());
+        product.setProductType(request.getProductType());
+        product.setCapacityValue(request.getCapacityValue());
         product.setWeightKg(request.getWeightKg());
         product.setLengthM(request.getLengthM());
         product.setWidthM(request.getWidthM());
