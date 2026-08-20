@@ -17,6 +17,19 @@ public class ProductUpdateRequest {
     @Size(min = 2, max = 100, message = "INVALID_SIZE")
     private String productName;
 
+    @Size(max = 100, message = "INVALID_SIZE")
+    private String brand;
+
+    @Size(max = 100, message = "INVALID_SIZE")
+    private String productGroup;
+
+    @Size(max = 100, message = "INVALID_SIZE")
+    private String productType;
+
+    @DecimalMin(value = "0", inclusive = true, message = "INVALID_FORMAT")
+    @Digits(integer = 8, fraction = 2, message = "INVALID_FORMAT")
+    private BigDecimal capacityValue;
+
     @NotNull(message = "FIELD_REQUIRED")
     @DecimalMin(value = "0.001", inclusive = true, message = "INVALID_FORMAT")
     @Digits(integer = 5, fraction = 3, message = "INVALID_FORMAT")

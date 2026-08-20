@@ -27,6 +27,19 @@ public class Product {
     @Column(name = "product_name", nullable = false, length = 100)
     private String productName;
 
+    @Column(name = "brand", length = 100)
+    private String brand;
+
+    @Column(name = "product_group", length = 100)
+    private String productGroup;
+
+    @Column(name = "product_type", length = 100)
+    private String productType;
+
+    // Dung tích (L) cho hàng lỏng / KL giặt (kg) cho máy giặt — 1 trường số dùng chung tuỳ loại hàng.
+    @Column(name = "capacity_value", precision = 10, scale = 2)
+    private BigDecimal capacityValue;
+
     @Column(name = "weight_kg", nullable = false, precision = 8, scale = 3)
     private BigDecimal weightKg;
 

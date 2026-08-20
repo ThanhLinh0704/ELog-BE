@@ -13,6 +13,10 @@ public class ProductListItemResponse {
     private Long id;
     private String sku;
     private String productName;
+    private String brand;
+    private String productGroup;
+    private String productType;
+    private BigDecimal capacityValue;
     private BigDecimal weightKg;
     private BigDecimal volumeM3;
     private Boolean isActive;
