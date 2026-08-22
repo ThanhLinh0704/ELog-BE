@@ -144,6 +144,7 @@ class ExceptionServiceImplTest {
         DeliveryExceptionResponse resp = service.resolveException(500L, req, "manager");
 
         assertAll(
+                () -> assertNotNull(resp),
                 () -> assertNotNull(exception.getResolvedAt()),
                 () -> assertEquals(3L, exception.getResolvedBy()),
                 () -> assertEquals("Resolved with customer", exception.getResolutionNotes())

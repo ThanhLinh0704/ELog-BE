@@ -199,7 +199,7 @@ class UserServiceImplTest {
         User user = User.builder().id(1L).username("user01").build();
         org.springframework.data.domain.Page<User> page = new org.springframework.data.domain.PageImpl<>(List.of(user));
 
-        when(userRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(org.springframework.data.domain.Pageable.class)))
+        when(userRepository.findAll(org.mockito.ArgumentMatchers.<org.springframework.data.jpa.domain.Specification<com.elog.entity.User>>any(), any(org.springframework.data.domain.Pageable.class)))
                 .thenReturn(page);
         when(userMapper.toResponse(user)).thenReturn(UserResponse.builder().id(1L).username("user01").build());
 

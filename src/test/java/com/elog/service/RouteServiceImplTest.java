@@ -91,7 +91,7 @@ class RouteServiceImplTest {
     @DisplayName("[L1-RT-13] getAllRoutes returns paginated response with stop count")
     void getAllRoutesSuccess() {
         org.springframework.data.domain.Page<Route> page = new org.springframework.data.domain.PageImpl<>(List.of(route));
-        when(routeRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(org.springframework.data.domain.Pageable.class))).thenReturn(page);
+        when(routeRepository.findAll(org.mockito.ArgumentMatchers.<org.springframework.data.jpa.domain.Specification<com.elog.entity.Route>>any(), any(org.springframework.data.domain.Pageable.class))).thenReturn(page);
         when(routeStopRepository.countStopsByRouteIdIn(List.of(1L))).thenReturn(List.<Object[]>of(new Object[]{1L, 3L}));
         when(routeMapper.toResponse(eq(route), eq(3))).thenReturn(RouteResponse.builder().id(1L).code("RT-01").build());
 

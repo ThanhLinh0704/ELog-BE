@@ -18,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -50,7 +49,7 @@ class DriverStatusServiceImplTest {
     @DisplayName("[L1-DS-01] getDrivers returns paginated list of drivers")
     void getDriversSuccess() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(userRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(new PageImpl<>(List.of(driver)));
+        when(userRepository.findAll(org.mockito.ArgumentMatchers.<org.springframework.data.jpa.domain.Specification<com.elog.entity.User>>any(), eq(pageable))).thenReturn(new PageImpl<>(List.of(driver)));
 
         ApiResponse<List<DriverResponse>> resp = service.getDrivers(null, null, pageable);
 

@@ -18,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -63,7 +62,7 @@ class TripOutcomeHistoryServiceImplTest {
     void searchSuccess() {
         Pageable pageable = PageRequest.of(0, 10);
         TripOutcomeEvent event = TripOutcomeEvent.builder().id(100L).tripId(10L).eventType(TripOutcomeEventType.ORDER_DELIVERED).actorType(PlanningActorType.USER).occurredAt(LocalDateTime.now()).build();
-        when(tripOutcomeEventRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(new PageImpl<>(List.of(event)));
+        when(tripOutcomeEventRepository.findAll(org.mockito.ArgumentMatchers.<org.springframework.data.jpa.domain.Specification<com.elog.entity.TripOutcomeEvent>>any(), eq(pageable))).thenReturn(new PageImpl<>(List.of(event)));
 
         TripOutcomeHistoryService.OutcomeHistoryFilter filter = new TripOutcomeHistoryService.OutcomeHistoryFilter(10L, null, null, null, null, null, null, null, null);
         ApiResponse<List<TripOutcomeEventResponse>> resp = service.search(filter, pageable, "dispatcher", false);

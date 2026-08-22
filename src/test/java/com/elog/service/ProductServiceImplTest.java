@@ -19,7 +19,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -94,7 +93,7 @@ class ProductServiceImplTest {
     @DisplayName("[L1-PR-04] getAllProducts returns paginated product list")
     void getAllProductsSuccess() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(productRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(new PageImpl<>(List.of(product)));
+        when(productRepository.findAll(org.mockito.ArgumentMatchers.<org.springframework.data.jpa.domain.Specification<com.elog.entity.Product>>any(), eq(pageable))).thenReturn(new PageImpl<>(List.of(product)));
         when(productMapper.toListItem(product)).thenReturn(ProductListItemResponse.builder().id(10L).sku("SKU-01").build());
 
         ApiResponse<List<ProductListItemResponse>> resp = service.getAllProducts(null, null, pageable);

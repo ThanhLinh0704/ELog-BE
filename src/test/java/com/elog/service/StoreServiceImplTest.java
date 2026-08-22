@@ -21,7 +21,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
@@ -95,7 +94,7 @@ class StoreServiceImplTest {
     @DisplayName("[L1-ST-03] getAllStores returns paginated store list")
     void getAllStoresSuccess() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(storeRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(new PageImpl<>(List.of(store)));
+        when(storeRepository.findAll(org.mockito.ArgumentMatchers.<org.springframework.data.jpa.domain.Specification<com.elog.entity.Store>>any(), eq(pageable))).thenReturn(new PageImpl<>(List.of(store)));
         when(routeStopRepository.findByStoreIdIn(List.of(10L))).thenReturn(List.of());
         when(storeMapper.toListItem(eq(store), any(), any())).thenReturn(StoreListItemResponse.builder().id(10L).storeCode("S10").build());
 

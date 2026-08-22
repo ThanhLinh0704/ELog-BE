@@ -47,7 +47,7 @@ class ManifestServiceImplTest {
         when(orderItemRepo.findByStoreIdInAndTripDraftId(anyList(),eq(1L))).thenReturn(allItems);
         when(manifestRepo.save(any())).thenAnswer(i->i.getArgument(0));
         service.generateManifest(1L,"warehouse");
-        ArgumentCaptor<List<ManifestLine>> lines=ArgumentCaptor.forClass(List.class);
+        @SuppressWarnings("unchecked") ArgumentCaptor<List<ManifestLine>> lines = (ArgumentCaptor<List<ManifestLine>>) (ArgumentCaptor<?>) ArgumentCaptor.forClass(List.class);
         verify(manifestLineRepo).saveAll(lines.capture());
         return lines.getValue();
     }
