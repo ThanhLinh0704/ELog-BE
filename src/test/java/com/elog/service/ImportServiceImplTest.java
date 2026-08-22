@@ -101,7 +101,7 @@ class ImportServiceImplTest {
     @Test
     @DisplayName("[L1-IM-01] ten valid XLSX rows complete with ten accepted")
     void importsTenValidRows() throws Exception {
-        ImportBatchResponse response = service.importExcel(workbook(validRows(10)), deliveryDate, false, 9L);
+        service.importExcel(workbook(validRows(10)), deliveryDate, false, 9L);
         assertAll(() -> assertEquals("COMPLETED", response.getStatus()),
                 () -> assertEquals(10, response.getAcceptedRows()),
                 () -> assertEquals(0, response.getRejectedRows()),
@@ -113,7 +113,7 @@ class ImportServiceImplTest {
     void replaceDeactivatesOldBatch() throws Exception {
         ImportBatch old = ImportBatch.builder().id(77L).deliveryDate(deliveryDate).isActive(true).build();
         lenient().when(batches.findAllActiveByDate(deliveryDate)).thenReturn(List.of(old));
-        ImportBatchResponse response = service.importExcel(workbook(List.of()), deliveryDate, true, 9L);
+        service.importExcel(workbook(List.of()), deliveryDate, true, 9L);
         assertAll(() -> assertFalse(old.getIsActive(), "confirmReplace must deactivate the prior active batch"),
                 () -> verify(batches).save(old),
                 () -> assertEquals(Boolean.TRUE, response.getIsActive()));
@@ -125,7 +125,7 @@ class ImportServiceImplTest {
         List<String[]> rows = new ArrayList<>(validRows(8));
         rows.add(row("BAD-1", "UNKNOWN-1"));
         rows.add(row("BAD-2", "UNKNOWN-2"));
-        ImportBatchResponse response = service.importExcel(workbook(rows), deliveryDate, false, 9L);
+        service.importExcel(workbook(rows), deliveryDate, false, 9L);
         ArgumentCaptor<List<ImportError>> captor = errorListCaptor();
         verify(errors).saveAll(captor.capture());
         assertAll(() -> assertEquals(8, response.getAcceptedRows()),
@@ -139,7 +139,7 @@ class ImportServiceImplTest {
         List<String[]> rows = List.of(
                 new String[]{"ORD-001", "ST-001", "SKU-A", "5"},
                 new String[]{"ORD-001", "ST-001", "SKU-A", "5"});
-        ImportBatchResponse response = service.importExcel(workbook(rows), deliveryDate, false, 9L);
+        service.importExcel(workbook(rows), deliveryDate, false, 9L);
         ArgumentCaptor<OrderItem> captor = ArgumentCaptor.forClass(OrderItem.class);
         verify(items, times(2)).save(captor.capture());
         assertAll(() -> assertEquals(2, response.getAcceptedRows()),
@@ -168,7 +168,7 @@ class ImportServiceImplTest {
             if (batch.getId() == null) batch.setId(100L);
             return batch;
         });
-        ImportBatchResponse response = service.importExcel(workbook(List.of()), deliveryDate, false, 9L);
+        service.importExcel(workbook(List.of()), deliveryDate, false, 9L);
         assertAll(() -> assertEquals(List.of("PROCESSING", "COMPLETED"), statusesAtSave),
                 () -> assertEquals(0, response.getTotalRows()),
                 () -> assertEquals(0, response.getAcceptedRows()),
@@ -203,7 +203,7 @@ class ImportServiceImplTest {
     @Test
     @DisplayName("[L1-IM-09] unknown store creates a storeCode not-found import error")
     void rejectsUnknownStoreWithFieldEvidence() throws Exception {
-        ImportBatchResponse response = service.importExcel(workbook(Collections.singletonList(row("BAD-1", "UNKNOWN_STORE"))), deliveryDate, false, 9L);
+        service.importExcel(workbook(Collections.singletonList(row("BAD-1", "UNKNOWN_STORE"))), deliveryDate, false, 9L);
         ArgumentCaptor<ImportError> captor = ArgumentCaptor.forClass(ImportError.class);
         verify(errors).save(captor.capture());
         assertAll(() -> assertEquals(0, response.getAcceptedRows()),
@@ -216,7 +216,7 @@ class ImportServiceImplTest {
     @Test
     @DisplayName("[L1-IM-16] all valid rows persist batch status COMPLETED with zero rejects")
     void allValidRowsSetCompletedStatus() throws Exception {
-        ImportBatchResponse response = service.importExcel(workbook(validRows(10)), deliveryDate, false, 9L);
+        service.importExcel(workbook(validRows(10)), deliveryDate, false, 9L);
         ArgumentCaptor<ImportBatch> captor = ArgumentCaptor.forClass(ImportBatch.class);
         verify(batches, atLeastOnce()).save(captor.capture());
         ImportBatch last = captor.getAllValues().get(captor.getAllValues().size() - 1);
@@ -230,7 +230,7 @@ class ImportServiceImplTest {
     void mixedRowsSetPartialStatus() throws Exception {
         List<String[]> rows = new ArrayList<>(validRows(5));
         for (int i = 0; i < 5; i++) rows.add(row("BAD-" + i, "UNKNOWN-" + i));
-        ImportBatchResponse response = service.importExcel(workbook(rows), deliveryDate, false, 9L);
+        service.importExcel(workbook(rows), deliveryDate, false, 9L);
         assertAll(() -> assertEquals(5, response.getAcceptedRows()),
                 () -> assertEquals(5, response.getRejectedRows()),
                 () -> assertEquals("PARTIAL", response.getStatus(), "mixed results need an observable partial-success status"));
@@ -241,7 +241,7 @@ class ImportServiceImplTest {
     void allInvalidRowsCreateNoOrders() throws Exception {
         List<String[]> rows = new ArrayList<>();
         for (int i = 0; i < 10; i++) rows.add(row("BAD-" + i, "UNKNOWN-" + i));
-        ImportBatchResponse response = service.importExcel(workbook(rows), deliveryDate, false, 9L);
+        service.importExcel(workbook(rows), deliveryDate, false, 9L);
         ArgumentCaptor<List<ImportError>> captor = errorListCaptor();
         verify(errors).saveAll(captor.capture());
         assertAll(() -> assertEquals(0, response.getAcceptedRows()),

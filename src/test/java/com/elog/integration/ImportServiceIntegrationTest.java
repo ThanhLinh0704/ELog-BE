@@ -1,10 +1,8 @@
 package com.elog.integration;
 
-import com.elog.dto.response.importbatch.ImportBatchResponse;
 import com.elog.entity.*;
 import com.elog.repository.*;
 import com.elog.service.ImportService;
-import com.elog.service.impl.ImportServiceImpl;
 import com.elog.exception.BusinessException;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -25,14 +23,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -41,7 +35,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import org.junit.jupiter.api.Disabled;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -71,9 +64,6 @@ class ImportServiceIntegrationTest {
 
     @Autowired
     private StoreRepository storeRepository;
-
-    @Autowired
-    private ProductRepository productRepository;
 
     @BeforeEach
     void setUp() {

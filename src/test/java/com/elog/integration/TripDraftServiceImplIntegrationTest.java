@@ -1,7 +1,6 @@
 package com.elog.integration;
 
 import com.elog.service.TripDraftService;
-import com.elog.dto.response.common.*;
 import com.elog.dto.response.trip.*;
 import com.elog.entity.*;
 import com.elog.repository.*;

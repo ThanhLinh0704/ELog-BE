@@ -7,13 +7,11 @@ import com.elog.exception.ErrorCode;
 import com.elog.repository.SystemConfigRepository;
 import com.elog.repository.TripDraftRepository;
 import com.elog.repository.TripDraftStopRepository;
-import com.elog.service.impl.HaversineEtaCalculator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
 import java.time.LocalTime;

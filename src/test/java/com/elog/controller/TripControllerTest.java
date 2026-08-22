@@ -3,7 +3,6 @@ package com.elog.controller;
 import com.elog.dto.request.trip.TripAssignRequest;
 import com.elog.dto.request.trip.TripAssignmentPatchRequest;
 import com.elog.dto.request.trip.TripSplitAssignRequest;
-import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.trip.TripResponse;
 import com.elog.dto.response.trip.TripSplitResponse;
 import com.elog.dto.response.user.AvailableDriverResponse;

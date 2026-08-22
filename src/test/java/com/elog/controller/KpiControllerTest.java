@@ -1,6 +1,5 @@
 package com.elog.controller;
 
-import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.kpi.KpiByDriverResponse;
 import com.elog.dto.response.kpi.KpiByRouteResponse;
 import com.elog.dto.response.kpi.KpiByVehicleResponse;

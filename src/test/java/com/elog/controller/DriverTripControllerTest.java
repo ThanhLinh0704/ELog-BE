@@ -1,7 +1,6 @@
 package com.elog.controller;
 
 import com.elog.dto.request.trip.UpdateOrderResultRequest;
-import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.trip.TripOutcomeResponse;
 import com.elog.dto.response.user.DriverTripResponse;
 import com.elog.exception.BusinessException;

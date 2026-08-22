@@ -1,6 +1,5 @@
 package com.elog.controller;
 
-import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.trip.TripOutcomeResponse;
 import com.elog.exception.GlobalExceptionHandler;
 import com.elog.service.TripOutcomeService;

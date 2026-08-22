@@ -1,6 +1,5 @@
 package com.elog.controller;
 
-import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.goong.DistrictResponse;
 import com.elog.dto.response.goong.ProvinceResponse;
 import com.elog.dto.response.goong.WardResponse;

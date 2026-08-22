@@ -6,7 +6,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 
-import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.*;
 

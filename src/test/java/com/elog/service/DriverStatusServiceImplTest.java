@@ -5,8 +5,6 @@ import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.user.DriverResponse;
 import com.elog.dto.response.user.DriverStatusHistoryResponse;
 import com.elog.entity.*;
-import com.elog.exception.BusinessException;
-import com.elog.exception.ErrorCode;
 import com.elog.repository.DriverStatusHistoryRepository;
 import com.elog.repository.TripRepository;
 import com.elog.repository.UserRepository;

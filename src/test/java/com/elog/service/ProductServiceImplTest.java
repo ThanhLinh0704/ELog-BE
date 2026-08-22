@@ -7,8 +7,6 @@ import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.product.ProductListItemResponse;
 import com.elog.dto.response.product.ProductResponse;
 import com.elog.entity.Product;
-import com.elog.exception.BusinessException;
-import com.elog.exception.ErrorCode;
 import com.elog.mapper.ProductMapper;
 import com.elog.repository.ProductRepository;
 import com.elog.service.impl.ProductServiceImpl;
@@ -27,6 +25,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -126,7 +125,7 @@ class ProductServiceImplTest {
 
     @Test
     void updateProduct_success_withClassificationFields() {
-        com.elog.dto.request.product.ProductUpdateRequest updateReq = new com.elog.dto.request.product.ProductUpdateRequest();
+        ProductUpdateRequest updateReq = new ProductUpdateRequest();
         updateReq.setProductName("Updated Name");
         updateReq.setBrand("Brand A");
         updateReq.setProductGroup("Tủ lạnh");
@@ -137,11 +136,11 @@ class ProductServiceImplTest {
         updateReq.setWidthM(BigDecimal.valueOf(0.8));
         updateReq.setHeightM(BigDecimal.valueOf(1.8));
 
-        when(productRepository.findById(1L)).thenReturn(java.util.Optional.of(product));
+        when(productRepository.findById(1L)).thenReturn(Optional.of(product));
         when(productRepository.save(any(Product.class))).thenReturn(product);
         when(productMapper.toResponse(any(Product.class))).thenReturn(ProductResponse.builder().id(1L).brand("Brand A").build());
 
-        ProductResponse res = productService.updateProduct(1L, updateReq);
+        ProductResponse res = service.updateProduct(1L, updateReq);
 
         assertThat(res).isNotNull();
         assertThat(product.getBrand()).isEqualTo("Brand A");

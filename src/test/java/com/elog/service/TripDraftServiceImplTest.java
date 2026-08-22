@@ -3,7 +3,6 @@ package com.elog.service;
 import com.elog.dto.request.trip.StopUpdateRequest;
 import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.common.ConfirmResponse;
-import com.elog.dto.response.common.ConfirmedByDto;
 import com.elog.dto.response.trip.*;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
