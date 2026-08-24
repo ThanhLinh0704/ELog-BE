@@ -46,8 +46,14 @@ public class TripStateMachine {
         switch (newStatus) {
             case DISPATCHED -> {
                 trip.setLockedAt(LocalDateTime.now());
+                // Xe đã bị khoá vào chuyến này (dispatched = sẵn sàng lăn bánh, chỉ chờ tài xế
+                // bấm bắt đầu) — phải coi là bận ngay từ đây, không phải AVAILABLE. Toàn bộ phần
+                // còn lại của hệ thống (mọi busyStatuses check) đã coi DISPATCHED là bận; dòng
+                // này trước đây set ngược lại khiến xe hiện "Sẵn sàng" suốt khoảng thời gian giữa
+                // lúc dispatch và lúc tài xế thực sự bấm bắt đầu chuyến trên app — có thể bị gán
+                // nhầm cho chuyến khác trong lúc đó.
                 if (trip.getVehicle() != null) {
-                    trip.getVehicle().setStatus(com.elog.entity.VehicleStatus.AVAILABLE);
+                    trip.getVehicle().setStatus(com.elog.entity.VehicleStatus.IN_USE);
                 }
             }
             case IN_PROGRESS -> {
@@ -60,6 +66,16 @@ public class TripStateMachine {
                 trip.setCompletedAt(LocalDateTime.now());
                 // Note: Vehicle remains IN_USE until driver confirms returnToWarehouse
             }
+            case CANCELLED -> {
+                trip.setCancelledAt(LocalDateTime.now());
+                // DISPATCHED -> CANCELLED is the only valid path here (see isValidTransition) — the
+                // trip was never started (driver never left the warehouse), so unlike COMPLETED the
+                // vehicle can be released immediately without waiting for a return-to-warehouse
+                // confirmation.
+                if (trip.getVehicle() != null) {
+                    trip.getVehicle().setStatus(com.elog.entity.VehicleStatus.AVAILABLE);
+                }
+            }
             default -> { /* VALIDATED has no side effects */ }
         }
 
@@ -69,9 +85,10 @@ public class TripStateMachine {
     private boolean isValidTransition(TripStatus from, TripStatus to) {
         return switch (from) {
             case VALIDATED   -> to == TripStatus.DISPATCHED;
-            case DISPATCHED  -> to == TripStatus.IN_PROGRESS;
+            case DISPATCHED  -> to == TripStatus.IN_PROGRESS || to == TripStatus.CANCELLED;
             case IN_PROGRESS -> to == TripStatus.COMPLETED;
             case COMPLETED   -> false;
+            case CANCELLED   -> false;
         };
     }
 }

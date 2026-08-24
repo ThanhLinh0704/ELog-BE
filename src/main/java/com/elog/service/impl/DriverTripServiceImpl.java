@@ -40,6 +40,7 @@ public class DriverTripServiceImpl implements DriverTripService {
     private final DeliveryExceptionRepository deliveryExceptionRepo;
     private final VehicleRepository vehicleRepo;
     private final com.elog.service.TripOutcomeHistoryService tripOutcomeHistoryService;
+    private final TripStartDeadlineService tripStartDeadlineService;
 
     @Override
     @Transactional(readOnly = true)
@@ -96,12 +97,20 @@ public class DriverTripServiceImpl implements DriverTripService {
                     HttpStatus.BAD_REQUEST);
         }
 
+        Trip trip = execution.getTrip();
+        if (trip != null && tripStartDeadlineService.isDeadlineExceeded(trip)) {
+            tripStartDeadlineService.flagIfNeeded(trip);
+            throw new BusinessException(
+                    ErrorCode.TRIP_START_DEADLINE_EXCEEDED,
+                    "Chuyến đã quá hạn và không thể bắt đầu. Vui lòng chờ Điều phối xử lý.",
+                    HttpStatus.CONFLICT);
+        }
+
         String statusBefore = execution.getStatus();
         execution.setStatus("IN_PROGRESS");
         execution.setStartedAt(LocalDateTime.now());
         tripExecutionRepo.save(execution);
 
-        Trip trip = execution.getTrip();
         if (trip != null) {
             trip.setStatus(TripStatus.IN_PROGRESS);
             if (trip.getActualDepartureTime() == null) {
@@ -157,14 +166,9 @@ public class DriverTripServiceImpl implements DriverTripService {
                     "Tất cả các điểm dừng của chuyến xe này đã hoàn thành.", HttpStatus.BAD_REQUEST);
         }
 
-        TripStop targetStop = tripStopRepo.findByTripDraftStopId(stopId)
+        TripStop targetStop = tripStopRepo.findByTrip_TripIdAndTripDraftStop_Id(trip.getTripId(), stopId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND,
                         "Không tìm thấy điểm dừng với ID: " + stopId, HttpStatus.NOT_FOUND));
-
-        if (!targetStop.getTrip().getTripId().equals(trip.getTripId())) {
-            throw new BusinessException(ErrorCode.VALIDATION_FAILED,
-                    "Điểm dừng không thuộc về chuyến xe này.", HttpStatus.BAD_REQUEST);
-        }
 
         TripStop firstRemaining = remainingStops.get(0);
         if (!firstRemaining.getTripStopId().equals(targetStop.getTripStopId())) {
@@ -277,21 +281,25 @@ public class DriverTripServiceImpl implements DriverTripService {
                         trip != null && trip.getRoute() != null ? trip.getRoute().getCode() : null,
                         trip != null ? trip.getDeliveryDate() : null, driverUsername));
 
-                // Sync to System A TripStop entity if exists
-                tripStopRepo.findByTripDraftStopId(stop.getId()).ifPresent(ts -> {
-                    LocalDateTime now = LocalDateTime.now();
-                    if (ts.getActualArrivalTime() == null) {
-                        ts.setActualArrivalTime(now);
-                    }
-                    ts.setActualDepartureTime(now);
+                // Sync to System A TripStop entity if exists — scoped by trip since
+                // trip_draft_stop_id is shared across a draft's trip history (cancel + reassign),
+                // not unique to the current trip (see TripStopRepository.findByTrip_TripIdAndTripDraftStop_Id).
+                if (trip != null) {
+                    tripStopRepo.findByTrip_TripIdAndTripDraftStop_Id(trip.getTripId(), stop.getId()).ifPresent(ts -> {
+                        LocalDateTime now = LocalDateTime.now();
+                        if (ts.getActualArrivalTime() == null) {
+                            ts.setActualArrivalTime(now);
+                        }
+                        ts.setActualDepartureTime(now);
 
-                    if ("DELIVERED".equals(stopStatusAfter)) {
-                        ts.setStatus(TripStopStatus.COMPLETED);
-                    } else if ("FAILED".equals(stopStatusAfter) || "PARTIAL".equals(stopStatusAfter) || "PARTIALLY_DELIVERED".equals(stopStatusAfter)) {
-                        ts.setStatus(TripStopStatus.EXCEPTION);
-                    }
-                    tripStopRepo.save(ts);
-                });
+                        if ("DELIVERED".equals(stopStatusAfter)) {
+                            ts.setStatus(TripStopStatus.COMPLETED);
+                        } else if ("FAILED".equals(stopStatusAfter) || "PARTIAL".equals(stopStatusAfter) || "PARTIALLY_DELIVERED".equals(stopStatusAfter)) {
+                            ts.setStatus(TripStopStatus.EXCEPTION);
+                        }
+                        tripStopRepo.save(ts);
+                    });
+                }
             }
         }
 
@@ -539,8 +547,13 @@ public class DriverTripServiceImpl implements DriverTripService {
         int completedCount = 0;
         int pendingCount = 0;
 
+        // trip_draft_stop_id is nullable on trip_stops (see TripStop.tripDraftStop) — a stop can
+        // exist with no linked TripDraftStop. Same filter already applied above (myTripStops ->
+        // stops, line ~516); omitting it here threw an NPE on ts.getTripDraftStop().getId() for
+        // any trip with such a stop, surfacing to the driver app as a generic 500.
         Map<Long, TripStop> tripStopMap = (trip != null)
                 ? tripStopRepo.findByTripTripIdOrderBySequenceOrderAsc(trip.getTripId()).stream()
+                        .filter(ts -> ts.getTripDraftStop() != null)
                         .collect(Collectors.toMap(ts -> ts.getTripDraftStop().getId(), ts -> ts, (a, b) -> a))
                 : Map.of();
 
@@ -633,6 +646,9 @@ public class DriverTripServiceImpl implements DriverTripService {
 
         String tripCodeStr = trip != null ? "TRIP-" + trip.getTripId() : null;
 
+        boolean deadlineApplies = trip != null && "ASSIGNED".equals(execution.getStatus())
+                && trip.getLockedAt() != null;
+
         return DriverTripResponse.builder()
                 .executionId(execution.getId())
                 .tripId(trip != null ? trip.getTripId() : null)
@@ -641,6 +657,10 @@ public class DriverTripServiceImpl implements DriverTripService {
                 .status(execution.getStatus())
                 .assignmentVersion(execution.getAssignmentVersion())
                 .returnedToWarehouseAt(execution.getReturnedToWarehouseAt())
+                .assignedAt(deadlineApplies ? trip.getLockedAt() : null)
+                .startDeadlineAt(deadlineApplies
+                        ? trip.getLockedAt().plusMinutes(tripStartDeadlineService.getDeadlineMinutes())
+                        : null)
                 .vehicleCode(trip != null && trip.getVehicle() != null ? trip.getVehicle().getVehicleCode() : null)
                 .plateNumber(trip != null && trip.getVehicle() != null ? trip.getVehicle().getPlateNumber() : null)
                 .driverName(execution.getDriver() != null ? execution.getDriver().getFullName() : null)

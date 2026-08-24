@@ -22,6 +22,11 @@ public class DriverTripResponse {
     private Integer assignmentVersion;
     private LocalDateTime returnedToWarehouseAt;
 
+    // Trip-start deadline: driver must call /start before startDeadlineAt (assignedAt + N min),
+    // or the server rejects the call. Null once the trip has left ASSIGNED (deadline no longer applies).
+    private LocalDateTime assignedAt;
+    private LocalDateTime startDeadlineAt;
+
     // Vehicle info
     private String vehicleCode;
     private String plateNumber;

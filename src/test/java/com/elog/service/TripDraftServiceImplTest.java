@@ -6,6 +6,7 @@ import com.elog.dto.response.trip.StopOrderItemResponse;
 import com.elog.dto.response.trip.TripDraftResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
 import com.elog.repository.*;
 import com.elog.service.impl.TripDraftServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,10 @@ class TripDraftServiceImplTest {
     private OrderItemRepository orderItemRepository;
     @Mock
     private PlanningHistoryService planningHistoryService;
+    @Mock
+    private TripRepository tripRepository;
+    @Mock
+    private ManifestRepository manifestRepository;
 
     @InjectMocks
     private TripDraftServiceImpl tripDraftService;
@@ -439,5 +444,69 @@ class TripDraftServiceImplTest {
         assertThat(result.get(0).getOrderId()).isEqualTo(300L);
         assertThat(result.get(0).getOrderRef()).isEqualTo("DH-EXCLUDED");
         assertThat(result.get(0).getSku()).isEqualTo("SKU-999");
+    }
+
+    // ── revertToDraft — CANCELLED Trip must not block revert, other statuses must ────────────
+
+    @Test
+    void revertToDraft_success_whenNoTripEverExisted() {
+        TripDraft draft = TripDraft.builder().id(60L).status("VALIDATED").build();
+
+        when(tripDraftRepository.findById(60L)).thenReturn(Optional.of(draft));
+        when(tripRepository.existsByTripDraftIdAndStatusNot(60L, TripStatus.CANCELLED)).thenReturn(false);
+        when(manifestRepository.findByTripDraftId(60L)).thenReturn(Optional.empty());
+
+        tripDraftService.revertToDraft(60L, "dispatcher01");
+
+        assertThat(draft.getStatus()).isEqualTo("DRAFT");
+        verify(tripDraftRepository).save(draft);
+    }
+
+    @Test
+    void revertToDraft_success_whenOnlyCancelledTripExists() {
+        // Trip A đã bị huỷ — không được tính là "đang tồn tại" để chặn revert.
+        TripDraft draft = TripDraft.builder().id(61L).status("VALIDATED").build();
+
+        when(tripDraftRepository.findById(61L)).thenReturn(Optional.of(draft));
+        when(tripRepository.existsByTripDraftIdAndStatusNot(61L, TripStatus.CANCELLED)).thenReturn(false);
+        when(manifestRepository.findByTripDraftId(61L)).thenReturn(Optional.empty());
+
+        tripDraftService.revertToDraft(61L, "dispatcher01");
+
+        assertThat(draft.getStatus()).isEqualTo("DRAFT");
+        verify(tripDraftRepository).save(draft);
+    }
+
+    @Test
+    void revertToDraft_throws_whenActiveTripExists() {
+        // Trip B đang DISPATCHED — phải chặn revert.
+        TripDraft draft = TripDraft.builder().id(62L).status("VALIDATED").build();
+
+        when(tripDraftRepository.findById(62L)).thenReturn(Optional.of(draft));
+        when(tripRepository.existsByTripDraftIdAndStatusNot(62L, TripStatus.CANCELLED)).thenReturn(true);
+
+        assertThatThrownBy(() -> tripDraftService.revertToDraft(62L, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED);
+
+        verify(tripDraftRepository, never()).save(any());
+        verifyNoInteractions(manifestRepository);
+    }
+
+    @Test
+    void revertToDraft_throws_whenTripAlreadyCompleted() {
+        // Chuyến đã giao xong — không được phép revert kế hoạch, dù chuyến không còn "active" theo
+        // nghĩa đang chạy. Guard phải dựa trên "khác CANCELLED", không phải liệt kê 1 danh sách
+        // trạng thái "active" cụ thể — nếu không COMPLETED sẽ vô tình lọt qua.
+        TripDraft draft = TripDraft.builder().id(63L).status("VALIDATED").build();
+
+        when(tripDraftRepository.findById(63L)).thenReturn(Optional.of(draft));
+        when(tripRepository.existsByTripDraftIdAndStatusNot(63L, TripStatus.CANCELLED)).thenReturn(true);
+
+        assertThatThrownBy(() -> tripDraftService.revertToDraft(63L, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED);
+
+        verify(tripDraftRepository, never()).save(any());
     }
 }

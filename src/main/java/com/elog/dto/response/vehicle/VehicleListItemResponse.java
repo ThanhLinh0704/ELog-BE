@@ -35,4 +35,5 @@ public class VehicleListItemResponse {
     private String assignedDriverName;
     private String assignedDriverPhone;
     private LicenseClass assignedDriverLicenseClass;
+    private VehicleCurrentTripResponse currentTrip;
 }

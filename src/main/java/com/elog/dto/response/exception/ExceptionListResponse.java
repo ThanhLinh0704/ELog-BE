@@ -10,6 +10,9 @@ import java.util.List;
 public class ExceptionListResponse {
 
     private String date;
+    /** Set instead of {@code date} when the list was queried over a date range. */
+    private String fromDate;
+    private String toDate;
     private int totalCount;
     private int unresolvedCount;
     private List<ExceptionItem> exceptions;

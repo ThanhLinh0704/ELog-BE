@@ -62,6 +62,10 @@ public class VehicleUpdateRequest {
 
     private VehicleStatus status;
 
+    /** Optional — null means "don't touch". Cùng 1 request set cả status lẫn isActive để FE chỉ
+     *  cần 1 control duy nhất thay vì 2 endpoint riêng (xem PATCH /vehicles/{id}/status cũ). */
+    private Boolean isActive;
+
     @Size(max = 512, message = "INVALID_SIZE")
     private String imageUrl;
 

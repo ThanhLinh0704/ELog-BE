@@ -20,6 +20,9 @@ public interface DeliveryExceptionRepository extends JpaRepository<DeliveryExcep
     /** Kiểm tra đã có DELIVERY_REJECTION chưa resolve cho order — guard FT-09 */
     boolean existsByOrderIdAndExceptionTypeAndResolvedAtIsNull(Long orderId, ExceptionType exceptionType);
 
+    /** Kiểm tra đã có TRIP_STALE_UNSTARTED chưa resolve cho execution — guard dedupe cho TripStaleDetectionJob */
+    boolean existsByTripExecutionIdAndExceptionTypeAndResolvedAtIsNull(Long tripExecutionId, ExceptionType exceptionType);
+
     List<DeliveryException> findByTripStopIdOrderByCreatedAtDesc(Long tripStopId);
 
     /** Batch load exceptions cho nhiều stops — tránh N+1 trong dashboard/progress queries */
@@ -49,6 +52,24 @@ public interface DeliveryExceptionRepository extends JpaRepository<DeliveryExcep
            "ORDER BY de.createdAt DESC")
     List<DeliveryException> findByFilters(
             @Param("date") LocalDate date,
+            @Param("exceptionType") ExceptionType exceptionType,
+            @Param("resolved") Boolean resolved);
+
+    /** Same filters as {@link #findByFilters}, but over a date range instead of a single day. */
+    @Query("SELECT de FROM DeliveryException de " +
+           "LEFT JOIN TripStop ts ON ts.tripStopId = de.tripStopId " +
+           "LEFT JOIN TripExecution te ON te.id = de.tripExecutionId " +
+           "LEFT JOIN ts.trip t1 " +
+           "LEFT JOIN te.trip t2 " +
+           "WHERE (t1.deliveryDate BETWEEN :startDate AND :endDate OR t2.deliveryDate BETWEEN :startDate AND :endDate) " +
+           "AND (:exceptionType IS NULL OR de.exceptionType = :exceptionType) " +
+           "AND (:resolved IS NULL " +
+           "     OR (:resolved = TRUE AND de.resolvedAt IS NOT NULL) " +
+           "     OR (:resolved = FALSE AND de.resolvedAt IS NULL)) " +
+           "ORDER BY de.createdAt DESC")
+    List<DeliveryException> findByFiltersInRange(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
             @Param("exceptionType") ExceptionType exceptionType,
             @Param("resolved") Boolean resolved);
 

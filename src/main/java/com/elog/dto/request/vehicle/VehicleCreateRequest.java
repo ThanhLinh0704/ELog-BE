@@ -20,7 +20,9 @@ public class VehicleCreateRequest {
 
     @NotBlank(message = "FIELD_REQUIRED")
     @Size(min = 6, max = 12, message = "INVALID_SIZE")
-    @Pattern(regexp = "^[A-Za-z0-9]+(-[A-Za-z0-9]+)*$",
+    // Biển số VN thật dùng dấu chấm trước 2 số cuối (vd "37X-564.17") — 20/20 xe hiện có trong DB
+    // đều theo dạng này; regex cũ không cho phép dấu chấm, chặn nhầm đúng định dạng thật.
+    @Pattern(regexp = "^[A-Za-z0-9]+([.-][A-Za-z0-9]+)*$",
             message = "INVALID_FORMAT")
     private String plateNumber;
 

@@ -5,6 +5,7 @@ import com.elog.dto.response.trip.StopArriveResponse;
 import com.elog.dto.response.trip.StopCompleteResponse;
 import com.elog.dto.response.trip.TripProgressResponse;
 import com.elog.dto.response.trip.TripStartResponse;
+import com.elog.dto.response.trip.TripStatusSummaryResponse;
 
 import java.time.LocalDate;
 
@@ -24,4 +25,7 @@ public interface TripMonitoringService {
 
     /** Chi tiết tiến độ từng stop của 1 trip. */
     TripProgressResponse getTripProgress(Long tripId);
+
+    /** Số lượng chuyến theo trạng thái (VALIDATED/DISPATCHED/IN_PROGRESS/COMPLETED) trong 1 ngày. */
+    TripStatusSummaryResponse getTripStatusSummary(LocalDate date);
 }

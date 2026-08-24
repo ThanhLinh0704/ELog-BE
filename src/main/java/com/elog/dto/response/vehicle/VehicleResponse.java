@@ -38,4 +38,5 @@ public class VehicleResponse {
     private LicenseClass assignedDriverLicenseClass;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private VehicleCurrentTripResponse currentTrip;
 }

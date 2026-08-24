@@ -1,7 +1,9 @@
 package com.elog.service;
 
+import com.elog.dto.request.trip.CancelTripRequest;
 import com.elog.dto.request.trip.TripAssignmentPatchRequest;
 import com.elog.dto.request.trip.TripAssignRequest;
+import com.elog.dto.request.trip.TripSplitAssignRequest;
 import com.elog.dto.response.trip.TripResponse;
 import com.elog.dto.response.user.AvailableDriverResponse;
 import com.elog.dto.response.vehicle.EligibleVehiclesResponse;
@@ -117,7 +119,7 @@ class TripServiceImplTest {
         request.setDriverId(2L);
 
         when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(tripRepository.existsByTripDraftIdAndStatusNot(1L, TripStatus.CANCELLED)).thenReturn(false);
         when(vehicleRepository.findById(1L)).thenReturn(Optional.of(testVehicle));
         when(userRepository.findById(2L)).thenReturn(Optional.of(testDriver));
         when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
@@ -141,6 +143,42 @@ class TripServiceImplTest {
         assertThat(response).isNotNull();
         assertThat(response.getTripId()).isEqualTo(100L);
         verify(tripRepository).save(any(Trip.class));
+        // Đây cũng chính là case "Trip Draft chỉ có Trip CANCELLED trước đó" — repository trả về
+        // false (không có Trip nào khác CANCELLED còn tồn tại) nên gán được bình thường.
+    }
+
+    @Test
+    void assignVehicleAndDriver_throws_whenActiveTripAlreadyExists() {
+        // Trip Draft đang có 1 Trip khác CANCELLED (VALIDATED/DISPATCHED/IN_PROGRESS/COMPLETED) —
+        // phải chặn gán thêm 1 Trip thứ hai.
+        TripAssignRequest request = new TripAssignRequest();
+        request.setVehicleId(1L);
+        request.setDriverId(2L);
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(tripRepository.existsByTripDraftIdAndStatusNot(1L, TripStatus.CANCELLED)).thenReturn(true);
+
+        assertThatThrownBy(() -> tripService.assignVehicleAndDriver(1L, request, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.CONFLICT);
+
+        verify(tripRepository, never()).save(any());
+    }
+
+    @Test
+    void assignSplit_throws_whenActiveTripAlreadyExists() {
+        TripSplitAssignRequest request = new TripSplitAssignRequest();
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(tripRepository.existsByTripDraftIdAndStatusNot(1L, TripStatus.CANCELLED)).thenReturn(true);
+
+        assertThatThrownBy(() -> tripService.assignSplit(1L, request, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED)
+                .hasFieldOrPropertyWithValue("httpStatus", HttpStatus.CONFLICT);
+
+        verify(tripRepository, never()).save(any());
     }
 
     @Test
@@ -153,7 +191,7 @@ class TripServiceImplTest {
         request.setDriverId(2L);
 
         when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(tripRepository.existsByTripDraftIdAndStatusNot(1L, TripStatus.CANCELLED)).thenReturn(false);
         when(vehicleRepository.findById(1L)).thenReturn(Optional.of(testVehicle));
         when(userRepository.findById(2L)).thenReturn(Optional.of(testDriver));
         when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
@@ -248,6 +286,76 @@ class TripServiceImplTest {
                 te.getDriver().getId().equals(testDriver.getId()) &&
                 te.getOrderResults().size() == 1
         ));
+    }
+
+    @Test
+    void cancelTrip_success_releasesVehicleAndClosesExecution() {
+        Trip trip = Trip.builder()
+                .tripId(100L)
+                .tripDraft(testDraft)
+                .route(testDraft.getRoute())
+                .vehicle(testVehicle)
+                .driver(testDriver)
+                .status(TripStatus.DISPATCHED)
+                .deliveryDate(LocalDate.now())
+                .build();
+
+        TripExecution execution = TripExecution.builder()
+                .id(50L)
+                .trip(trip)
+                .driver(testDriver)
+                .status("ASSIGNED")
+                .build();
+
+        when(tripRepository.findById(100L)).thenReturn(Optional.of(trip));
+        when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
+        when(tripExecutionRepository.findByTripId(100L)).thenReturn(Optional.of(execution));
+        doAnswer(invocation -> {
+            trip.setStatus(TripStatus.CANCELLED);
+            trip.getVehicle().setStatus(VehicleStatus.AVAILABLE);
+            return null;
+        }).when(tripStateMachine).transition(eq(trip), eq(TripStatus.CANCELLED), any());
+
+        TripResponse response = tripService.cancelTrip(100L, new CancelTripRequest("Driver unavailable"), "dispatcher01");
+
+        assertThat(response).isNotNull();
+        assertThat(trip.getCancelledBy()).isEqualTo(testDispatcher);
+        assertThat(trip.getCancelReason()).isEqualTo("Driver unavailable");
+        assertThat(testVehicle.getStatus()).isEqualTo(VehicleStatus.AVAILABLE);
+        verify(tripExecutionRepository).save(argThat(te -> "CANCELLED".equals(te.getStatus())));
+        verify(vehicleRepository).save(testVehicle);
+    }
+
+    @Test
+    void cancelTrip_whenTripNotFound_throws() {
+        when(tripRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> tripService.cancelTrip(999L, null, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.TRIP_NOT_FOUND);
+
+        verify(tripExecutionRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelTrip_whenAlreadyStarted_propagatesStateMachineRejection() {
+        Trip trip = Trip.builder()
+                .tripId(100L)
+                .vehicle(testVehicle)
+                .status(TripStatus.IN_PROGRESS)
+                .build();
+
+        when(tripRepository.findById(100L)).thenReturn(Optional.of(trip));
+        when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
+        doThrow(new BusinessException(ErrorCode.INVALID_TRIP_TRANSITION, "Cannot cancel", HttpStatus.CONFLICT))
+                .when(tripStateMachine).transition(eq(trip), eq(TripStatus.CANCELLED), any());
+
+        assertThatThrownBy(() -> tripService.cancelTrip(100L, null, "dispatcher01"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_TRIP_TRANSITION);
+
+        verify(tripExecutionRepository, never()).save(any());
+        verify(vehicleRepository, never()).save(any());
     }
 
     @Test
@@ -545,7 +653,7 @@ class TripServiceImplTest {
         testDraft.setVolumeCheckResult(ConstraintResult.FAIL);
 
         when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(tripRepository.existsByTripDraftIdAndStatusNot(1L, TripStatus.CANCELLED)).thenReturn(false);
         when(vehicleRepository.findByIsActiveTrue()).thenReturn(List.of(testVehicle));
 
         EligibleVehiclesResponse response = tripService.getEligibleVehicles(1L);
@@ -576,7 +684,7 @@ class TripServiceImplTest {
         req.setDriverId(2L);
 
         when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(tripRepository.existsByTripDraftIdAndStatusNot(1L, TripStatus.CANCELLED)).thenReturn(false);
         when(vehicleRepository.findById(1L)).thenReturn(Optional.of(testVehicle));
         when(userRepository.findById(2L)).thenReturn(Optional.of(testDriver));
         when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));
@@ -603,7 +711,7 @@ class TripServiceImplTest {
         req.setDriverId(2L);
 
         when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
-        when(tripRepository.existsByTripDraftId(1L)).thenReturn(false);
+        when(tripRepository.existsByTripDraftIdAndStatusNot(1L, TripStatus.CANCELLED)).thenReturn(false);
         when(vehicleRepository.findById(1L)).thenReturn(Optional.of(testVehicle));
         when(userRepository.findById(2L)).thenReturn(Optional.of(testDriver));
         when(userRepository.findByUsername("dispatcher01")).thenReturn(Optional.of(testDispatcher));

@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
@@ -45,6 +46,8 @@ class DriverTripServiceImplTest {
         private DeliveryExceptionRepository deliveryExceptionRepo;
         @Mock
         private TripOutcomeHistoryService tripOutcomeHistoryService;
+        @Mock
+        private com.elog.service.impl.TripStartDeadlineService tripStartDeadlineService;
 
         @InjectMocks
         private DriverTripServiceImpl driverTripService;
@@ -105,6 +108,23 @@ class DriverTripServiceImplTest {
         }
 
         @Test
+        @DisplayName("startTrip bị chặn khi quá hạn N phút kể từ lúc gán xe, và trip được flag cho điều phối")
+        void startTrip_pastStartDeadline_throwsAndFlagsDispatcher() {
+                execution.setStatus("ASSIGNED");
+                trip.setLockedAt(LocalDateTime.now().minusMinutes(30));
+                when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+                when(tripStartDeadlineService.isDeadlineExceeded(trip)).thenReturn(true);
+
+                assertThatThrownBy(() -> driverTripService.startTrip(50L, "driver1"))
+                                .isInstanceOf(BusinessException.class)
+                                .hasMessageContaining("quá hạn");
+
+                verify(tripStartDeadlineService).flagIfNeeded(trip);
+                verify(tripExecutionRepo, never()).save(any());
+                assertThat(execution.getStatus()).isEqualTo("ASSIGNED");
+        }
+
+        @Test
         @DisplayName("updateOrderResult: khi tất cả đơn trong stop DELIVERED -> đồng bộ TripStop sang COMPLETED")
         void updateOrderResult_allOrdersDeliveredInStop_syncsTripStopToCompleted() {
                 execution.setStatus("IN_PROGRESS");
@@ -125,7 +145,7 @@ class DriverTripServiceImplTest {
                 when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
                 when(deliveryOrderResultRepo.findByTripExecutionIdAndOrderId(50L, 10L)).thenReturn(Optional.of(result));
                 when(deliveryOrderResultRepo.findByTripExecutionId(50L)).thenReturn(java.util.List.of(result));
-                when(tripStopRepo.findByTripDraftStopId(200L)).thenReturn(Optional.of(tripStop));
+                when(tripStopRepo.findByTrip_TripIdAndTripDraftStop_Id(100L, 200L)).thenReturn(Optional.of(tripStop));
 
                 UpdateOrderResultRequest req = new UpdateOrderResultRequest();
                 req.setStatus("DELIVERED");
@@ -158,7 +178,7 @@ class DriverTripServiceImplTest {
                 when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
                 when(deliveryOrderResultRepo.findByTripExecutionIdAndOrderId(50L, 10L)).thenReturn(Optional.of(result));
                 when(deliveryOrderResultRepo.findByTripExecutionId(50L)).thenReturn(java.util.List.of(result));
-                when(tripStopRepo.findByTripDraftStopId(200L)).thenReturn(Optional.of(tripStop));
+                when(tripStopRepo.findByTrip_TripIdAndTripDraftStop_Id(100L, 200L)).thenReturn(Optional.of(tripStop));
 
                 com.elog.dto.request.trip.UpdateOrderResultRequest req = new com.elog.dto.request.trip.UpdateOrderResultRequest();
                 req.setStatus("FAILED");
@@ -284,7 +304,7 @@ class DriverTripServiceImplTest {
                                 .build();
 
                 when(tripStopRepo.findRemainingStopsOrdered(100L)).thenReturn(java.util.List.of(stop1));
-                when(tripStopRepo.findByTripDraftStopId(1L)).thenReturn(Optional.of(stop1));
+                when(tripStopRepo.findByTrip_TripIdAndTripDraftStop_Id(100L, 1L)).thenReturn(Optional.of(stop1));
 
                 DriverTripResponse response = driverTripService.arriveAtStop(50L, 1L, "driver1");
 
@@ -292,5 +312,37 @@ class DriverTripServiceImplTest {
                 assertThat(stop1.getStatus()).isEqualTo(TripStopStatus.IN_PROGRESS);
                 assertThat(stop1.getActualArrivalTime()).isNotNull();
                 verify(tripStopRepo).save(stop1);
+        }
+
+        @Test
+        @DisplayName("arriveAtStop không NPE khi 1 TripStop của chuyến có tripDraftStop = null (trip_draft_stop_id nullable)")
+        void arriveAtStop_tripStopWithNullTripDraftStop_doesNotThrow() {
+                execution.setStatus("IN_PROGRESS");
+                when(tripExecutionRepo.findById(50L)).thenReturn(Optional.of(execution));
+
+                TripStop stop1 = TripStop.builder()
+                                .tripStopId(101L)
+                                .trip(trip)
+                                .sequenceOrder(1)
+                                .status(TripStopStatus.PENDING)
+                                .build();
+                // Orphaned stop with no linked TripDraftStop — a real, reachable DB state
+                // (trip_draft_stop_id is nullable). buildDriverTripResponse() must filter this
+                // out rather than call getTripDraftStop().getId() on it.
+                TripStop orphanStop = TripStop.builder()
+                                .tripStopId(102L)
+                                .trip(trip)
+                                .sequenceOrder(2)
+                                .status(TripStopStatus.PENDING)
+                                .tripDraftStop(null)
+                                .build();
+
+                when(tripStopRepo.findRemainingStopsOrdered(100L)).thenReturn(java.util.List.of(stop1));
+                when(tripStopRepo.findByTrip_TripIdAndTripDraftStop_Id(100L, 1L)).thenReturn(Optional.of(stop1));
+                when(tripStopRepo.findByTripTripIdOrderBySequenceOrderAsc(100L))
+                                .thenReturn(java.util.List.of(stop1, orphanStop));
+
+                assertThatCode(() -> driverTripService.arriveAtStop(50L, 1L, "driver1"))
+                                .doesNotThrowAnyException();
         }
 }

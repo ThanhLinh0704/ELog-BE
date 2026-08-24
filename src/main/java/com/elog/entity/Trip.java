@@ -71,6 +71,16 @@ public class Trip {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cancelled_by")
+    private User cancelledBy;
+
+    @Column(name = "cancel_reason", length = 255)
+    private String cancelReason;
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)

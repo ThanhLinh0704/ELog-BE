@@ -9,6 +9,7 @@ import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
 import com.elog.repository.DriverStatusHistoryRepository;
+import com.elog.repository.TripExecutionRepository;
 import com.elog.repository.TripRepository;
 import com.elog.repository.UserRepository;
 import com.elog.repository.specification.DriverSpecification;
@@ -23,7 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +35,7 @@ public class DriverStatusServiceImpl implements DriverStatusService {
     private final UserRepository userRepository;
     private final DriverStatusHistoryRepository driverStatusHistoryRepository;
     private final TripRepository tripRepository;
+    private final TripExecutionRepository tripExecutionRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -147,18 +151,35 @@ public class DriverStatusServiceImpl implements DriverStatusService {
     }
 
     private DriverResponse toDriverResponse(User driver) {
-        List<ActiveTripWarningResponse> warnings = new ArrayList<>();
-        if (driver.getDriverStatus() == DriverStatus.INACTIVE) {
-            List<TripStatus> uncompletedStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
-            List<Trip> activeTrips = tripRepository.findByDriverIdAndStatusIn(driver.getId(), uncompletedStatuses);
-            warnings = activeTrips.stream()
-                    .map(t -> ActiveTripWarningResponse.builder()
-                            .tripId(t.getTripId())
-                            .status(t.getStatus().name())
-                            .deliveryDate(t.getDeliveryDate())
-                            .routeCode(t.getRoute() != null ? t.getRoute().getCode() : null)
-                            .build())
-                    .toList();
+        List<TripStatus> uncompletedStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+        List<Trip> activeTrips = tripRepository.findByDriverIdAndStatusIn(driver.getId(), uncompletedStatuses);
+        List<ActiveTripWarningResponse> warnings = new ArrayList<>(activeTrips.stream()
+                .map(t -> ActiveTripWarningResponse.builder()
+                        .tripId(t.getTripId())
+                        .status(t.getStatus().name())
+                        .deliveryDate(t.getDeliveryDate())
+                        .routeCode(t.getRoute() != null ? t.getRoute().getCode() : null)
+                        .build())
+                .toList());
+
+        // Trip.status already moves to COMPLETED as soon as the driver finishes delivering, but the
+        // driver/vehicle is only truly free once the execution is confirmed back at the warehouse
+        // (returnedToWarehouseAt) — same busy definition TripServiceImpl.getAvailableDrivers() uses.
+        // Without this, a driver who just finished a trip but hasn't returned yet would show as
+        // "Đang bận" in that other check while this list stays empty.
+        Set<Long> seenTripIds = new HashSet<>();
+        for (ActiveTripWarningResponse w : warnings) {
+            if (w.getTripId() != null) seenTripIds.add(w.getTripId());
+        }
+        for (TripExecution te : tripExecutionRepository.findUnreturnedByDriverId(driver.getId())) {
+            Trip t = te.getTrip();
+            if (t == null || t.getTripId() == null || !seenTripIds.add(t.getTripId())) continue;
+            warnings.add(ActiveTripWarningResponse.builder()
+                    .tripId(t.getTripId())
+                    .status("PENDING_RETURN")
+                    .deliveryDate(t.getDeliveryDate())
+                    .routeCode(t.getRoute() != null ? t.getRoute().getCode() : null)
+                    .build());
         }
 
         String updatedByName = driver.getDriverStatusUpdatedBy() != null ? driver.getDriverStatusUpdatedBy().getUsername() : null;

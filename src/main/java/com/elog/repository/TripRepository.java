@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface TripRepository extends JpaRepository<Trip, Long> {
@@ -15,7 +16,14 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         @EntityGraph(attributePaths = {"vehicle", "driver", "route", "tripDraft", "lockedBy"})
         List<Trip> findByTripDraftId(Long tripDraftId);
 
-        boolean existsByTripDraftId(Long tripDraftId);
+        /**
+         * "Đang có Trip nào ràng buộc TripDraft này không" — dùng cho mọi cổng chặn thao tác
+         * (gán xe, gán tách, revert về nháp...). CANCELLED không tính là ràng buộc: 1 TripDraft có
+         * thể có nhiều Trip lịch sử (vd Trip A huỷ, Trip B đang chạy) nhưng chỉ được có tối đa 1
+         * Trip không-CANCELLED tại 1 thời điểm. Các màn hình audit/lịch sử vẫn dùng
+         * findByTripDraftId / findByTripDraftIdWithDetails (không lọc status) để thấy đủ cả CANCELLED.
+         */
+        boolean existsByTripDraftIdAndStatusNot(Long tripDraftId, TripStatus status);
 
         boolean existsByVehicleIdAndDeliveryDateAndStatusIn(
                         Long vehicleId, LocalDate deliveryDate, List<TripStatus> statuses);
@@ -30,6 +38,20 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         List<Long> findBusyDriverIdsOnDate(@Param("date") LocalDate date, @Param("statuses") List<TripStatus> statuses);
 
         List<Trip> findByDriverIdAndStatusIn(Long driverId, List<TripStatus> statuses);
+
+        List<Trip> findByVehicleIdAndStatusIn(Long vehicleId, List<TripStatus> statuses);
+
+        List<Trip> findByVehicleIdAndDeliveryDate(Long vehicleId, LocalDate deliveryDate);
+
+        /** US-XX stale-trip detection: chuyến ở status cho trước, deliveryDate trước cutoff (chưa bắt đầu quá lâu). */
+        List<Trip> findByStatusAndDeliveryDateBefore(TripStatus status, LocalDate cutoff);
+
+        /**
+         * Trip-start-deadline sweep: chuyến ở status cho trước mà lockedAt (thời điểm gán xe) đã
+         * trước cutoff — tức quá hạn N phút cho phép mà tài xế vẫn chưa bấm "Bắt đầu chuyến".
+         * lockedAt IS NULL bị loại tự nhiên vì so sánh NULL < cutoff luôn false.
+         */
+        List<Trip> findByStatusAndLockedAtBefore(TripStatus status, LocalDateTime cutoff);
 
         boolean existsByDriverIdAndDeliveryDateAndStatusInAndTripIdNot(
                         Long driverId, LocalDate deliveryDate, List<TripStatus> statuses, Long tripIdNot);

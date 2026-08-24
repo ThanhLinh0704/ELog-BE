@@ -3,6 +3,7 @@ package com.elog.controller;
 import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.trip.ActiveTripsResponse;
 import com.elog.dto.response.trip.TripProgressResponse;
+import com.elog.dto.response.trip.TripStatusSummaryResponse;
 import com.elog.service.TripMonitoringService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,6 +34,21 @@ public class DashboardController {
 
         LocalDate queryDate = (date != null) ? date : LocalDate.now();
         ActiveTripsResponse response = tripMonitoringService.getActiveTripsDashboard(queryDate);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * Fleet Status Dashboard: số lượng chuyến theo từng trạng thái (VALIDATED/DISPATCHED/
+     * IN_PROGRESS/COMPLETED) của 1 ngày. Default: hôm nay.
+     */
+    @GetMapping("/api/v1/dashboard/trip-status-summary")
+    @Operation(summary = "Get trip counts by status for a date (Fleet Status Dashboard)")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
+    public ResponseEntity<ApiResponse<TripStatusSummaryResponse>> getTripStatusSummary(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+
+        LocalDate queryDate = (date != null) ? date : LocalDate.now();
+        TripStatusSummaryResponse response = tripMonitoringService.getTripStatusSummary(queryDate);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 

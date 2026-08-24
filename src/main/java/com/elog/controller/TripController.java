@@ -1,5 +1,6 @@
 package com.elog.controller;
 
+import com.elog.dto.request.trip.CancelTripRequest;
 import com.elog.dto.request.trip.TripAssignmentPatchRequest;
 import com.elog.dto.request.trip.TripAssignRequest;
 import com.elog.dto.request.trip.TripSplitAssignRequest;
@@ -109,6 +110,17 @@ public class TripController {
     public ResponseEntity<ApiResponse<TripResponse>> dispatchTrip(@PathVariable Long id) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         TripResponse response = tripService.dispatchTrip(id, username);
+        return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
+    }
+
+    @PostMapping("/api/v1/trips/{id}/cancel")
+    @Operation(summary = "Cancel a DISPATCHED trip that hasn't started yet — releases vehicle/driver immediately")
+    @PreAuthorize("hasAuthority('trip:coordinate')")
+    public ResponseEntity<ApiResponse<TripResponse>> cancelTrip(
+            @PathVariable Long id,
+            @RequestBody(required = false) CancelTripRequest request) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        TripResponse response = tripService.cancelTrip(id, request, username);
         return ResponseEntity.ok(ApiResponse.success(response, response.getMessage()));
     }
 

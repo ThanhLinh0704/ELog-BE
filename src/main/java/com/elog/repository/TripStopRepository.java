@@ -18,7 +18,15 @@ public interface TripStopRepository extends JpaRepository<TripStop, Long> {
     @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"routeStop", "routeStop.store", "tripDraftStop"})
     List<TripStop> findByTripTripIdInOrderBySequenceOrderAsc(java.util.Collection<Long> tripIds);
 
-    java.util.Optional<TripStop> findByTripDraftStopId(Long tripDraftStopId);
+    /**
+     * Scoped by trip on purpose: trip_draft_stop_id is NOT unique across trip_stops — after a
+     * cancel + reassign, the same TripDraftStop is referenced by both the old (CANCELLED) trip's
+     * stop and the new active trip's stop. An unscoped findByTripDraftStopId(Long) returning
+     * Optional<TripStop> throws IncorrectResultSizeDataAccessException the moment 2 such rows
+     * exist — reproduced live via the Driver app's "Đã đến điểm giao" action on a trip whose
+     * draft had been reassigned once.
+     */
+    java.util.Optional<TripStop> findByTrip_TripIdAndTripDraftStop_Id(Long tripId, Long tripDraftStopId);
 
     boolean existsByRouteStopId(Long routeStopId);
 

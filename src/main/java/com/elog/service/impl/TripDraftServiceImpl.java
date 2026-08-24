@@ -441,8 +441,10 @@ public class TripDraftServiceImpl implements TripDraftService {
     public void revertToDraft(Long tripDraftId, String currentUsername) {
         TripDraft draft = findDraftOrThrow(tripDraftId);
 
-        // Guard: cannot revert if already assigned to a Trip
-        if (tripRepository.existsByTripDraftId(tripDraftId)) {
+        // Guard: cannot revert if a non-cancelled Trip still exists. A CANCELLED Trip does not
+        // block revert — it never started, so undoing the whole plan is safe; keep the CANCELLED
+        // row itself for audit/history (not deleted).
+        if (tripRepository.existsByTripDraftIdAndStatusNot(tripDraftId, TripStatus.CANCELLED)) {
             throw new BusinessException(
                     ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED,
                     "Trip Draft already assigned to a Trip. Cannot revert to DRAFT.",

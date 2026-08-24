@@ -4,5 +4,6 @@ public enum TripStatus {
     VALIDATED,
     DISPATCHED,
     IN_PROGRESS,
-    COMPLETED
+    COMPLETED,
+    CANCELLED
 }

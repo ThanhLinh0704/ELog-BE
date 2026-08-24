@@ -31,6 +31,9 @@ public class TripResponse {
     private LocalDateTime lockedAt;
     private DriverInfo lockedBy;
     private LocalDateTime completedAt;
+    private LocalDateTime cancelledAt;
+    /** Số ngày quá hạn deliveryDate khi status vẫn DISPATCHED — null nếu chưa quá hạn. */
+    private Integer daysOverdue;
     private Integer tripStopCount;
     private Long manifestId;
     private List<TripStopResponse> tripStops;

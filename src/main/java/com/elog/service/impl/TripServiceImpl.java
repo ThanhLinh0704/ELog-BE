@@ -1,5 +1,6 @@
 package com.elog.service.impl;
 
+import com.elog.dto.request.trip.CancelTripRequest;
 import com.elog.dto.request.trip.TripAssignmentPatchRequest;
 import com.elog.dto.request.trip.TripAssignRequest;
 import com.elog.dto.request.trip.TripSplitAssignRequest;
@@ -32,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -64,7 +66,7 @@ public class TripServiceImpl implements TripService {
         boolean isValidated = "VALIDATED".equals(td.getStatus());
         boolean isPlannedAndChecked = "PLANNED".equals(td.getStatus())
                 && td.getVolumeCheckResult() != ConstraintResult.NOT_CHECKED
-                && !tripRepository.existsByTripDraftId(td.getId());
+                && !tripRepository.existsByTripDraftIdAndStatusNot(td.getId(), TripStatus.CANCELLED);
 
         if (!isValidated && !isPlannedAndChecked) {
             throw new BusinessException(ErrorCode.TRIP_DRAFT_NOT_VALIDATED,
@@ -312,7 +314,9 @@ public class TripServiceImpl implements TripService {
                                                 String currentUsername) {
         TripDraft td = findTripDraftOrThrow(tripDraftId);
 
-        if (tripRepository.existsByTripDraftId(tripDraftId)) {
+        // CANCELLED Trip không tính là "đã gán" — cho phép gán lại xe khác. Chỉ chặn khi còn 1 Trip
+        // nào khác đang tồn tại (VALIDATED/DISPATCHED/IN_PROGRESS/COMPLETED).
+        if (tripRepository.existsByTripDraftIdAndStatusNot(tripDraftId, TripStatus.CANCELLED)) {
             throw new BusinessException(ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED,
                     "Trip Draft has already been assigned.", HttpStatus.CONFLICT);
         }
@@ -442,7 +446,8 @@ public class TripServiceImpl implements TripService {
                                           String currentUsername) {
         TripDraft td = findTripDraftOrThrow(tripDraftId);
 
-        if (tripRepository.existsByTripDraftId(tripDraftId)) {
+        // CANCELLED Trip không tính là "đã gán" — xem giải thích ở assignVehicleAndDriver.
+        if (tripRepository.existsByTripDraftIdAndStatusNot(tripDraftId, TripStatus.CANCELLED)) {
             throw new BusinessException(ErrorCode.TRIP_DRAFT_ALREADY_ASSIGNED,
                     "Trip Draft has already been assigned.", HttpStatus.CONFLICT);
         }
@@ -779,6 +784,53 @@ public class TripServiceImpl implements TripService {
         return response;
     }
 
+    // ── Cancel trip (DISPATCHED, not yet started) ───────────────────
+    @Override
+    @Transactional
+    public TripResponse cancelTrip(Long tripId, CancelTripRequest request, String currentUsername) {
+        Trip trip = tripRepository.findById(tripId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TRIP_NOT_FOUND,
+                        "Trip not found.", HttpStatus.NOT_FOUND));
+
+        User actor = findUserByUsernameOrThrow(currentUsername);
+        String reason = request != null ? request.getReason() : null;
+
+        // State machine guards: only DISPATCHED->CANCELLED is valid; any other current status throws
+        // the right BusinessException (TRIP_COMPLETED / INVALID_TRIP_TRANSITION) — see TripStateMachine.
+        tripStateMachine.transition(trip, TripStatus.CANCELLED, actor.getId());
+        trip.setCancelledBy(actor);
+        trip.setCancelReason(reason);
+        tripRepository.save(trip);
+
+        // Trip is guaranteed not-started here (DISPATCHED->CANCELLED only), so the driver never left
+        // the warehouse — close the execution outright instead of waiting for a return confirmation.
+        tripExecutionRepository.findByTripId(trip.getTripId()).ifPresent(execution -> {
+            execution.setStatus("CANCELLED");
+            tripExecutionRepository.save(execution);
+
+            tripOutcomeHistoryService.record(new com.elog.service.TripOutcomeHistoryService.OutcomeEventInput(
+                    execution.getId(), trip.getTripId(),
+                    com.elog.entity.TripOutcomeEventType.CANCELLED_BY_DISPATCHER,
+                    com.elog.entity.PlanningActorType.USER, currentUsername,
+                    "DISPATCHED", "CANCELLED",
+                    null, null, null, null, null, reason, null, null,
+                    trip.getRoute() != null ? trip.getRoute().getCode() : null,
+                    trip.getDeliveryDate(),
+                    trip.getDriver() != null ? trip.getDriver().getUsername() : null
+            ));
+        });
+
+        // Explicit save — defensive, matching the adminOverrideTripExecution pattern rather than
+        // relying solely on persistence-context dirty-checking.
+        if (trip.getVehicle() != null) {
+            vehicleRepository.save(trip.getVehicle());
+        }
+
+        log.info("Trip {} cancelled by dispatcher {} (reason: {})", tripId, currentUsername, reason);
+
+        return buildTripResponse(trip, "Trip cancelled. Vehicle and driver released.");
+    }
+
     @Override
     @Transactional(readOnly = true)
     public String getHandoverSlipHtml(Long tripId) {
@@ -1014,6 +1066,8 @@ public class TripServiceImpl implements TripService {
                         .fullName(trip.getLockedBy().getFullName())
                         .build() : null)
                 .completedAt(trip.getCompletedAt())
+                .cancelledAt(trip.getCancelledAt())
+                .daysOverdue(computeDaysOverdue(trip))
                 .tripStopCount(stops.size())
                 .manifestId(manifestId)
                 .tripStops(stops.stream().map(this::buildTripStopResponse).toList())
@@ -1021,11 +1075,25 @@ public class TripServiceImpl implements TripService {
                 .build();
     }
 
+    /** Số ngày quá hạn deliveryDate khi trip vẫn DISPATCHED chưa bắt đầu — null nếu chưa quá ngưỡng. */
+    private Integer computeDaysOverdue(Trip trip) {
+        if (trip.getStatus() != TripStatus.DISPATCHED) {
+            return null;
+        }
+        int thresholdDays = systemConfigRepository.findByConfigKey("TRIP_STALE_THRESHOLD_DAYS")
+                .map(c -> Integer.parseInt(c.getConfigValue()))
+                .orElse(3);
+        long diff = ChronoUnit.DAYS.between(trip.getDeliveryDate(), LocalDate.now());
+        return diff >= thresholdDays ? (int) diff : null;
+    }
+
     private TripStopResponse buildTripStopResponse(TripStop ts) {
         return TripStopResponse.builder()
                 .tripStopId(ts.getTripStopId())
                 .routeStopId(ts.getRouteStop().getId())
-                .tripDraftStopId(ts.getTripDraftStop().getId())
+                // trip_draft_stop_id is nullable on trip_stops (see TripStop.tripDraftStop) — guard
+                // like storeCode/storeName below instead of NPE-ing on an orphaned stop.
+                .tripDraftStopId(ts.getTripDraftStop() != null ? ts.getTripDraftStop().getId() : null)
                 .sequenceOrder(ts.getSequenceOrder())
                 .storeCode(ts.getRouteStop().getStore() != null
                         ? ts.getRouteStop().getStore().getCode() : null)
@@ -1166,6 +1234,22 @@ public class TripServiceImpl implements TripService {
     }
 
     private void validateVehicleAndDriverAvailability(Vehicle vehicle, User driver, LocalDate deliveryDate, LocalTime plannedDepartureTime, Long excludeTripId) {
+        // 0. Vehicle must be administratively usable — Maintenance/OutOfService/deactivated vehicles
+        // are never assignable, regardless of date (unlike the IN_USE case below, which is a
+        // per-date busy check, not a blanket block — a vehicle busy today can still be planned
+        // for a future date).
+        if (vehicle.getStatus() == VehicleStatus.MAINTENANCE || vehicle.getStatus() == VehicleStatus.OUT_OF_SERVICE) {
+            throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
+                    "Vehicle " + vehicle.getPlateNumber() + " is currently " + vehicle.getStatus()
+                            + " and cannot be assigned to a trip.",
+                    HttpStatus.BAD_REQUEST);
+        }
+        if (!Boolean.TRUE.equals(vehicle.getIsActive())) {
+            throw new BusinessException(ErrorCode.VEHICLE_NOT_ELIGIBLE,
+                    "Vehicle " + vehicle.getPlateNumber() + " has been deactivated and cannot be assigned to a trip.",
+                    HttpStatus.BAD_REQUEST);
+        }
+
         List<TripStatus> busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
 
         // 1. Vehicle active trip check on same day

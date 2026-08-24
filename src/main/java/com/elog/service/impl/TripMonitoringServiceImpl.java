@@ -5,6 +5,7 @@ import com.elog.dto.response.trip.StopArriveResponse;
 import com.elog.dto.response.trip.StopCompleteResponse;
 import com.elog.dto.response.trip.TripProgressResponse;
 import com.elog.dto.response.trip.TripStartResponse;
+import com.elog.dto.response.trip.TripStatusSummaryResponse;
 import com.elog.entity.*;
 import com.elog.exception.BusinessException;
 import com.elog.exception.ErrorCode;
@@ -249,6 +250,26 @@ public class TripMonitoringServiceImpl implements TripMonitoringService {
                         .filter(t -> t.getStatus() != TripStatus.COMPLETED)
                         .count())
                 .trips(summaries)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TripStatusSummaryResponse getTripStatusSummary(LocalDate date) {
+        List<TripStatus> allStatuses = List.of(
+                TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS, TripStatus.COMPLETED);
+        List<Trip> trips = tripRepo.findActiveTripsByDate(date, allStatuses);
+
+        Map<TripStatus, Long> countByStatus = trips.stream()
+                .collect(Collectors.groupingBy(Trip::getStatus, Collectors.counting()));
+
+        return TripStatusSummaryResponse.builder()
+                .date(date.toString())
+                .totalCount(trips.size())
+                .validatedCount(countByStatus.getOrDefault(TripStatus.VALIDATED, 0L).intValue())
+                .dispatchedCount(countByStatus.getOrDefault(TripStatus.DISPATCHED, 0L).intValue())
+                .inProgressCount(countByStatus.getOrDefault(TripStatus.IN_PROGRESS, 0L).intValue())
+                .completedCount(countByStatus.getOrDefault(TripStatus.COMPLETED, 0L).intValue())
                 .build();
     }
 

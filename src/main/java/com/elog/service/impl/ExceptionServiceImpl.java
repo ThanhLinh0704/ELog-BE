@@ -117,6 +117,29 @@ public class ExceptionServiceImpl implements ExceptionService {
 
         List<DeliveryException> exceptions = deliveryExceptionRepo.findByFilters(date, exceptionType, resolvedFlag);
 
+        return buildListResponse(exceptions,
+                date != null ? date.toString() : LocalDate.now().toString(), null, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExceptionListResponse listExceptionsInRange(LocalDate startDate, LocalDate endDate, String type, String resolved) {
+        ExceptionType exceptionType = parseExceptionType(type);
+        Boolean resolvedFlag = parseResolved(resolved);
+
+        List<DeliveryException> exceptions =
+                deliveryExceptionRepo.findByFiltersInRange(startDate, endDate, exceptionType, resolvedFlag);
+
+        return buildListResponse(exceptions, null, startDate.toString(), endDate.toString());
+    }
+
+    /**
+     * Shared by {@link #listExceptions} and {@link #listExceptionsInRange} — applies the
+     * driver-scoping filter (a driver only sees their own exceptions) and builds the response.
+     * Exactly one of {@code dateLabel} or the {@code fromDate}/{@code toDate} pair is non-null.
+     */
+    private ExceptionListResponse buildListResponse(List<DeliveryException> exceptions, String dateLabel,
+                                                      String fromDate, String toDate) {
         if (SecurityContextHolder.getContext().getAuthentication() != null) {
             String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
             boolean isDriver = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
@@ -156,7 +179,9 @@ public class ExceptionServiceImpl implements ExceptionService {
         long unresolvedCount = exceptions.stream().filter(e -> e.getResolvedAt() == null).count();
 
         return ExceptionListResponse.builder()
-                .date(date != null ? date.toString() : LocalDate.now().toString())
+                .date(dateLabel)
+                .fromDate(fromDate)
+                .toDate(toDate)
                 .totalCount(exceptions.size())
                 .unresolvedCount((int) unresolvedCount)
                 .exceptions(exceptions.stream().map(this::buildListItem).toList())

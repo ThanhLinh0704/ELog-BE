@@ -73,9 +73,10 @@ public class VehicleController {
             @RequestParam(required = false) Boolean isActive,
             @RequestParam(required = false) BigDecimal minWeightKg,
             @RequestParam(required = false) BigDecimal minVolumeM3,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
             @PageableDefault(size = 20) Pageable pageable) {
         ApiResponse<List<VehicleListItemResponse>> response =
-                vehicleService.getAllVehicles(keyword, isActive, minWeightKg, minVolumeM3, pageable);
+                vehicleService.getAllVehicles(keyword, isActive, minWeightKg, minVolumeM3, pageable, date);
         return ResponseEntity.ok(response);
     }
 

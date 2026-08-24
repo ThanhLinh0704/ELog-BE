@@ -13,6 +13,8 @@ public interface ExceptionService {
 
     ExceptionListResponse listExceptions(LocalDate date, String type, String resolved);
 
+    ExceptionListResponse listExceptionsInRange(LocalDate startDate, LocalDate endDate, String type, String resolved);
+
     DeliveryExceptionResponse getException(Long exceptionId);
 
     DeliveryExceptionResponse resolveException(Long exceptionId, ResolveExceptionRequest request,

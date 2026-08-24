@@ -5,6 +5,8 @@ import com.elog.dto.request.exception.ResolveExceptionRequest;
 import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.exception.DeliveryExceptionResponse;
 import com.elog.dto.response.exception.ExceptionListResponse;
+import com.elog.exception.BusinessException;
+import com.elog.exception.ErrorCode;
 import com.elog.service.ExceptionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -40,12 +42,22 @@ public class ExceptionController {
     }
 
     @GetMapping("/api/v1/exceptions")
-    @Operation(summary = "Danh sách exception — filter theo ngày, loại, trạng thái resolve")
+    @Operation(summary = "Danh sách exception — filter theo ngày (hoặc khoảng ngày), loại, trạng thái resolve")
     @PreAuthorize("hasAuthority('trip:read')")
     public ResponseEntity<ApiResponse<ExceptionListResponse>> listExceptions(
-            @Parameter(description = "yyyy-MM-dd, mặc định hôm nay") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "yyyy-MM-dd, mặc định hôm nay — bỏ qua nếu truyền fromDate/toDate") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @Parameter(description = "yyyy-MM-dd — cùng với toDate để lọc theo khoảng ngày thay vì 1 ngày") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @Parameter(description = "yyyy-MM-dd — bắt buộc đi kèm fromDate") @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
             @Parameter(description = "ALL | TIME_EXCEPTION | DELIVERY_REJECTION") @RequestParam(required = false, defaultValue = "ALL") String type,
             @Parameter(description = "true | false | all") @RequestParam(required = false, defaultValue = "false") String resolved) {
+        if (fromDate != null && toDate != null) {
+            if (fromDate.isAfter(toDate)) {
+                throw new BusinessException(ErrorCode.INVALID_DATE_RANGE,
+                        "fromDate must not be after toDate", HttpStatus.BAD_REQUEST);
+            }
+            ExceptionListResponse response = exceptionService.listExceptionsInRange(fromDate, toDate, type, resolved);
+            return ResponseEntity.ok(ApiResponse.success(response, null));
+        }
         LocalDate effectiveDate = (date != null) ? date : LocalDate.now();
         ExceptionListResponse response = exceptionService.listExceptions(effectiveDate, type, resolved);
         return ResponseEntity.ok(ApiResponse.success(response, null));

@@ -1,5 +1,6 @@
 package com.elog.service;
 
+import com.elog.dto.request.trip.CancelTripRequest;
 import com.elog.dto.request.trip.TripAssignmentPatchRequest;
 import com.elog.dto.request.trip.TripAssignRequest;
 import com.elog.dto.request.trip.TripSplitAssignRequest;
@@ -34,6 +35,9 @@ public interface TripService {
 
     // US-16 TASK-02 — Dispatch
     TripResponse dispatchTrip(Long tripId, String currentUsername);
+
+    // Cancel a DISPATCHED trip that hasn't started yet — releases vehicle/driver immediately.
+    TripResponse cancelTrip(Long tripId, CancelTripRequest request, String currentUsername);
 
     String getHandoverSlipHtml(Long tripId);
 
