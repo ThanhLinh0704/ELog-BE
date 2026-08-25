@@ -1,0 +1,37 @@
+[
+  {
+    "level": "L1",
+    "pass": 363,
+    "fail": 0,
+    "notRun": 0,
+    "total": 363
+  },
+  {
+    "level": "L2",
+    "pass": 75,
+    "fail": 0,
+    "notRun": 0,
+    "total": 75
+  },
+  {
+    "level": "L3",
+    "pass": 130,
+    "fail": 0,
+    "notRun": 0,
+    "total": 130
+  },
+  {
+    "level": "L4",
+    "pass": 50,
+    "fail": 0,
+    "notRun": 0,
+    "total": 50
+  },
+  {
+    "level": "UAT",
+    "pass": 25,
+    "fail": 0,
+    "notRun": 0,
+    "total": 25
+  }
+]

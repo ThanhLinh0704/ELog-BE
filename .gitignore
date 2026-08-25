@@ -62,7 +62,6 @@ ehthumbs.db
 *.log
 logs/
 src/test/legacy_archive/
-test-execution/
 
 *.ndjson
 *.dump

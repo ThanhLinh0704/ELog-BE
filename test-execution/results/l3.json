@@ -1,0 +1,1182 @@
+{
+  "generatedAt": "2026-08-15T03:16:23.107Z",
+  "level": "L3",
+  "total": 130,
+  "summary": {
+    "Pass": 130,
+    "Fail": 0,
+    "Not Run": 0
+  },
+  "results": [
+    {
+      "testId": "L3-MASTERDATA-001",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-002",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-003",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-AUTH-004",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-AUTH-005",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-AUTH-006",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-007",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-008",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-009",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-010",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-011",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-012",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-013",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-014",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-015",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-016",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-017",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-018",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-019",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-020",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-021",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-022",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-023",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-024",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-025",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IMPORT-026",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IMPORT-027",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IMPORT-028",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IMPORT-029",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IMPORT-030",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IMPORT-031",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-032",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-033",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-034",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-035",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-036",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-037",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-038",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-039",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-040",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-041",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-042",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-043",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-044",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-045",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-046",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-047",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-048",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-049",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-050",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-051",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-052",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-053",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-054",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-055",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-056",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-057",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-058",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-059",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-060",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-061",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-062",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-063",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-064",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-065",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-066",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-067",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-068",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-069",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-070",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-071",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-072",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-073",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-074",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-075",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-076",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-077",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-078",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-079",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-080",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-081",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-082",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-083",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-084",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-085",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-086",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-087",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-088",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-089",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-090",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-091",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MONITORING-092",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-093",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-094",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-095",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-096",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-097",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-098",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-099",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-100",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-101",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-102",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-103",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-104",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-105",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-106",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-107",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-108",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-109",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-110",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IDENTITY-111",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-112",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-113",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 201 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-114",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-115",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-116",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-117",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-118",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 200 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-AUTH-119",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 401 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-AUTH-120",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 403 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-AUTH-121",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 401 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-AUTH-122",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 401 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-123",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 409 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-124",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 409 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-125",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 409 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-MASTERDATA-126",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 409 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-IMPORT-127",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 400 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-PLANNING-128",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 409 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-129",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 409 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    },
+    {
+      "testId": "L3-EXECUTION-130",
+      "level": "L3",
+      "status": "Pass",
+      "assertion": "HTTP 409 and basic response envelope matched",
+      "evidence": [
+        "l3-rerun-results.json"
+      ]
+    }
+  ]
+}
