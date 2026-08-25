@@ -1,6 +1,7 @@
 package com.elog.repository.specification;
 
 import com.elog.entity.Vehicle;
+import com.elog.entity.VehicleStatus;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
@@ -40,6 +41,20 @@ public class VehicleSpecification {
         return (root, query, cb) -> {
             if (minVolumeM3 == null) return null;
             return cb.greaterThanOrEqualTo(root.get("maxVolumeM3"), minVolumeM3);
+        };
+    }
+
+    public static Specification<Vehicle> hasStatus(VehicleStatus status) {
+        return (root, query, cb) -> {
+            if (status == null) return null;
+            return cb.equal(root.get("status"), status);
+        };
+    }
+
+    public static Specification<Vehicle> hasMaximumWeight(BigDecimal maxWeightKg) {
+        return (root, query, cb) -> {
+            if (maxWeightKg == null) return null;
+            return cb.lessThanOrEqualTo(root.get("payloadKg"), maxWeightKg);
         };
     }
 }

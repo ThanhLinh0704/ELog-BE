@@ -499,6 +499,22 @@ public class TripDraftServiceImpl implements TripDraftService {
 
     // ── Mapping helpers ─────────────────────────────────────────
 
+    private String resolveEffectiveDraftStatus(TripDraft draft) {
+        if (draft == null || "DRAFT".equals(draft.getStatus()) || "PLANNED".equals(draft.getStatus())) {
+            return draft != null ? draft.getStatus() : null;
+        }
+        List<Trip> trips = tripRepository.findByTripDraftId(draft.getId());
+        if (trips != null && !trips.isEmpty()) {
+            Optional<Trip> activeTrip = trips.stream()
+                    .filter(t -> t.getStatus() != TripStatus.CANCELLED)
+                    .max(Comparator.comparing(Trip::getTripId));
+            if (activeTrip.isPresent()) {
+                return activeTrip.get().getStatus().name();
+            }
+        }
+        return draft.getStatus();
+    }
+
     private TripDraftResponse toResponse(TripDraft draft, List<TripDraftStopResponse> stops) {
         ConfirmedByDto confirmedByDto = null;
         if (draft.getConfirmedBy() != null) {
@@ -517,7 +533,7 @@ public class TripDraftServiceImpl implements TripDraftService {
                 .totalWeightKg(draft.getTotalWeightKg())
                 .activeStopCount(draft.getActiveStopCount())
                 .skippedStopCount(draft.getSkippedStopCount())
-                .status(draft.getStatus())
+                .status(resolveEffectiveDraftStatus(draft))
                 .plannedDepartureTime(draft.getPlannedDepartureTime())
                 .confirmedAt(draft.getConfirmedAt())
                 .confirmedBy(confirmedByDto)

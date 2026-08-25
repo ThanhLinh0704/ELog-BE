@@ -432,6 +432,40 @@ class TripServiceImplTest {
     }
 
     @Test
+    void getEligibleVehicles_whenVehicleBusyOnSameDeliveryDate_marksAsIneligible() {
+        // Regression: dispatcher reported a vehicle already committed to another trip on this exact
+        // delivery date still showing up as "đủ tải" in the manual Chọn xe list — evaluateVehiclesFor-
+        // VolumeAndWeight() previously never checked vehicle-side conflicts at all (only driver-side).
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepository.findByIsActiveTrue()).thenReturn(List.of(testVehicle));
+        when(tripRepository.findBusyVehicleIdsOnDate(eq(testDraft.getDeliveryDate()), any()))
+                .thenReturn(List.of(testVehicle.getId()));
+
+        var response = tripService.getEligibleVehicles(1L);
+
+        assertThat(response.getEligibleVehicles()).isEmpty();
+        assertThat(response.getIneligibleVehicles()).hasSize(1);
+        assertThat(response.getIneligibleVehicles().get(0).getFailureReason())
+                .contains("already assigned to another trip on " + testDraft.getDeliveryDate());
+    }
+
+    @Test
+    void getEligibleVehicles_excludesMaintenanceVehicle_evenThoughIsActiveTrue() {
+        // Regression: MAINTENANCE vehicle (isActive=true) must never appear in either list here,
+        // matching the blanket exclusion already applied everywhere else (CapacityValidationServiceImpl,
+        // RecommendationServiceImpl HC-1).
+        testVehicle.setStatus(VehicleStatus.MAINTENANCE);
+
+        when(tripDraftRepository.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepository.findByIsActiveTrue()).thenReturn(List.of(testVehicle));
+
+        var response = tripService.getEligibleVehicles(1L);
+
+        assertThat(response.getEligibleVehicles()).isEmpty();
+        assertThat(response.getIneligibleVehicles()).isEmpty();
+    }
+
+    @Test
     void assignVehicleAndDriver_whenVehicleExceedsStoreWeightLimit_throwsException() {
         Store store = Store.builder()
                 .id(1L)

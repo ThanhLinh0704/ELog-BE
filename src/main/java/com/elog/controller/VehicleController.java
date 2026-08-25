@@ -7,6 +7,7 @@ import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.vehicle.VehicleFleetCapacityResponse;
 import com.elog.dto.response.vehicle.VehicleListItemResponse;
 import com.elog.dto.response.vehicle.VehicleResponse;
+import com.elog.entity.VehicleStatus;
 import com.elog.service.VehicleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -71,12 +72,14 @@ public class VehicleController {
     public ResponseEntity<ApiResponse<List<VehicleListItemResponse>>> getAllVehicles(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isActive,
+            @RequestParam(required = false) VehicleStatus status,
             @RequestParam(required = false) BigDecimal minWeightKg,
+            @RequestParam(required = false) BigDecimal maxWeightKg,
             @RequestParam(required = false) BigDecimal minVolumeM3,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
             @PageableDefault(size = 20) Pageable pageable) {
         ApiResponse<List<VehicleListItemResponse>> response =
-                vehicleService.getAllVehicles(keyword, isActive, minWeightKg, minVolumeM3, pageable, date);
+                vehicleService.getAllVehicles(keyword, isActive, status, minWeightKg, maxWeightKg, minVolumeM3, pageable, date);
         return ResponseEntity.ok(response);
     }
 

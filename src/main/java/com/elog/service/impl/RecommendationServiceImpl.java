@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 
 /**
@@ -207,7 +209,7 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         // Pre-load available drivers
         List<User> allDrivers = findActiveDrivers();
-        List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+        List<TripStatus> busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
 
         // Compute max cost/speed across fleet for normalization
         double maxCostPerKm = allVehicles.stream()
@@ -231,7 +233,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             }
 
             // Resolve driver pairing (assigned driver first, fallback to temporary driver)
-            PairedDriverInfo driverInfo = resolveDriverForVehicle(v, deliveryDate, allDrivers, busyStatuses);
+            PairedDriverInfo driverInfo = resolveDriverForVehicle(v, deliveryDate, allDrivers, busyStatuses, draft.getPlannedDepartureTime());
             if (driverInfo == null) {
                 continue; // No driver with compatible license available
             }
@@ -270,7 +272,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         List<Vehicle> allVehicles = vehicleRepo.findByIsActiveTrue();
         LocalDate deliveryDate = draft.getDeliveryDate();
         List<User> allDrivers = findActiveDrivers();
-        List<TripStatus> busyStatuses = List.of(TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+        List<TripStatus> busyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
         List<Order> draftOrders = orderRepo.findByTripDraftId(draft.getId());
 
         // Normalization params
@@ -304,7 +306,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             // Find vehicles that pass hard constraints for subA
             List<Vehicle> candidatesA = new ArrayList<>();
             for (Vehicle v : allVehicles) {
-                if (passesHardConstraintsForSub(v, subAVolume, subAWeight, stopsA, storesA, draftOrders, deliveryDate, busyStatuses)) {
+                if (passesHardConstraintsForSub(v, subAVolume, subAWeight, stopsA, storesA, draftOrders, deliveryDate, busyStatuses, draft.getPlannedDepartureTime())) {
                     candidatesA.add(v);
                 }
             }
@@ -312,7 +314,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             // Find vehicles that pass hard constraints for subB
             List<Vehicle> candidatesB = new ArrayList<>();
             for (Vehicle v : allVehicles) {
-                if (passesHardConstraintsForSub(v, subBVolume, subBWeight, stopsB, storesB, draftOrders, deliveryDate, busyStatuses)) {
+                if (passesHardConstraintsForSub(v, subBVolume, subBWeight, stopsB, storesB, draftOrders, deliveryDate, busyStatuses, draft.getPlannedDepartureTime())) {
                     candidatesB.add(v);
                 }
             }
@@ -322,12 +324,12 @@ public class RecommendationServiceImpl implements RecommendationService {
 
             // Pair up VA != VB, both must have eligible drivers
             for (Vehicle va : candidatesA) {
-                PairedDriverInfo driverInfoA = resolveDriverForVehicle(va, deliveryDate, allDrivers, busyStatuses);
+                PairedDriverInfo driverInfoA = resolveDriverForVehicle(va, deliveryDate, allDrivers, busyStatuses, draft.getPlannedDepartureTime());
 
                 for (Vehicle vb : candidatesB) {
                     if (va.getId().equals(vb.getId())) continue;
 
-                    PairedDriverInfo driverInfoB = resolveDriverForVehicle(vb, deliveryDate, allDrivers, busyStatuses);
+                    PairedDriverInfo driverInfoB = resolveDriverForVehicle(vb, deliveryDate, allDrivers, busyStatuses, draft.getPlannedDepartureTime());
 
                     if (driverInfoA == null || driverInfoB == null) {
                         foundVehiclePairButNoDriver = true;
@@ -361,33 +363,26 @@ public class RecommendationServiceImpl implements RecommendationService {
             }
         }
 
-        if (allPairs.isEmpty()) {
-            long etaViolations = stops.stream()
-                    .filter(s -> constraintValidationService.validateStopEta(s, draftOrders) != null)
-                    .count();
+        // Sort descending by totalScore
+        allPairs.sort(Comparator.comparing(ScoredPair::pairScore).reversed());
 
-            if (everyPointLacksVehicleForA || everyPointLacksVehicleForB) {
-                if (etaViolations > 0) {
-                    outReasons.add(etaViolations + " điểm dừng vi phạm khung giờ giao hàng của đơn hàng (TIME_WINDOW) — cần điều chỉnh giờ xuất phát hoặc thứ tự điểm dừng, không phải đổi/thêm xe.");
-                } else {
-                    outReasons.add("Không có xe nào đủ tải trọng/thể tích cho ít nhất 1 trong 2 nửa tuyến, ở cả "
-                            + validSplitPoints.size() + " điểm chia thử được — cần xe lớn hơn hoặc tách bớt đơn sang đợt khác.");
-                }
-            } else if (foundVehiclePairButSameDriverOnly && !foundVehiclePairButNoDriver) {
-                outReasons.add("Có xe phù hợp cho cả 2 nửa tuyến, nhưng chỉ có 1 tài xế đang rảnh đáp ứng được cả 2 xe — cần thêm ít nhất 1 tài xế khả dụng nữa.");
+        // ELOG-140 diagnostic feedback
+        if (allPairs.isEmpty()) {
+            if (everyPointLacksVehicleForA && everyPointLacksVehicleForB) {
+                outReasons.add("Cả hai nhánh sau khi tách đều vượt tải trọng hoặc thể tích của toàn bộ xe trong đội.");
+            } else if (everyPointLacksVehicleForA) {
+                outReasons.add("Nhánh 1 sau khi tách vượt quá tải trọng hoặc thể tích của toàn bộ xe trong đội.");
+            } else if (everyPointLacksVehicleForB) {
+                outReasons.add("Nhánh 2 sau khi tách vượt quá tải trọng hoặc thể tích của toàn bộ xe trong đội.");
             } else if (foundVehiclePairButNoDriver) {
-                outReasons.add("Có cặp xe phù hợp cho cả 2 nửa tuyến nhưng không tìm được tài xế khả dụng tương ứng — kiểm tra lại danh sách tài xế đang rảnh (Active, không bận, đã xác nhận về kho).");
+                outReasons.add("Tìm thấy cặp xe đủ tải nhưng không có đủ 2 tài xế có bằng lái phù hợp và đang rảnh.");
+            } else if (foundVehiclePairButSameDriverOnly) {
+                outReasons.add("Tìm thấy cặp xe đủ tải nhưng chỉ có 1 tài xế khả dụng (cần 2 tài xế khác nhau cho 2 xe).");
             } else {
-                if (etaViolations > 0) {
-                    outReasons.add(etaViolations + " điểm dừng vi phạm khung giờ giao hàng của đơn hàng (TIME_WINDOW) — cần điều chỉnh giờ xuất phát hoặc thứ tự điểm dừng.");
-                } else {
-                    outReasons.add("Có " + validSplitPoints.size() + " cách chia hợp lệ nhưng không tổ hợp 2 xe nào đáp ứng đồng thời tất cả ràng buộc.");
-                }
+                outReasons.add("Không tìm được cặp xe + tài xế nào khả dụng đáp ứng toàn bộ ràng buộc sau khi tách chuyến.");
             }
         }
 
-        // Sort descending by pairScore, take top-N
-        allPairs.sort(Comparator.comparing(ScoredPair::pairScore).reversed());
         return allPairs.stream().limit(TOP_N * 2L).toList(); // keep more for dedup, then limit at response
     }
 
@@ -400,9 +395,11 @@ public class RecommendationServiceImpl implements RecommendationService {
                                               LocalDate deliveryDate, List<TripStatus> busyStatuses) {
         List<String> fails = new ArrayList<>();
 
-        // HC-1: Vehicle status
-        if (v.getStatus() != VehicleStatus.AVAILABLE) {
-            fails.add("Vehicle status is " + v.getStatus() + ", not AVAILABLE");
+        // HC-1: Vehicle status — chặn xe Bảo dưỡng/Ngừng hoạt động (không bao giờ khả dụng). Xe IN_USE được
+        // giữ lại vì trạng thái IN_USE trong DB là trạng thái tĩnh — xe có thể chỉ bận vào 1 ngày cụ thể
+        // mà vẫn rảnh cho ngày đang xét. HC-2 bên dưới kiểm tra xung đột theo đúng deliveryDate.
+        if (v.getStatus() == VehicleStatus.MAINTENANCE || v.getStatus() == VehicleStatus.OUT_OF_SERVICE) {
+            fails.add("Vehicle status is " + v.getStatus() + ", not operational");
             return fails; // fast-fail
         }
 
@@ -414,6 +411,11 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         if (hasUnreturnedVehicleConflict(v.getId(), deliveryDate)) {
             fails.add("Vehicle is IN_USE and has not confirmed return to warehouse yet");
+            return fails;
+        }
+
+        if (hasReturnWindowConflict(v.getId(), deliveryDate, draft.getPlannedDepartureTime())) {
+            fails.add("Vehicle return to warehouse time violates planned departure return window (needs at least 30 mins)");
             return fails;
         }
 
@@ -457,10 +459,12 @@ public class RecommendationServiceImpl implements RecommendationService {
     private boolean passesHardConstraintsForSub(Vehicle v, BigDecimal subVolume, BigDecimal subWeight,
                                                  List<TripDraftStop> subStops, List<Store> subStores,
                                                  List<Order> draftOrders,
-                                                 LocalDate deliveryDate, List<TripStatus> busyStatuses) {
-        if (v.getStatus() != VehicleStatus.AVAILABLE) return false;
+                                                 LocalDate deliveryDate, List<TripStatus> busyStatuses,
+                                                 LocalTime plannedDepartureTime) {
+        if (v.getStatus() == VehicleStatus.MAINTENANCE || v.getStatus() == VehicleStatus.OUT_OF_SERVICE) return false;
         if (tripRepo.existsByVehicleIdAndDeliveryDateAndStatusIn(v.getId(), deliveryDate, busyStatuses)) return false;
         if (hasUnreturnedVehicleConflict(v.getId(), deliveryDate)) return false;
+        if (hasReturnWindowConflict(v.getId(), deliveryDate, plannedDepartureTime)) return false;
 
         BigDecimal safetyBuffer = getSafetyBufferRatio();
         BigDecimal effectiveVolume = v.getMaxVolumeM3().multiply(safetyBuffer);
@@ -525,7 +529,8 @@ public class RecommendationServiceImpl implements RecommendationService {
     }
 
     private List<User> findEligibleDrivers(Vehicle v, LocalDate date,
-                                            List<User> allDrivers, List<TripStatus> busyStatuses) {
+                                            List<User> allDrivers, List<TripStatus> busyStatuses,
+                                            LocalTime plannedDepartureTime) {
         return allDrivers.stream()
                 .filter(d -> {
                     // License check
@@ -535,10 +540,11 @@ public class RecommendationServiceImpl implements RecommendationService {
                             return false;
                         }
                     }
-                    // Schedule check: not busy on date AND has returned to warehouse from all past executions
+                    // Schedule check: not busy on date AND has returned to warehouse from all past executions AND satisfies return window
                     boolean busyOnDate = tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(d.getId(), date, busyStatuses);
                     boolean unreturned = hasUnreturnedDriverConflict(d.getId(), date);
-                    return !busyOnDate && !unreturned;
+                    boolean returnWindow = hasDriverReturnWindowConflict(d.getId(), date, plannedDepartureTime);
+                    return !busyOnDate && !unreturned && !returnWindow;
                 })
                 .toList();
     }
@@ -668,14 +674,16 @@ public class RecommendationServiceImpl implements RecommendationService {
     // RESPONSE BUILDERS
     // ══════════════════════════════════════════════════════════════════════════
 
-    private PairedDriverInfo resolveDriverForVehicle(Vehicle v, LocalDate date, List<User> allDrivers, List<TripStatus> busyStatuses) {
+    private PairedDriverInfo resolveDriverForVehicle(Vehicle v, LocalDate date, List<User> allDrivers,
+                                                    List<TripStatus> busyStatuses, LocalTime plannedDepartureTime) {
         // Step 1: Try fixed assigned driver first
         User assigned = v.getAssignedDriver();
         if (assigned != null && Boolean.TRUE.equals(assigned.getIsActive())) {
             boolean licenseOk = (v.getRequiredLicense() == null) ||
                     (assigned.getLicenseClass() != null && assigned.getLicenseClass().ordinal() >= v.getRequiredLicense().ordinal());
             boolean busy = tripRepo.existsByDriverIdAndDeliveryDateAndStatusIn(assigned.getId(), date, busyStatuses)
-                    || hasUnreturnedDriverConflict(assigned.getId(), date);
+                    || hasUnreturnedDriverConflict(assigned.getId(), date)
+                    || hasDriverReturnWindowConflict(assigned.getId(), date, plannedDepartureTime);
 
             if (licenseOk && !busy) {
                 return new PairedDriverInfo(assigned, false);
@@ -683,7 +691,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         }
 
         // Step 2: Fallback to temporary substitute driver
-        List<User> eligibleSubstitutes = findEligibleDrivers(v, date, allDrivers, busyStatuses);
+        List<User> eligibleSubstitutes = findEligibleDrivers(v, date, allDrivers, busyStatuses, plannedDepartureTime);
         if (!eligibleSubstitutes.isEmpty()) {
             return new PairedDriverInfo(eligibleSubstitutes.get(0), true);
         }
@@ -699,6 +707,42 @@ public class RecommendationServiceImpl implements RecommendationService {
     private boolean hasUnreturnedDriverConflict(Long driverId, LocalDate targetDate) {
         List<TripExecution> unreturned = tripExecutionRepo.findUnreturnedByDriverId(driverId);
         return unreturned.stream().anyMatch(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(targetDate));
+    }
+
+    private boolean hasReturnWindowConflict(Long vehicleId, LocalDate deliveryDate, LocalTime plannedDepartureTime) {
+        if (plannedDepartureTime == null || deliveryDate == null) return false;
+        LocalDateTime newDeparture = LocalDateTime.of(deliveryDate, plannedDepartureTime);
+        List<TripExecution> vehicleHistory = tripExecutionRepo.findByVehicleId(vehicleId);
+        for (TripExecution te : vehicleHistory) {
+            if (te.getReturnedToWarehouseAt() != null) {
+                if (te.getTrip() != null && te.getTrip().getDeliveryDate() != null && te.getTrip().getDeliveryDate().isAfter(deliveryDate)) {
+                    continue;
+                }
+                LocalDateTime earliestAvailable = te.getReturnedToWarehouseAt().plusMinutes(30);
+                if (newDeparture.isBefore(earliestAvailable)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasDriverReturnWindowConflict(Long driverId, LocalDate deliveryDate, LocalTime plannedDepartureTime) {
+        if (plannedDepartureTime == null || deliveryDate == null) return false;
+        LocalDateTime newDeparture = LocalDateTime.of(deliveryDate, plannedDepartureTime);
+        List<TripExecution> driverHistory = tripExecutionRepo.findByDriverId(driverId);
+        for (TripExecution te : driverHistory) {
+            if (te.getReturnedToWarehouseAt() != null) {
+                if (te.getTrip() != null && te.getTrip().getDeliveryDate() != null && te.getTrip().getDeliveryDate().isAfter(deliveryDate)) {
+                    continue;
+                }
+                LocalDateTime earliestAvailable = te.getReturnedToWarehouseAt().plusMinutes(30);
+                if (newDeparture.isBefore(earliestAvailable)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     // ══════════════════════════════════════════════════════════════════════════

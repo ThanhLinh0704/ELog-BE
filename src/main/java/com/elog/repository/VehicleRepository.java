@@ -1,6 +1,7 @@
 package com.elog.repository;
 
 import com.elog.entity.Vehicle;
+import com.elog.entity.VehicleStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -25,6 +26,9 @@ public interface VehicleRepository extends JpaRepository<Vehicle, Long>, JpaSpec
     long countByIsActiveTrue();
 
     List<Vehicle> findByIsActiveTrue();
+
+    /** AVAILABLE only — excludes IN_USE/MAINTENANCE/OUT_OF_SERVICE. See CapacityValidationServiceImpl. */
+    List<Vehicle> findByIsActiveTrueAndStatus(VehicleStatus status);
 
     List<Vehicle> findByAssignedDriverId(Long driverId);
 

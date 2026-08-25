@@ -69,11 +69,17 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                     HttpStatus.BAD_REQUEST);
         }
 
-        List<Vehicle> activeVehicles = vehicleRepo.findByIsActiveTrue();
+        // Loại xe Bảo dưỡng/Ngừng hoạt động (không bao giờ liệt kê). Xe IN_USE được giữ lại vì
+        // trạng thái IN_USE trong DB là trạng thái tĩnh — xe có thể chỉ bận vào 1 ngày cụ thể
+        // (ví dụ: 28/08) nhưng vẫn rảnh cho ngày đang xét (ví dụ: 25/08). Xung đột theo ngày
+        // do RecommendationServiceImpl.checkHardConstraints() HC-2 xử lý.
+        List<Vehicle> activeVehicles = vehicleRepo.findByIsActiveTrue().stream()
+                .filter(v -> v.getStatus() != VehicleStatus.MAINTENANCE && v.getStatus() != VehicleStatus.OUT_OF_SERVICE)
+                .toList();
         if (activeVehicles.isEmpty()) {
             throw new BusinessException(
                     ErrorCode.NO_ACTIVE_VEHICLE,
-                    "No active vehicles found in fleet. Please contact Admin to configure vehicle master data.",
+                    "No available vehicles in fleet (all are in use, under maintenance, or out of service).",
                     HttpStatus.SERVICE_UNAVAILABLE);
         }
 
@@ -274,7 +280,9 @@ public class CapacityValidationServiceImpl implements CapacityValidationService 
                         "Trip Draft not found with id: " + tripDraftId,
                         HttpStatus.NOT_FOUND));
 
-        List<Vehicle> activeVehicles = vehicleRepo.findByIsActiveTrue();
+        List<Vehicle> activeVehicles = vehicleRepo.findByIsActiveTrue().stream()
+                .filter(v -> v.getStatus() != VehicleStatus.MAINTENANCE && v.getStatus() != VehicleStatus.OUT_OF_SERVICE)
+                .toList();
         List<EligibleVehicleDto> eligibleVehicles = new ArrayList<>();
         List<IneligibleVehicleDto> ineligibleVehicles = new ArrayList<>();
         List<Order> draftOrders = orderRepository.findByTripDraftId(draft.getId());

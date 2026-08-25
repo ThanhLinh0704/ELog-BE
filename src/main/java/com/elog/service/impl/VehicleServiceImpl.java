@@ -99,7 +99,9 @@ public class VehicleServiceImpl implements VehicleService {
     public ApiResponse<List<VehicleListItemResponse>> getAllVehicles(
             String keyword,
             Boolean isActive,
+            VehicleStatus status,
             BigDecimal minWeightKg,
+            BigDecimal maxWeightKg,
             BigDecimal minVolumeM3,
             Pageable pageable,
             LocalDate date) {
@@ -107,7 +109,9 @@ public class VehicleServiceImpl implements VehicleService {
         Specification<Vehicle> spec = Specification
                 .where(VehicleSpecification.hasKeyword(keyword))
                 .and(VehicleSpecification.hasActiveStatus(isActive))
+                .and(VehicleSpecification.hasStatus(status))
                 .and(VehicleSpecification.hasMinimumWeight(minWeightKg))
+                .and(VehicleSpecification.hasMaximumWeight(maxWeightKg))
                 .and(VehicleSpecification.hasMinimumVolume(minVolumeM3));
 
         Page<Vehicle> page = vehicleRepository.findAll(spec, pageable);
@@ -258,7 +262,7 @@ public class VehicleServiceImpl implements VehicleService {
             // chưa từng chạy (execution vẫn ASSIGNED, returnedToWarehouseAt cũng NULL) thành RETURNING.
             // Bỏ qua toàn bộ fallback này khi xem NGÀY TRONG QUÁ KHỨ (audit lịch sử), vì lúc đó "xe
             // hiện tại đang làm gì" không liên quan gì tới đúng ngày lịch sử đang xem.
-            return date.isBefore(LocalDate.now()) ? null : buildCurrentTrip(vehicleId);
+            return date.isBefore(LocalDate.now()) ? null : buildFallbackTripStatus(vehicleId, date);
         }
         // 1 xe có thể có >1 Trip cùng ngày kể từ khi có tính năng Huỷ chuyến (xe được giải phóng ngay
         // sau khi huỷ nên có thể được gán 1 Trip mới cùng ngày). Chuyến CANCELLED không còn ý nghĩa gì
@@ -277,6 +281,34 @@ public class VehicleServiceImpl implements VehicleService {
                     .map(te -> te.getReturnedToWarehouseAt() != null)
                     .orElse(false);
             phase = returned ? "COMPLETED_RETURNED" : "RETURNING";
+        }
+
+        return toCurrentTripResponse(trip, phase);
+    }
+
+    /**
+     * Fallback riêng cho {@link #buildTripStatusForDate} — CHỈ bắt "1 chuyến ngày trước tràn sang"
+     * (deliveryDate <= ngày đang xem), khác {@link #buildCurrentTrip} (không giới hạn ngày, dùng cho
+     * truy vấn không có ngữ cảnh ngày cụ thể). Nếu dùng buildCurrentTrip ở đây, 1 xe đã DISPATCHED
+     * cho chuyến 30/08 sẽ bị hiện nhầm "Đã điều phối" khi xem Fleet Dashboard ở NGÀY 26/08 — dù chuyến
+     * đó chưa liên quan gì tới ngày đang xem.
+     */
+    private VehicleCurrentTripResponse buildFallbackTripStatus(Long vehicleId, LocalDate viewedDate) {
+        List<Trip> uncompletedTrips = tripRepository.findByVehicleIdAndStatusIn(vehicleId, UNCOMPLETED_STATUSES).stream()
+                .filter(t -> t.getDeliveryDate() == null || !t.getDeliveryDate().isAfter(viewedDate))
+                .toList();
+
+        Trip trip;
+        String phase;
+        if (!uncompletedTrips.isEmpty()) {
+            trip = uncompletedTrips.get(0);
+            phase = phaseForUncompletedTrip(trip);
+        } else {
+            List<TripExecution> unreturned = tripExecutionRepository.findUnreturnedByVehicleId(vehicleId).stream()
+                    .filter(te -> te.getTrip() == null || te.getTrip().getDeliveryDate() == null || !te.getTrip().getDeliveryDate().isAfter(viewedDate))
+                    .toList();
+            trip = unreturned.isEmpty() ? null : unreturned.get(0).getTrip();
+            phase = trip != null ? "RETURNING" : null;
         }
 
         return toCurrentTripResponse(trip, phase);

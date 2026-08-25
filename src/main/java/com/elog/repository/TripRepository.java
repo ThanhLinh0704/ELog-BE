@@ -37,6 +37,10 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
         @Query("SELECT DISTINCT t.driver.id FROM Trip t WHERE t.deliveryDate = :date AND t.status IN :statuses AND t.driver.id IS NOT NULL")
         List<Long> findBusyDriverIdsOnDate(@Param("date") LocalDate date, @Param("statuses") List<TripStatus> statuses);
 
+        /** Mirrors {@link #findBusyDriverIdsOnDate} for the vehicle side — see TripServiceImpl.evaluateVehiclesForVolumeAndWeight. */
+        @Query("SELECT DISTINCT t.vehicle.id FROM Trip t WHERE t.deliveryDate = :date AND t.status IN :statuses AND t.vehicle.id IS NOT NULL")
+        List<Long> findBusyVehicleIdsOnDate(@Param("date") LocalDate date, @Param("statuses") List<TripStatus> statuses);
+
         List<Trip> findByDriverIdAndStatusIn(Long driverId, List<TripStatus> statuses);
 
         List<Trip> findByVehicleIdAndStatusIn(Long vehicleId, List<TripStatus> statuses);

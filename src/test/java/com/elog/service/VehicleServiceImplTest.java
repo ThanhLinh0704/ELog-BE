@@ -138,7 +138,7 @@ class VehicleServiceImplTest {
         when(tripRepository.findByVehicleIdAndDeliveryDate(1L, date)).thenReturn(List.of(cancelledTrip, activeTrip));
         when(tripExecutionRepository.findByTripId(9L)).thenReturn(java.util.Optional.of(execution));
 
-        var response = vehicleService.getAllVehicles(null, null, null, null, PageRequest.of(0, 10), date);
+        var response = vehicleService.getAllVehicles(null, null, null, null, null, null, PageRequest.of(0, 10), date);
 
         assertThat(response.getData()).hasSize(1);
         assertThat(response.getData().get(0).getCurrentTrip()).isNotNull();
@@ -163,7 +163,7 @@ class VehicleServiceImplTest {
         when(tripRepository.findByVehicleIdAndStatusIn(eq(1L), any())).thenReturn(List.of());
         when(tripExecutionRepository.findUnreturnedByVehicleId(1L)).thenReturn(List.of(unreturnedExecution));
 
-        var response = vehicleService.getAllVehicles(null, null, null, null, PageRequest.of(0, 10), today);
+        var response = vehicleService.getAllVehicles(null, null, null, null, null, null, PageRequest.of(0, 10), today);
 
         assertThat(response.getData().get(0).getCurrentTrip()).isNotNull();
         assertThat(response.getData().get(0).getCurrentTrip().getTripId()).isEqualTo(9L);
@@ -187,12 +187,36 @@ class VehicleServiceImplTest {
         when(tripRepository.findByVehicleIdAndDeliveryDate(1L, today)).thenReturn(List.of());
         when(tripRepository.findByVehicleIdAndStatusIn(eq(1L), any())).thenReturn(List.of(notStartedTrip));
 
-        var response = vehicleService.getAllVehicles(null, null, null, null, PageRequest.of(0, 10), today);
+        var response = vehicleService.getAllVehicles(null, null, null, null, null, null, PageRequest.of(0, 10), today);
 
         assertThat(response.getData().get(0).getCurrentTrip()).isNotNull();
         assertThat(response.getData().get(0).getCurrentTrip().getTripId()).isEqualTo(8L);
         assertThat(response.getData().get(0).getCurrentTrip().getPhase()).isEqualTo("DISPATCHED");
         verify(tripExecutionRepository, never()).findUnreturnedByVehicleId(any());
+    }
+
+    @Test
+    void getAllVehicles_withDateBeforeFutureDispatchedTrip_doesNotLeakFutureTripBackward() {
+        // Regression: dispatcher reported a vehicle DISPATCHED for a FUTURE date (e.g. 30/08) wrongly
+        // showing as "Đã điều phối" on Fleet Dashboard for an EARLIER viewed date (e.g. 26/08) that has
+        // nothing to do with that trip — buildFallbackTripStatus() must only surface trips whose
+        // deliveryDate is <= the date being viewed, not any uncompleted trip regardless of date.
+        LocalDate today = LocalDate.now();
+        LocalDate viewedDate = today.plusDays(1);
+        LocalDate futureTripDate = today.plusDays(5);
+        Trip futureTrip = Trip.builder().tripId(11L).vehicle(vehicle).status(TripStatus.DISPATCHED)
+                .deliveryDate(futureTripDate).build();
+
+        when(vehicleRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(vehicle)));
+        when(vehicleMapper.toListItem(vehicle)).thenReturn(VehicleListItemResponse.builder().id(1L).build());
+        when(tripRepository.findByVehicleIdAndDeliveryDate(1L, viewedDate)).thenReturn(List.of());
+        when(tripRepository.findByVehicleIdAndStatusIn(eq(1L), any())).thenReturn(List.of(futureTrip));
+        when(tripExecutionRepository.findUnreturnedByVehicleId(1L)).thenReturn(List.of());
+
+        var response = vehicleService.getAllVehicles(null, null, null, null, null, null, PageRequest.of(0, 10), viewedDate);
+
+        assertThat(response.getData().get(0).getCurrentTrip()).isNull();
     }
 
     @Test
@@ -206,7 +230,7 @@ class VehicleServiceImplTest {
         when(vehicleMapper.toListItem(vehicle)).thenReturn(VehicleListItemResponse.builder().id(1L).build());
         when(tripRepository.findByVehicleIdAndDeliveryDate(1L, pastDate)).thenReturn(List.of());
 
-        var response = vehicleService.getAllVehicles(null, null, null, null, PageRequest.of(0, 10), pastDate);
+        var response = vehicleService.getAllVehicles(null, null, null, null, null, null, PageRequest.of(0, 10), pastDate);
 
         assertThat(response.getData().get(0).getCurrentTrip()).isNull();
         verify(tripExecutionRepository, never()).findUnreturnedByVehicleId(any());

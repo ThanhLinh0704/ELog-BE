@@ -7,6 +7,7 @@ import com.elog.dto.response.common.ApiResponse;
 import com.elog.dto.response.vehicle.VehicleFleetCapacityResponse;
 import com.elog.dto.response.vehicle.VehicleListItemResponse;
 import com.elog.dto.response.vehicle.VehicleResponse;
+import com.elog.entity.VehicleStatus;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
@@ -28,7 +29,9 @@ public interface VehicleService {
     ApiResponse<List<VehicleListItemResponse>> getAllVehicles(
             String keyword,
             Boolean isActive,
+            VehicleStatus status,
             BigDecimal minWeightKg,
+            BigDecimal maxWeightKg,
             BigDecimal minVolumeM3,
             Pageable pageable,
             LocalDate date);

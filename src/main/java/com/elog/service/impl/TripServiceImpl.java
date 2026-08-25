@@ -125,7 +125,12 @@ public class TripServiceImpl implements TripService {
 
     private EligibleVehiclesResponse evaluateVehiclesForVolumeAndWeight(
             BigDecimal totalVolume, BigDecimal totalWeight, List<TripDraftStop> stops, LocalDate deliveryDate) {
-        List<Vehicle> activeVehicles = vehicleRepository.findByIsActiveTrue();
+        // Bảo dưỡng/Ngừng hoạt động: chặn hẳn (mọi ngày), khớp Guard 0 của
+        // validateVehicleAndDriverAvailability() — xe này không bao giờ được liệt kê ở đây, dù
+        // "đủ tải" hay "không đủ tải" (giữ đúng convention RecommendationServiceImpl HC-1 đang dùng).
+        List<Vehicle> activeVehicles = vehicleRepository.findByIsActiveTrue().stream()
+                .filter(v -> v.getStatus() != VehicleStatus.MAINTENANCE && v.getStatus() != VehicleStatus.OUT_OF_SERVICE)
+                .toList();
         List<EligibleVehicleDto> eligibleVehicles = new ArrayList<>();
         List<IneligibleVehicleDto> ineligibleVehicles = new ArrayList<>();
 
@@ -146,6 +151,20 @@ public class TripServiceImpl implements TripService {
         java.util.Map<Long, List<TripExecution>> unreturnedByDriverId = allUnreturned.stream()
                 .filter(te -> te.getDriver() != null && (te.getTrip() == null || te.getTrip().getDeliveryDate() == null || deliveryDate == null || !te.getTrip().getDeliveryDate().isAfter(deliveryDate)))
                 .collect(java.util.stream.Collectors.groupingBy(te -> te.getDriver().getId()));
+
+        // Vehicle-side per-date conflict — mirrors Guard 1/3 of validateVehicleAndDriverAvailability()
+        // (the real gate at confirm-time) so this preview list matches what "Xác nhận" will actually
+        // accept. NOTE: busy set here intentionally includes VALIDATED (unlike the driver busyStatuses
+        // above) — a vehicle already earmarked (VALIDATED, not yet dispatched) for another trip on this
+        // exact date is a real conflict, same as the confirm-time check.
+        List<TripStatus> vehicleBusyStatuses = List.of(TripStatus.VALIDATED, TripStatus.DISPATCHED, TripStatus.IN_PROGRESS);
+        java.util.Set<Long> busyVehicleIdsOnDate = (deliveryDate != null)
+                ? new java.util.HashSet<>(tripRepository.findBusyVehicleIdsOnDate(deliveryDate, vehicleBusyStatuses))
+                : java.util.Collections.emptySet();
+        java.util.Map<Long, List<TripExecution>> unreturnedByVehicleId = allUnreturned.stream()
+                .filter(te -> te.getTrip() != null && te.getTrip().getVehicle() != null
+                        && (te.getTrip().getDeliveryDate() == null || deliveryDate == null || !te.getTrip().getDeliveryDate().isAfter(deliveryDate)))
+                .collect(java.util.stream.Collectors.groupingBy(te -> te.getTrip().getVehicle().getId()));
 
         for (Vehicle v : activeVehicles) {
             if (v.getMaxVolumeM3() == null || v.getPayloadKg() == null) {
@@ -171,6 +190,16 @@ public class TripServiceImpl implements TripService {
                         break;
                     }
                 }
+            }
+
+            boolean vehicleAvailable = true;
+            String vehicleBusyReason = null;
+            if (busyVehicleIdsOnDate.contains(v.getId())) {
+                vehicleAvailable = false;
+                vehicleBusyReason = "Vehicle already assigned to another trip on " + deliveryDate;
+            } else if (!unreturnedByVehicleId.getOrDefault(v.getId(), Collections.emptyList()).isEmpty()) {
+                vehicleAvailable = false;
+                vehicleBusyReason = "Vehicle is IN_USE and has not confirmed return to warehouse yet";
             }
 
             Long assignedDriverId = null;
@@ -203,7 +232,7 @@ public class TripServiceImpl implements TripService {
                 }
             }
 
-            if (volumeOk && weightOk && routeWeightOk && etaAllowed) {
+            if (volumeOk && weightOk && routeWeightOk && etaAllowed && vehicleAvailable) {
                 eligibleVehicles.add(EligibleVehicleDto.builder()
                         .vehicleId(v.getId())
                         .plateNumber(v.getPlateNumber())
@@ -238,6 +267,10 @@ public class TripServiceImpl implements TripService {
                     if (reason.length() > 0) reason.append(" and ");
                     reason.append(etaViolationReason);
                 }
+                if (!vehicleAvailable) {
+                    if (reason.length() > 0) reason.append(" and ");
+                    reason.append(vehicleBusyReason);
+                }
 
                 ineligibleVehicles.add(IneligibleVehicleDto.builder()
                         .vehicleId(v.getId())
@@ -246,7 +279,7 @@ public class TripServiceImpl implements TripService {
                         .maxVolumeM3(v.getMaxVolumeM3())
                         .maxWeightKg(v.getPayloadKg())
                         .volumeCheckResult(volumeOk ? ConstraintResult.PASS : ConstraintResult.FAIL)
-                        .weightCheckResult((weightOk && routeWeightOk && etaAllowed) ? ConstraintResult.PASS : ConstraintResult.FAIL)
+                        .weightCheckResult((weightOk && routeWeightOk && etaAllowed && vehicleAvailable) ? ConstraintResult.PASS : ConstraintResult.FAIL)
                         .failureReason(reason.toString())
                         .build());
             }
@@ -707,6 +740,12 @@ public class TripServiceImpl implements TripService {
         trip.setLockedBy(dispatcher);
         tripRepository.save(trip);
 
+        if (trip.getTripDraft() != null) {
+            TripDraft td = trip.getTripDraft();
+            td.setStatus("DISPATCHED");
+            tripDraftRepository.save(td);
+        }
+
         // Create & save TripExecution (FT-09 lifecycle) for the driver if not already existing
         if (tripExecutionRepository.findByTripId(trip.getTripId()).isEmpty()) {
             TripExecution execution = TripExecution.builder()
@@ -801,6 +840,12 @@ public class TripServiceImpl implements TripService {
         trip.setCancelledBy(actor);
         trip.setCancelReason(reason);
         tripRepository.save(trip);
+
+        if (trip.getTripDraft() != null) {
+            TripDraft td = trip.getTripDraft();
+            td.setStatus("VALIDATED");
+            tripDraftRepository.save(td);
+        }
 
         // Trip is guaranteed not-started here (DISPATCHED->CANCELLED only), so the driver never left
         // the warehouse — close the execution outright instead of waiting for a return confirmation.
@@ -1321,13 +1366,16 @@ public class TripServiceImpl implements TripService {
             List<TripExecution> vehicleHistory = tripExecutionRepository.findByVehicleId(vehicle.getId());
             for (TripExecution te : vehicleHistory) {
                 if (te.getReturnedToWarehouseAt() != null) {
+                    if (te.getTrip() != null && te.getTrip().getDeliveryDate() != null && te.getTrip().getDeliveryDate().isAfter(deliveryDate)) {
+                        continue;
+                    }
                     LocalDateTime earliestAvailable = te.getReturnedToWarehouseAt().plusMinutes(30);
                     if (newDeparture.isBefore(earliestAvailable)) {
                         throw new BusinessException(ErrorCode.VEHICLE_CONFLICT,
-                                "Vehicle " + vehicle.getPlateNumber() + " returned to warehouse at "
+                                "Xe " + vehicle.getPlateNumber() + " về kho lúc "
                                         + te.getReturnedToWarehouseAt().format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy"))
-                                        + ". New departure at " + newDeparture.format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy"))
-                                        + " violates return window.",
+                                        + ". Giờ xuất phát dự kiến " + newDeparture.format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy"))
+                                        + " vi phạm thời gian giãn cách sau khi về kho (cần tối thiểu 30 phút).",
                                 HttpStatus.CONFLICT);
                     }
                 }
@@ -1336,13 +1384,16 @@ public class TripServiceImpl implements TripService {
             List<TripExecution> driverHistory = tripExecutionRepository.findByDriverId(driver.getId());
             for (TripExecution te : driverHistory) {
                 if (te.getReturnedToWarehouseAt() != null) {
+                    if (te.getTrip() != null && te.getTrip().getDeliveryDate() != null && te.getTrip().getDeliveryDate().isAfter(deliveryDate)) {
+                        continue;
+                    }
                     LocalDateTime earliestAvailable = te.getReturnedToWarehouseAt().plusMinutes(30);
                     if (newDeparture.isBefore(earliestAvailable)) {
                         throw new BusinessException(ErrorCode.DRIVER_CONFLICT,
-                                "Driver " + driver.getFullName() + " returned to warehouse at "
+                                "Tài xế " + driver.getFullName() + " về kho lúc "
                                         + te.getReturnedToWarehouseAt().format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy"))
-                                        + ". New departure at " + newDeparture.format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy"))
-                                        + " violates return window.",
+                                        + ". Giờ xuất phát dự kiến " + newDeparture.format(DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy"))
+                                        + " vi phạm thời gian giãn cách sau khi về kho (cần tối thiểu 30 phút).",
                                 HttpStatus.CONFLICT);
                     }
                 }

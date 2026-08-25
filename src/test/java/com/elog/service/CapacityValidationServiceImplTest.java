@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -98,6 +99,7 @@ class CapacityValidationServiceImplTest {
                 .vehicleType("1.25 TONS")
                 .maxVolumeM3(BigDecimal.valueOf(10.0))
                 .payloadKg(BigDecimal.valueOf(3000.0))
+                .status(VehicleStatus.AVAILABLE)
                 .isActive(true)
                 .build();
     }
@@ -221,6 +223,36 @@ class CapacityValidationServiceImplTest {
 
         verify(recommendationService).isTwoVehicleFeasible(1L);
         verify(tripDraftRepo).save(testDraft);
+    }
+
+    @Test
+    void validate_excludesMaintenanceVehicles_butKeepsInUseVehicles() {
+        // Regression fix: CapacityValidation now uses per-date availability logic.
+        // MAINTENANCE vehicles are truly non-operational → always excluded.
+        // IN_USE vehicles are kept → they may only be busy on a different date.
+        Vehicle maintenanceVehicle = Vehicle.builder()
+                .id(2L).plateNumber("34X-MAINT").vehicleType("TRUCK")
+                .maxVolumeM3(BigDecimal.valueOf(20.0)).payloadKg(BigDecimal.valueOf(5000.0))
+                .status(VehicleStatus.MAINTENANCE).isActive(true).build();
+
+        Vehicle inUseVehicle = Vehicle.builder()
+                .id(3L).plateNumber("34X-INUSE").vehicleType("TRUCK")
+                .maxVolumeM3(BigDecimal.valueOf(15.0)).payloadKg(BigDecimal.valueOf(4000.0))
+                .status(VehicleStatus.IN_USE).isActive(true).build();
+
+        when(tripDraftRepo.findById(1L)).thenReturn(Optional.of(testDraft));
+        when(vehicleRepo.findByIsActiveTrue())
+                .thenReturn(List.of(testVehicle, maintenanceVehicle, inUseVehicle));
+        when(userRepo.findByUsername("dispatcher")).thenReturn(Optional.of(testUser));
+        when(orderRepository.findByTripDraftId(1L)).thenReturn(Collections.emptyList());
+
+        CapacityValidationResultResponse response = capacityValidationService.validate(1L, "dispatcher");
+
+        // testVehicle (AVAILABLE) and inUseVehicle (IN_USE) should both be eligible
+        // maintenanceVehicle (MAINTENANCE) should be filtered out by stream filter
+        assertThat(response.getEligibleVehicles()).extracting("vehicleId").containsExactlyInAnyOrder(1L, 3L);
+        assertThat(response.getEligibleVehicles()).extracting("plateNumber")
+                .doesNotContain("34X-MAINT");
     }
 
     @Test
